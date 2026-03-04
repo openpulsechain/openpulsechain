@@ -1,11 +1,11 @@
--- Title:       PulseChain Bridge — Daily Flows v4
--- Description: Daily deposit/withdrawal volume with cumulative net flow (decoded tables)
+-- Title:       PulseChain Bridge — Monthly Flows
+-- Description: Monthly bridge volume with 3-month moving average
 -- Chain:       ethereum
 -- Contracts:   0x1715a3e4a142d8b698131108995174f37aeba10d (OmniBridge)
--- Output:      day, deposits_usd, withdrawals_usd, net_flow_usd, cumulative_net_flow_usd
+-- Output:      month, deposits_usd, withdrawals_usd, total_volume_usd, net_flow_usd, ma_3m_volume_usd, tx_count
 -- Author:      @evasentience
--- Dune ID:     6776544
--- Source:      Decoded OmniBridge events (tokensbridginginitiated + tokensbridged)
+-- Dune ID:     6776545
+-- Source:      Decoded OmniBridge events
 
 WITH bridge_events AS (
     SELECT
@@ -44,21 +44,25 @@ priced AS (
           * COALESCE(p.price, 0) <= 50000000
 ),
 
-daily AS (
+monthly AS (
     SELECT
-        evt_block_date AS day,
+        DATE_TRUNC('month', evt_block_date) AS month,
         SUM(CASE WHEN direction = 'deposit' THEN usd_value ELSE 0 END) AS deposits_usd,
         SUM(CASE WHEN direction = 'withdrawal' THEN usd_value ELSE 0 END) AS withdrawals_usd,
-        SUM(CASE WHEN direction = 'deposit' THEN usd_value ELSE -usd_value END) AS net_flow_usd
+        SUM(usd_value) AS total_volume_usd,
+        SUM(CASE WHEN direction = 'deposit' THEN usd_value ELSE -usd_value END) AS net_flow_usd,
+        COUNT(*) AS tx_count
     FROM priced
-    GROUP BY evt_block_date
+    GROUP BY DATE_TRUNC('month', evt_block_date)
 )
 
 SELECT
-    day,
+    month,
     deposits_usd,
     withdrawals_usd,
+    total_volume_usd,
     net_flow_usd,
-    SUM(net_flow_usd) OVER (ORDER BY day ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_net_flow_usd
-FROM daily
-ORDER BY day
+    AVG(total_volume_usd) OVER (ORDER BY month ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS ma_3m_volume_usd,
+    tx_count
+FROM monthly
+ORDER BY month
