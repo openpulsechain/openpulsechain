@@ -11,7 +11,7 @@ export function Header({ activePage, onNavigate }: HeaderProps) {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           <Activity className="h-6 w-6 text-emerald-400" />
-          <span className="text-lg font-bold text-white">PulseChain Analytics</span>
+          <span className="text-lg font-bold text-white">OpenPulse</span>
         </div>
 
         <nav className="flex items-center gap-1">

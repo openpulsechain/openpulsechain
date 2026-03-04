@@ -2,7 +2,7 @@ export function Footer() {
   return (
     <footer className="border-t border-gray-800 py-6 text-center text-sm text-gray-500">
       <p>
-        PulseChain Analytics — Open-source, community-driven.{' '}
+        OpenPulse — Open-source PulseChain analytics.{' '}
         <a
           href="https://github.com/eva-sentience/pulsechain-analytics"
           target="_blank"
