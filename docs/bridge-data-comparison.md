@@ -13,10 +13,13 @@ Different analytics platforms report vastly different numbers for the PulseChain
 | Platform | Headline Number | What It Measures |
 |----------|----------------|------------------|
 | **Our Dune Dashboard** | ~$8.2B | Total historical volume (all deposits + withdrawals, priced at time of transfer) |
+| **Dune @dereek69** | Partial | Hourly deposits/withdrawals for 8 hardcoded tokens only |
 | **DefiLlama** | ~$72M | TVL — current token balance locked in the bridge contract |
 | **GoPulse** | ~$70M | Tokens currently bridged via **Hyperlane only** (not OmniBridge) |
 | **AlphaGrowth** | ~$55M | TVL snapshot |
 | **PulseChainStats** | Dynamic | TVL + flows for OmniBridge + Hyperlane + Coast |
+| **PLSFolio** | N/A | Network stats and portfolio tracking — no bridge volume data |
+| **PulseCoinList** | N/A | Market stats (supply, gas, burn) — no bridge analytics |
 
 **These numbers are not contradictory.** They measure fundamentally different things. This document explains why.
 
@@ -152,6 +155,66 @@ PulseChain has three active bridges, each tracked by different platforms:
 
 **Why different:** Covers all three bridges but focuses on TVL and flow direction, not cumulative volume. Data not publicly accessible via API.
 
+### 6. Dune — @dereek69 Dashboard (existing competitor)
+
+**URL:** [dune.com/dereek69/pulsechain-bridge](https://dune.com/dereek69/pulsechain-bridge)
+
+**Data source:** Raw `ethereum.logs` filtered by OmniBridge topic hashes (not decoded tables)
+
+**Query ID:** [2484728](https://dune.com/queries/2484728) (65 versions)
+
+**Methodology:**
+- Parses raw log events using topic0 matching for `TokensBridgingInitiated` and `TokensBridged`
+- Hardcodes **8 tokens only**: WETH, HEX, DAI, USDC, USDT, WBTC, HDRN, PLSB
+- Prices from `prices.usd` (minute-level), averaged hourly
+- Separate CTEs for each token's deposits and withdrawals (16 CTEs)
+- No price sanitization cap
+- No partition pruning optimization
+
+**Key differences vs our dashboard:**
+
+| Factor | @dereek69 | Our Dashboard |
+|--------|-----------|---------------|
+| **Data source** | Raw `ethereum.logs` + topic parsing | Decoded event tables |
+| **Token coverage** | 8 hardcoded tokens | All 731+ tokens (dynamic) |
+| **WBTC decimals** | `POWER(10,18)` (incorrect — WBTC has 8 decimals) | `tokens.erc20` (correct) |
+| **Price source** | `prices.usd` (minute, hourly avg) | `prices.day` (daily) |
+| **Price cap** | None | $50M per transfer |
+| **User analytics** | None | Top 100 users, weekly active bridgers |
+| **Transfer analysis** | None | Size distribution (5 buckets) |
+| **Partition pruning** | None | `evt_block_date >= DATE '2023-05-10'` |
+| **Credit efficiency** | Higher (raw logs + no pruning) | ~13 credits for 9 queries |
+
+**Notable issue:** The WBTC decimal error (`POWER(10,18)` instead of `POWER(10,8)`) means WBTC amounts are divided by 10^10 too much, effectively zeroing out WBTC volume in their dashboard.
+
+### 7. PLSFolio
+
+**URL:** [plsfolio.com/statistics](https://plsfolio.com/statistics/)
+
+**Data source:** PulseChain RPC and DEX data
+
+**Focus:** Network statistics and portfolio tracking (wallet balances, token performance, market stats). Non-custodial, read-only design.
+
+**Bridge data:** None. PLSFolio does not track bridge activity, TVL, or cross-chain flows.
+
+### 8. PulseCoinList
+
+**URL:** [pulsecoinlist.com/stats](https://pulsecoinlist.com/stats)
+
+**Data source:** PulseChain RPC and CoinGecko
+
+**Metrics:**
+| Metric | Value |
+|--------|-------|
+| PLS Market Cap | $1.28B |
+| PLS Holders | 425M |
+| Total Cryptos | 136,100 tokens |
+| Total PulseChain Market Cap | $28.38B |
+| Total Liquidity | $470.9M |
+| 24h DEX Volume | $13.58M |
+
+**Bridge data:** None directly. Links to @dereek69's Dune dashboard as external resource. Provides ecosystem-level stats (supply, gas, burn) but no bridge volume or TVL.
+
 ---
 
 ## Cross-Validation: Our TVL Estimate vs DefiLlama
@@ -209,22 +272,25 @@ A ratio of 127.5x means the bridge has processed 127 times more value than what 
 
 ---
 
-## Metrics Only Available on Our Dashboard
+## Metrics Comparison Matrix
 
-| Metric | Our Dashboard | DefiLlama | GoPulse | PulseChainStats |
-|--------|:---:|:---:|:---:|:---:|
-| Total historical volume | **Yes** | No | No | No |
-| Total transaction count | **Yes** | No | No | Partial |
-| Unique user count | **Yes** | No | No | No |
-| Transfer size distribution | **Yes** | No | No | No |
-| Top 100 user profiles | **Yes** | No | No | No |
-| Weekly active bridgers | **Yes** | No | No | No |
-| Monthly flows + MA | **Yes** | No | No | Partial |
-| Token breakdown (50 tokens) | **Yes** | Partial | 7 tokens | Top 5 |
-| TVL | **Yes** (computed) | Yes | Yes | Yes |
-| Hyperlane data | No | No | **Yes** | **Yes** |
-| Coast (CST) data | No | No | No | **Yes** |
-| Open-source SQL | **Yes** | No | No | No |
+| Metric | Our Dashboard | Dune @dereek69 | DefiLlama | GoPulse | PulseChainStats | PLSFolio | PulseCoinList |
+|--------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Total historical volume | **Yes** | Partial (8 tokens) | No | No | No | No | No |
+| Total transaction count | **Yes** | No | No | No | Partial | No | No |
+| Unique user count | **Yes** | No | No | No | No | No | No |
+| Transfer size distribution | **Yes** | No | No | No | No | No | No |
+| Top 100 user profiles | **Yes** | No | No | No | No | No | No |
+| Weekly active bridgers | **Yes** | No | No | No | No | No | No |
+| Monthly flows + MA | **Yes** | No | No | No | Partial | No | No |
+| Token breakdown (50+ tokens) | **Yes** | 8 tokens | Partial | 7 tokens | Top 5 | No | No |
+| TVL | **Yes** (computed) | No | **Yes** | Yes | **Yes** | No | No |
+| Volume-to-TVL ratio | **Yes** | No | No | No | No | No | No |
+| Hyperlane data | No | No | No | **Yes** | **Yes** | No | No |
+| Coast (CST) data | No | No | No | No | **Yes** | No | No |
+| Network stats (gas, burn) | No | No | No | No | No | Partial | **Yes** |
+| Portfolio tracking | No | No | No | No | No | **Yes** | No |
+| Open-source SQL | **Yes** | Yes | No | No | No | No | No |
 
 ---
 
@@ -243,17 +309,27 @@ A ratio of 127.5x means the bridge has processed 127 times more value than what 
 
 ## Conclusion
 
-Our Dune dashboard provides **the most comprehensive historical analysis** of PulseChain bridge activity available anywhere. While platforms like DefiLlama and GoPulse focus on TVL snapshots, our queries reveal the full picture: $8.18B in cumulative bridge volume across 949K transactions from 146K unique users since May 2023.
+Across **8 platforms analyzed**, our Dune dashboard provides **the most comprehensive historical analysis** of PulseChain bridge activity:
 
-The apparent discrepancy between our $8.18B and DefiLlama's $72M is not an error — it's the difference between measuring **flow** (everything that moved through the pipe) and **stock** (what's currently sitting in the pipe). Both are valid and complementary metrics.
+- **vs DefiLlama/GoPulse/AlphaGrowth:** They show TVL snapshots (~$55-72M); we show the full $8.18B in cumulative volume that produced that TVL.
+- **vs @dereek69 (existing Dune dashboard):** They track 8 hardcoded tokens with a WBTC decimal bug; we dynamically cover 731+ tokens with correct pricing and add user analytics, transfer distributions, and TVL validation.
+- **vs PulseChainStats:** They cover all 3 bridges (OmniBridge + Hyperlane + Coast) with TVL focus; we provide deeper OmniBridge analysis with historical volume and user behavior.
+- **vs PLSFolio/PulseCoinList:** They focus on network-level stats (gas, supply, portfolios); neither provides bridge analytics.
+
+The apparent discrepancy between our $8.18B and DefiLlama's $72M is not an error — it's the difference between measuring **flow** (everything that moved through the pipe) and **stock** (what's currently sitting in the pipe). Our TVL validation query confirms alignment: $64.2M computed vs $72.5M DefiLlama (~11% delta, fully explained).
+
+No other platform provides total historical volume, transfer size distribution, top user profiles, or weekly active bridger trends for the PulseChain OmniBridge.
 
 ---
 
 ## References
 
-- [Our Dashboard](https://dune.com/evasentience/pulsechain-bridge-analytics)
+- [Our Dashboard — @evasentience](https://dune.com/evasentience/pulsechain-bridge-analytics)
+- [Dune Dashboard — @dereek69](https://dune.com/dereek69/pulsechain-bridge) (query [#2484728](https://dune.com/queries/2484728))
 - [DefiLlama — PulseChain Bridge](https://defillama.com/protocol/pulsechain-bridge)
 - [GoPulse Bridge](https://gopulse.com/bridge)
 - [AlphaGrowth — PulseChain Bridge](https://alphagrowth.io/pulsechain-bridge)
 - [PulseChainStats Bridge Stats](https://www.pulsechainstats.com/bridge-stats)
+- [PLSFolio Statistics](https://plsfolio.com/statistics/)
+- [PulseCoinList Stats](https://pulsecoinlist.com/stats)
 - [OmniBridge Contract (Etherscan)](https://etherscan.io/address/0x1715a3e4a142d8b698131108995174f37aeba10d)
