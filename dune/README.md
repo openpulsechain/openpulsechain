@@ -41,8 +41,12 @@ Queries use the decoded event tables from the PulseChain OmniBridge contract on 
 | `bridge_transfer_size_distribution.sql` | Transfer count and volume by size bracket | 5 buckets | [6776548](https://dune.com/queries/6776548) | ~3 |
 | `bridge_weekly_active_users.sql` | Weekly unique bridgers over time | Time series | [6776549](https://dune.com/queries/6776549) | ~0.1 |
 | `bridge_top_users.sql` | Top 100 bridge users by total USD volume | Table | [6776550](https://dune.com/queries/6776550) | ~2 |
+| `bridge_tvl_validation.sql` | TVL by token (current prices) — cross-validates against DefiLlama | Table (top 50) | [6776740](https://dune.com/queries/6776740) | ~0.1 |
+| `bridge_volume_vs_tvl.sql` | Volume vs TVL summary with ratio — explains cross-platform differences | Single row | [6776741](https://dune.com/queries/6776741) | ~3 |
 
-**Total: ~10 credits for all 7 queries** (Dune free tier: 2,500 credits/month)
+**Total: ~13 credits for all 9 queries** (Dune free tier: 2,500 credits/month)
+
+> **Why do different platforms show different numbers?** See [`docs/bridge-data-comparison.md`](../docs/bridge-data-comparison.md) for a detailed cross-platform comparison explaining why our $8.18B volume differs from DefiLlama's $72M TVL.
 
 ---
 
@@ -74,6 +78,12 @@ Each `.sql` file includes a comment header with:
 ---
 
 ## Version History
+
+### v5 (March 2026) — Cross-Platform Validation
+- Added TVL validation query: computes estimated TVL from OmniBridge events ($64.2M vs DefiLlama's $72M — ~11% delta, fully explained)
+- Added Volume vs TVL summary query: shows volume-to-TVL ratio of 127.5x
+- Published cross-platform comparison study ([`docs/bridge-data-comparison.md`](../docs/bridge-data-comparison.md))
+- 7 new visualizations: TVL counter, Volume-to-TVL ratio, deposits/withdrawals counters, TVL pie chart, TVL token table, unique tokens counter
 
 ### v4 (March 2026) — Decoded Tables Migration
 - Migrated all queries from `erc20_ethereum.evt_Transfer` to decoded OmniBridge event tables
