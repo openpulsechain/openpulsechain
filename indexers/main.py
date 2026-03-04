@@ -1,0 +1,78 @@
+"""PulseChain Analytics — Main indexer orchestrator.
+
+Runs all indexers sequentially. Designed to be called by Railway cron every 15 minutes.
+"""
+
+import logging
+import sys
+import time
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("main")
+
+
+def run_indexer(name, module):
+    """Run a single indexer with error handling."""
+    try:
+        start = time.time()
+        module.run()
+        elapsed = time.time() - start
+        logger.info(f"  {name} completed in {elapsed:.1f}s")
+        return True
+    except Exception as e:
+        logger.error(f"  {name} FAILED: {e}")
+        return False
+
+
+def main():
+    logger.info("=" * 60)
+    logger.info("PulseChain Analytics — Indexer Run")
+    logger.info("=" * 60)
+
+    start_total = time.time()
+
+    from indexers import bridge_subgraph
+    from indexers import bridge_aggregator
+    from indexers import network_tvl
+    from indexers import network_dex_volume
+    from indexers import token_prices
+    from indexers import network_snapshot
+
+    indexers = [
+        ("bridge_subgraph", bridge_subgraph),
+        ("bridge_aggregator", bridge_aggregator),
+        ("network_tvl", network_tvl),
+        ("network_dex_volume", network_dex_volume),
+        ("token_prices", token_prices),
+        ("network_snapshot", network_snapshot),
+    ]
+
+    results = {}
+    for name, module in indexers:
+        logger.info(f"Running {name}...")
+        results[name] = run_indexer(name, module)
+
+    elapsed_total = time.time() - start_total
+
+    # Summary
+    success = sum(1 for v in results.values() if v)
+    failed = sum(1 for v in results.values() if not v)
+
+    logger.info("=" * 60)
+    logger.info(f"All indexers completed in {elapsed_total:.1f}s — {success} OK, {failed} failed")
+
+    if failed:
+        for name, ok in results.items():
+            if not ok:
+                logger.error(f"  FAILED: {name}")
+        sys.exit(1)
+
+    logger.info("All indexers completed successfully")
+
+
+if __name__ == "__main__":
+    main()
