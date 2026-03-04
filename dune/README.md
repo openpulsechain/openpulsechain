@@ -19,7 +19,9 @@ PulseChain is not natively indexed by Dune Analytics as of March 2026. All queri
 
 - **Deposits** (Ethereum to PulseChain): ERC20 `Transfer` events where `to` is a bridge contract address. Tokens are locked on Ethereum and minted on PulseChain.
 - **Withdrawals** (PulseChain to Ethereum): ERC20 `Transfer` events where `from` is a bridge contract address. Tokens are released on Ethereum after being burned on PulseChain.
-- **USD valuation**: Daily average price from `prices.usd` joined on token contract address.
+- **USD valuation**: Daily price from `prices.day` (curated Dune table) joined on token contract address.
+- **Price sanitization**: Per-transfer USD cap of $50M to filter out tokens with manipulated/inflated prices from low-liquidity sources.
+- **Partition pruning**: All queries filter on `evt_block_date` (physical partition column) for optimal performance.
 
 ---
 
@@ -29,7 +31,15 @@ PulseChain is not natively indexed by Dune Analytics as of March 2026. All queri
 |------|-------------|--------|
 | `bridge_daily_flows.sql` | Daily deposit and withdrawal volume in USD with cumulative net flow | Time series: day, deposits, withdrawals, net flow |
 | `bridge_token_breakdown.sql` | Aggregate bridge volume by token, ranked by total volume | Table: token, deposits, withdrawals, net flow, tx count |
-| `bridge_top_users.sql` | Top 100 bridge users by total USD volume | Table: address, deposits, withdrawals, net flow, activity dates |
+| `bridge_top_users.sql` | Top 100 bridge users by total USD volume (excludes bridge contracts) | Table: address, deposits, withdrawals, net flow, activity dates |
+
+### Dune Query IDs
+
+| Query | Dune ID | Credits |
+|-------|---------|---------|
+| Daily Flows | [6775936](https://dune.com/queries/6775936) | ~10 |
+| Token Breakdown | [6775937](https://dune.com/queries/6775937) | ~7 |
+| Top Users | [6775939](https://dune.com/queries/6775939) | ~8 |
 
 ---
 
@@ -38,7 +48,7 @@ PulseChain is not natively indexed by Dune Analytics as of March 2026. All queri
 1. Sign in to [dune.com](https://dune.com) (free tier is sufficient).
 2. Create a new query.
 3. Copy the contents of the desired `.sql` file into the query editor.
-4. Execute. The queries use DuneSQL syntax and target the `erc20_ethereum.evt_Transfer`, `tokens.erc20`, and `prices.usd` tables.
+4. Execute. The queries use DuneSQL syntax and target `erc20_ethereum.evt_Transfer`, `tokens.erc20`, and `prices.day` tables.
 5. Add visualizations (bar chart for daily flows, table for token breakdown, etc.).
 
 ---
@@ -61,10 +71,11 @@ Each `.sql` file includes a comment header with:
 
 ## Limitations
 
-- These queries only capture **Ethereum-side** bridge activity. PulseChain-native transactions are not visible.
+- These queries only capture **Ethereum-side** bridge activity. PulseChain-native transactions are not visible until PulseChain is natively indexed on Dune.
 - Native ETH transfers to the WETH router are tracked via the WETH wrapping event, not raw ETH transfers.
-- Tokens without entries in `prices.usd` will show a USD value of 0.
-- The `prices.usd` subquery aggregates daily averages, which may differ slightly from spot prices at transaction time.
+- Tokens without entries in `prices.day` will show a USD value of 0.
+- Transfers exceeding $50M USD per transaction are filtered out to exclude tokens with manipulated prices from low-liquidity sources.
+- The `0x000...000` address (token mint/burn) appears in top users as it receives burned bridged tokens.
 
 ---
 
