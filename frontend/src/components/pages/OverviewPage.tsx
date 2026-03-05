@@ -1,9 +1,20 @@
+import { useMemo } from 'react'
 import { DollarSign, TrendingUp, Fuel, Box } from 'lucide-react'
 import { KpiCard } from '../cards/KpiCard'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
 import { useNetworkTvl, useNetworkDexVolume, useTokenPrices, useNetworkSnapshot } from '../../hooks/useSupabase'
 import { formatUsd, formatNumber, formatGwei } from '../../lib/format'
+
+// Standard gas limits for common operations on PulseChain
+const GAS_ESTIMATES = [
+  { label: 'PLS Send', gasLimit: 21000 },
+  { label: 'Token Transfer', gasLimit: 65000 },
+  { label: 'Token Approval', gasLimit: 46000 },
+  { label: 'DEX Swap', gasLimit: 200000 },
+  { label: 'Add Liquidity', gasLimit: 300000 },
+  { label: 'Bridge Transfer', gasLimit: 250000 },
+]
 
 export function OverviewPage() {
   const tvl = useNetworkTvl()
@@ -14,6 +25,17 @@ export function OverviewPage() {
   const latestTvl = tvl.data.length > 0 ? tvl.data[tvl.data.length - 1] : null
   const latestSnapshot = snapshot.data.length > 0 ? snapshot.data[0] : null
   const plsPrice = prices.data.find((p) => p.symbol === 'PLS')
+
+  // Gas estimates computed from gas price + PLS price
+  const gasEstimates = useMemo(() => {
+    if (!latestSnapshot || !plsPrice?.price_usd) return null
+    const gasPriceGwei = latestSnapshot.gas_price_gwei
+    return GAS_ESTIMATES.map((e) => {
+      const costPls = (gasPriceGwei * e.gasLimit) / 1e9
+      const costUsd = costPls * plsPrice.price_usd!
+      return { ...e, costPls, costUsd }
+    })
+  }, [latestSnapshot, plsPrice])
 
   // Last 180 days for charts
   const tvlRecent = tvl.data.slice(-180)
@@ -81,6 +103,32 @@ export function OverviewPage() {
           <p className="py-12 text-center text-gray-500">No DEX volume data available</p>
         )}
       </div>
+
+      {/* Gas Estimates */}
+      {gasEstimates && (
+        <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Fuel className="h-5 w-5 text-[#00D4FF]" />
+            <h2 className="text-lg font-semibold text-white">Gas Estimates</h2>
+            <span className="text-xs text-gray-500">@ {formatGwei(latestSnapshot!.gas_price_gwei)} Gwei</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {gasEstimates.map((e) => (
+              <div key={e.label} className="rounded-lg bg-white/5 p-3">
+                <div className="text-xs text-gray-400 mb-1">{e.label}</div>
+                <div className="text-sm font-medium text-white">
+                  {e.costPls < 1
+                    ? e.costPls.toFixed(4)
+                    : e.costPls.toLocaleString('en-US', { maximumFractionDigits: 1 })} PLS
+                </div>
+                <div className="text-xs text-gray-500">
+                  ${e.costUsd < 0.01 ? e.costUsd.toFixed(6) : e.costUsd.toFixed(4)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Token Prices Table */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">

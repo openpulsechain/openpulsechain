@@ -22,22 +22,9 @@ DEFILLAMA_DEX_VOLUME = "https://api.llama.fi/overview/dexs/PulseChain"
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 COINGECKO_API_KEY = os.environ.get("COINGECKO_API_KEY", "")
 
-# Tokens to track prices for (CoinGecko IDs)
-TRACKED_TOKENS = {
-    "pulsechain": {"symbol": "PLS", "name": "PulseChain"},
-    "hex": {"symbol": "HEX", "name": "HEX"},
-    "pulsex": {"symbol": "PLSX", "name": "PulseX"},
-    "dai": {"symbol": "DAI", "name": "Dai"},
-    "usd-coin": {"symbol": "USDC", "name": "USD Coin"},
-    "tether": {"symbol": "USDT", "name": "Tether"},
-    "weth": {"symbol": "WETH", "name": "Wrapped Ether"},
-    "wrapped-bitcoin": {"symbol": "WBTC", "name": "Wrapped Bitcoin"},
-    "ethereum": {"symbol": "ETH", "name": "Ethereum"},
-    "bitcoin": {"symbol": "BTC", "name": "Bitcoin"},
-    "hedron": {"symbol": "HDRN", "name": "Hedron"},
-    "icosa": {"symbol": "ICSA", "name": "Icosa"},
-    "9inch": {"symbol": "9INCH", "name": "9inch"},
-}
+# Token lists are now defined in indexers/token_prices.py
+# PulseChain tokens: GeckoTerminal (same pools as EvaInvest)
+# Major tokens (BTC, ETH, stables): CoinGecko
 
 # Subgraph page size
 SUBGRAPH_PAGE_SIZE = 1000

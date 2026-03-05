@@ -9,6 +9,7 @@ import type {
   TokenPrice,
   NetworkSnapshot,
   PulsexDailyStats,
+  PulsexTopPair,
 } from '../types'
 
 function useQuery<T>(table: string, options?: {
@@ -103,6 +104,14 @@ export function usePulsexDailyStats() {
   return useQuery<PulsexDailyStats>('pulsex_daily_stats', {
     orderBy: 'date',
     ascending: true,
+  })
+}
+
+export function usePulsexTopPairs() {
+  return useQuery<PulsexTopPair>('pulsex_top_pairs', {
+    orderBy: 'volume_usd',
+    ascending: false,
+    limit: 30,
   })
 }
 

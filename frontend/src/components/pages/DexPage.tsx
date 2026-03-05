@@ -4,11 +4,12 @@ import { KpiCard } from '../cards/KpiCard'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { BarChartComponent } from '../charts/BarChart'
 import { Spinner } from '../ui/Spinner'
-import { usePulsexDailyStats } from '../../hooks/useSupabase'
+import { usePulsexDailyStats, usePulsexTopPairs } from '../../hooks/useSupabase'
 import { formatUsd, formatNumber } from '../../lib/format'
 
 export function DexPage() {
   const pulsex = usePulsexDailyStats()
+  const topPairs = usePulsexTopPairs()
 
   const latest = pulsex.data.length > 0 ? pulsex.data[pulsex.data.length - 1] : null
 
@@ -110,6 +111,41 @@ export function DexPage() {
           <p className="py-12 text-center text-gray-500">No volume data available</p>
         )}
       </div>
+
+      {/* Top Pairs */}
+      {topPairs.data.length > 0 && (
+        <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
+          <h2 className="mb-4 text-lg font-semibold text-white">Top Pairs by Volume</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-gray-400">
+                  <th className="py-3 pr-4">#</th>
+                  <th className="py-3 pr-4">Pair</th>
+                  <th className="py-3 pr-4 text-right">Volume (All Time)</th>
+                  <th className="py-3 pr-4 text-right">Liquidity</th>
+                  <th className="py-3 text-right">Transactions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topPairs.data.map((pair, i) => (
+                  <tr key={pair.pair_address} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="py-2.5 pr-4 text-gray-500">{i + 1}</td>
+                    <td className="py-2.5 pr-4">
+                      <span className="font-medium text-white">{pair.token0_symbol}</span>
+                      <span className="text-gray-500"> / </span>
+                      <span className="text-gray-300">{pair.token1_symbol}</span>
+                    </td>
+                    <td className="py-2.5 pr-4 text-right text-gray-300">{formatUsd(pair.volume_usd)}</td>
+                    <td className="py-2.5 pr-4 text-right text-gray-300">{formatUsd(pair.reserve_usd)}</td>
+                    <td className="py-2.5 text-right text-gray-400">{formatNumber(pair.total_transactions)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

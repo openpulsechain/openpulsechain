@@ -42,6 +42,7 @@ def main():
     from indexers import token_prices
     from indexers import network_snapshot
     from indexers import pulsex_stats
+    from indexers import pulsex_pairs
 
     indexers = [
         ("bridge_subgraph", bridge_subgraph),
@@ -51,6 +52,7 @@ def main():
         ("token_prices", token_prices),
         ("network_snapshot", network_snapshot),
         ("pulsex_stats", pulsex_stats),
+        ("pulsex_pairs", pulsex_pairs),
     ]
 
     results = {}

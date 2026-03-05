@@ -70,3 +70,14 @@ export interface PulsexDailyStats {
   total_volume_usd: number
   total_transactions: number
 }
+
+export interface PulsexTopPair {
+  pair_address: string
+  token0_symbol: string
+  token0_name: string
+  token1_symbol: string
+  token1_name: string
+  volume_usd: number
+  reserve_usd: number
+  total_transactions: number
+}
