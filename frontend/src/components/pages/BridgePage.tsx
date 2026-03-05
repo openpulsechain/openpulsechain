@@ -3,10 +3,8 @@ import { ArrowDownUp, Coins, Hash, DollarSign, Globe } from 'lucide-react'
 
 function WhaleIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 13c0-4.4 3.6-8 8-8 3.3 0 6.2 2 7.4 5h2.6l-2 3 2 3h-3c-1.5 2.4-4.2 4-7 4-4.4 0-8-3.1-8-7z" />
-      <circle cx="10" cy="12" r="1" fill="currentColor" />
-      <path d="M2 17c1-1 2-4.5 2-4.5" />
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20.5 10.5c-.6-1.2-1.8-2.5-3.5-3.2C15.8 6.5 14 6 12 6c-3.5 0-6.5 1.5-8 4-.8 1.3-1 2.7-.8 4 .3 1.5 1.2 2.8 2.5 3.5 1 .6 2.2.8 3.3.5.8-.2 1.5-.7 2-1.3.3-.4.8-.4 1.1 0 .5.6 1.2 1.1 2 1.3 1.1.3 2.3.1 3.3-.5 1.3-.7 2.2-2 2.5-3.5.1-.5.1-1 0-1.5l1.6-1c.3-.2.3-.6.1-.8l-1.6-1.2zM8.5 13a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM3 11.5c-.3-.5-.3-1.2 0-1.8l-.8-1c-.2-.2-.5-.1-.6.1-.5.9-.6 2-.2 3 .1.2.4.3.6.1l1-.4z" />
     </svg>
   )
 }
@@ -45,6 +43,26 @@ const EXPLORER_URLS: Record<number, { name: string; url: string }> = {
   8453: { name: 'BASE', url: 'https://basescan.org/tx/' },
   42161: { name: 'ARB', url: 'https://arbiscan.io/tx/' },
   43114: { name: 'AVAX', url: 'https://subnets.avax.network/c-chain/tx/' },
+}
+
+const CHAIN_ABBREV: Record<string, string> = {
+  ethereum: 'ETH',
+  optimism: 'OP',
+  bsc: 'BSC',
+  gnosis: 'GNO',
+  unichain: 'UNI',
+  polygon: 'POLY',
+  fantom: 'FTM',
+  pulsechain: 'PLS',
+  sei: 'SEI',
+  base: 'BASE',
+  arbitrum: 'ARB',
+  avalanche: 'AVAX',
+}
+
+function chainLabel(name: string | null): string {
+  if (!name) return '?'
+  return CHAIN_ABBREV[name.toLowerCase()] || name.toUpperCase()
 }
 
 const BRIDGE_TABS = [
@@ -209,8 +227,8 @@ export function BridgePage() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       tx.direction === 'inbound' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
                     }`}>{tx.direction === 'inbound'
-                      ? `${(tx.origin_chain_name || '?').toUpperCase()} → PLS`
-                      : `PLS → ${(tx.destination_chain_name || '?').toUpperCase()}`}</span>
+                      ? `${chainLabel(tx.origin_chain_name)} → PLS`
+                      : `PLS → ${chainLabel(tx.destination_chain_name)}`}</span>
                     <span className="text-lg font-bold text-white">{formatUsd(tx.amount_usd)}</span>
                     <span className="text-sm text-gray-400">{tx.token_symbol || '--'}</span>
                     <span className="font-mono text-xs text-gray-500">{shortenAddress(tx.origin_tx_sender || '')}</span>
@@ -377,8 +395,8 @@ export function BridgePage() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       tx.direction === 'inbound' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
                     }`}>{tx.direction === 'inbound'
-                      ? `${(tx.origin_chain_name || '?').toUpperCase()} → PLS`
-                      : `PLS → ${(tx.destination_chain_name || '?').toUpperCase()}`}</span>
+                      ? `${chainLabel(tx.origin_chain_name)} → PLS`
+                      : `PLS → ${chainLabel(tx.destination_chain_name)}`}</span>
                     <span className="text-lg font-bold text-white">{formatUsd(tx.amount_usd)}</span>
                     <span className="text-sm text-gray-400">{tx.token_symbol || '--'}</span>
                     <span className="font-mono text-xs text-gray-500">{shortenAddress(tx.origin_tx_sender || '')}</span>
@@ -462,8 +480,8 @@ export function BridgePage() {
                           tx.direction === 'inbound' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
                         }`}>
                           {tx.direction === 'inbound'
-                            ? `${(tx.origin_chain_name || '?').toUpperCase()} → PLS`
-                            : `PLS → ${(tx.destination_chain_name || '?').toUpperCase()}`}
+                            ? `${chainLabel(tx.origin_chain_name)} → PLS`
+                            : `PLS → ${chainLabel(tx.destination_chain_name)}`}
                         </span>
                       </td>
                       <td className="py-2.5 pr-4 text-white">{tx.token_symbol || '--'}</td>

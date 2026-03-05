@@ -7,7 +7,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts'
-import { formatUsd, formatDateShort } from '../../lib/format'
+import { formatUsd, formatDateShort, formatDateFull } from '../../lib/format'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface AreaChartProps {
@@ -35,8 +35,9 @@ export function AreaChartComponent({ data, xKey, yKey, color = '#34d399', yForma
           dataKey={xKey}
           tickFormatter={formatDateShort}
           stroke="#6b7280"
-          tick={{ fontSize: 12 }}
-          interval="preserveStartEnd"
+          tick={{ fontSize: 11 }}
+          interval={Math.max(0, Math.ceil(data.length / 6) - 1)}
+          angle={0}
         />
         <YAxis
           tickFormatter={(v) => fmt(v)}
@@ -46,7 +47,7 @@ export function AreaChartComponent({ data, xKey, yKey, color = '#34d399', yForma
         />
         <Tooltip
           contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}
-          labelFormatter={(label) => formatDateShort(String(label))}
+          labelFormatter={(label) => formatDateFull(String(label))}
           formatter={(v: unknown) => [fmt(Number(v)), '']}
         />
         <Area

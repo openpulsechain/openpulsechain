@@ -19,7 +19,15 @@ export function formatDate(dateStr: string): string {
 
 export function formatDateShort(dateStr: string): string {
   const d = new Date(dateStr)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+}
+
+export function formatDateFull(dateStr: string): string {
+  const d = new Date(dateStr)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${mm}/${dd}/${yyyy}`
 }
 
 export function shortenAddress(addr: string): string {

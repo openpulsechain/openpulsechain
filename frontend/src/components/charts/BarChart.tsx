@@ -8,7 +8,7 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts'
-import { formatUsd, formatDateShort } from '../../lib/format'
+import { formatUsd, formatDateShort, formatDateFull } from '../../lib/format'
 
 interface BarChartProps {
   data: any[]
@@ -25,8 +25,9 @@ export function BarChartComponent({ data, xKey, bars }: BarChartProps) {
           dataKey={xKey}
           tickFormatter={formatDateShort}
           stroke="#6b7280"
-          tick={{ fontSize: 12 }}
-          interval="preserveStartEnd"
+          tick={{ fontSize: 11 }}
+          interval={Math.max(0, Math.ceil(data.length / 6) - 1)}
+          angle={0}
         />
         <YAxis
           tickFormatter={(v) => formatUsd(v)}
@@ -36,7 +37,7 @@ export function BarChartComponent({ data, xKey, bars }: BarChartProps) {
         />
         <Tooltip
           contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}
-          labelFormatter={(label) => formatDateShort(String(label))}
+          labelFormatter={(label) => formatDateFull(String(label))}
           formatter={(v: unknown) => [formatUsd(Number(v)), '']}
         />
         <Legend />
