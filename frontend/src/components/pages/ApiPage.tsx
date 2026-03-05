@@ -28,8 +28,8 @@ function CodeBlock({ code, className = '' }: { code: string; className?: string 
   )
 }
 
-const BASE_URL = 'https://xzxsdusvsrrzcbatpiap.supabase.co'
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6eHNkdXN2c3JyemNiYXRwaWFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MzA2OTgsImV4cCI6MjA4ODIwNjY5OH0.oi37EgNxTKSVNq3QD8jqlqum-E5bsJMnAvyoYp1brDg'
+const BASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 interface TableColumn {
   name: string
