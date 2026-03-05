@@ -55,7 +55,7 @@ PulseChain has three active bridges, each tracked by different platforms:
 
 ### 1. Our Dune Dashboard
 
-**URL:** [dune.com/evasentience/pulsechain-bridge-analytics](https://dune.com/evasentience/pulsechain-bridge-analytics)
+**URL:** [dune.com/openpulsechain/pulsechain-bridge-analytics](https://dune.com/openpulsechain/pulsechain-bridge-analytics)
 
 **Data source:** Decoded OmniBridge contract events on Ethereum mainnet
 - `TokensBridgingInitiated` — tokens locked on ETH, minted on PulseChain (deposit)
@@ -324,7 +324,7 @@ No other platform provides total historical volume, transfer size distribution, 
 
 ## References
 
-- [Our Dashboard — @evasentience](https://dune.com/evasentience/pulsechain-bridge-analytics)
+- [Our Dashboard — @openpulsechain](https://dune.com/openpulsechain/pulsechain-bridge-analytics)
 - [Dune Dashboard — @dereek69](https://dune.com/dereek69/pulsechain-bridge) (query [#2484728](https://dune.com/queries/2484728))
 - [DefiLlama — PulseChain Bridge](https://defillama.com/protocol/pulsechain-bridge)
 - [GoPulse Bridge](https://gopulse.com/bridge)

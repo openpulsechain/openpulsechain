@@ -467,7 +467,7 @@ export function ApiPage() {
       {/* Links */}
       <section className="flex flex-wrap gap-3 pb-6">
         <a
-          href="https://github.com/eva-sentience/pulsechain-analytics"
+          href="https://github.com/openpulsechain/openpulsechain"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"

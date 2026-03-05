@@ -4,7 +4,7 @@
 -- Chain:       ethereum
 -- Contracts:   0x1715a3e4a142d8b698131108995174f37aeba10d (OmniBridge)
 -- Output:      Section 1: TVL by token (current prices) | Section 2: Volume vs TVL summary
--- Author:      @evasentience
+-- Author:      @openpulsechain
 -- Source:      Decoded OmniBridge events + prices.day + tokens.erc20
 
 -- =============================================================================

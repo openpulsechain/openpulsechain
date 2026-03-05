@@ -34,7 +34,7 @@ export function Header({ activePage, onNavigate }: HeaderProps) {
             </button>
           ))}
           <a
-            href="https://github.com/eva-sentience/pulsechain-analytics"
+            href="https://github.com/openpulsechain/openpulsechain"
             target="_blank"
             rel="noopener noreferrer"
             className="ml-4 text-gray-400 hover:text-[#00D4FF] transition-colors"

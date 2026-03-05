@@ -100,7 +100,7 @@ All data sources used in this project are free and publicly accessible.
 ### Clone the repository
 
 ```bash
-git clone https://github.com/eva-sentience/pulsechain-analytics.git
+git clone https://github.com/openpulsechain/openpulsechain.git
 cd pulsechain-analytics
 ```
 
@@ -118,7 +118,7 @@ PulseChain is not natively indexed by Dune Analytics. The SQL queries in [`/dune
 
 These queries can be copied directly into the [Dune query editor](https://dune.com) and executed on the free tier.
 
-**Live dashboard:** [dune.com/evasentience/pulsechain-bridge-analytics](https://dune.com/evasentience/pulsechain-bridge-analytics)
+**Live dashboard:** [dune.com/openpulsechain/pulsechain-bridge-analytics](https://dune.com/openpulsechain/pulsechain-bridge-analytics)
 
 For a detailed comparison of our data against other platforms (DefiLlama, GoPulse, PulseChainStats), see [`docs/bridge-data-comparison.md`](docs/bridge-data-comparison.md).
 

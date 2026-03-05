@@ -4,7 +4,7 @@ export function Footer() {
       <p>
         OpenPulsechain — Open-source PulseChain analytics.{' '}
         <a
-          href="https://github.com/eva-sentience/pulsechain-analytics"
+          href="https://github.com/openpulsechain/openpulsechain"
           target="_blank"
           rel="noopener noreferrer"
           className="text-gray-400 hover:text-[#00D4FF] transition-colors"
@@ -13,7 +13,7 @@ export function Footer() {
         </a>
         {' | '}
         <a
-          href="https://dune.com/evasentience/pulsechain-bridge-analytics"
+          href="https://dune.com/openpulsechain/pulsechain-bridge-analytics"
           target="_blank"
           rel="noopener noreferrer"
           className="text-gray-400 hover:text-[#00D4FF] transition-colors"

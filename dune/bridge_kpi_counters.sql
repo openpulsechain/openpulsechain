@@ -3,7 +3,7 @@
 -- Chain:       ethereum
 -- Contracts:   0x1715a3e4a142d8b698131108995174f37aeba10d (OmniBridge)
 -- Output:      total_volume_usd, total_txs, unique_users, volume_30d_usd, avg_tx_size_usd
--- Author:      @evasentience
+-- Author:      @openpulsechain
 -- Dune ID:     6776541
 -- Source:      Decoded OmniBridge events (tokensbridginginitiated + tokensbridged)
 

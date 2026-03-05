@@ -5,7 +5,7 @@
 -- Contracts:   0x1715a3e4a142d8b698131108995174f37aeba10d (OmniBridge)
 -- Output:      total_volume_usd, total_deposits_usd, total_withdrawals_usd, estimated_tvl_usd,
 --              volume_to_tvl_ratio, total_txs, unique_users, unique_tokens
--- Author:      @evasentience
+-- Author:      @openpulsechain
 -- Source:      Decoded OmniBridge events + prices.day + tokens.erc20
 
 WITH bridge_events AS (

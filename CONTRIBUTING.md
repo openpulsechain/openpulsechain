@@ -19,7 +19,7 @@ This document outlines the guidelines for contributing to PulseChain Analytics. 
 ## Development Setup
 
 ```bash
-git clone https://github.com/eva-sentience/pulsechain-analytics.git
+git clone https://github.com/openpulsechain/openpulsechain.git
 cd pulsechain-analytics
 ```
 

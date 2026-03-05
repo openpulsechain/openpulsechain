@@ -155,7 +155,7 @@ export function BridgePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Bridge Analytics</h1>
         <a
-          href="https://dune.com/evasentience/pulsechain-bridge-analytics"
+          href="https://dune.com/openpulsechain/pulsechain-bridge-analytics"
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-lg border border-[#8000E0]/30 bg-[#8000E0]/10 px-3 py-1.5 text-sm text-[#00D4FF] hover:bg-[#8000E0]/20 transition-colors"

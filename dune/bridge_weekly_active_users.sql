@@ -3,7 +3,7 @@
 -- Chain:       ethereum
 -- Contracts:   0x1715a3e4a142d8b698131108995174f37aeba10d (OmniBridge)
 -- Output:      week, unique_users, deposit_users, withdrawal_users
--- Author:      @evasentience
+-- Author:      @openpulsechain
 -- Dune ID:     6776549
 -- Source:      Decoded OmniBridge events
 
