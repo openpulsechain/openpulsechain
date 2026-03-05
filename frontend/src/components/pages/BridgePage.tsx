@@ -1,5 +1,15 @@
 import { useMemo } from 'react'
-import { ArrowDownUp, Coins, Hash, DollarSign, Fish } from 'lucide-react'
+import { ArrowDownUp, Coins, Hash, DollarSign } from 'lucide-react'
+
+function WhaleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 13c0-4.4 3.6-8 8-8 3.3 0 6.2 2 7.4 5h2.6l-2 3 2 3h-3c-1.5 2.4-4.2 4-7 4-4.4 0-8-3.1-8-7z" />
+      <circle cx="10" cy="12" r="1" fill="currentColor" />
+      <path d="M2 17c1-1 2-4.5 2-4.5" />
+    </svg>
+  )
+}
 import { KpiCard } from '../cards/KpiCard'
 import { TokenTable } from '../cards/TokenTable'
 import { BarChartComponent } from '../charts/BarChart'
@@ -106,7 +116,7 @@ export function BridgePage() {
       {whales.data.length > 0 && (
         <div className="rounded-xl border border-[#FF0040]/20 bg-gray-900/40 backdrop-blur-sm p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Fish className="h-5 w-5 text-[#FF0040]" />
+            <WhaleIcon className="h-5 w-5 text-[#FF0040]" />
             <h2 className="text-lg font-semibold text-white">Whale Alerts</h2>
             <span className="text-xs text-gray-500">Transfers &gt; $50K</span>
           </div>
