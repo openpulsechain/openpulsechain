@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
-import { ArrowDownUp, Coins, Hash, DollarSign } from 'lucide-react'
+import { ArrowDownUp, Coins, Hash, DollarSign, Fish } from 'lucide-react'
 import { KpiCard } from '../cards/KpiCard'
 import { TokenTable } from '../cards/TokenTable'
 import { BarChartComponent } from '../charts/BarChart'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { PieChartComponent } from '../charts/PieChart'
 import { Spinner } from '../ui/Spinner'
-import { useBridgeDailyStats, useBridgeTokenStats, useBridgeTransfers } from '../../hooks/useSupabase'
+import { useBridgeDailyStats, useBridgeTokenStats, useBridgeTransfers, useBridgeWhales } from '../../hooks/useSupabase'
 import { formatUsd, formatNumber, formatDate, shortenAddress } from '../../lib/format'
 
 function formatAmount(raw: string | null, decimals: number | null): string {
@@ -23,6 +23,7 @@ export function BridgePage() {
   const daily = useBridgeDailyStats()
   const tokens = useBridgeTokenStats()
   const transfers = useBridgeTransfers()
+  const whales = useBridgeWhales(50000)
 
   // Compute KPIs from daily stats
   const kpis = useMemo(() => {
@@ -98,6 +99,44 @@ export function BridgePage() {
             value={formatNumber(tokens.data.length)}
             icon={<Coins className="h-5 w-5" />}
           />
+        </div>
+      )}
+
+      {/* Whale Alerts */}
+      {whales.data.length > 0 && (
+        <div className="rounded-xl border border-[#FF0040]/20 bg-gray-900/40 backdrop-blur-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Fish className="h-5 w-5 text-[#FF0040]" />
+            <h2 className="text-lg font-semibold text-white">Whale Alerts</h2>
+            <span className="text-xs text-gray-500">Transfers &gt; $50K</span>
+          </div>
+          <div className="space-y-2">
+            {whales.data.map((tx) => (
+              <div key={tx.id} className="flex items-center gap-3 rounded-lg bg-white/5 px-4 py-3">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  tx.direction === 'deposit'
+                    ? 'bg-[#00D4FF]/10 text-[#00D4FF]'
+                    : 'bg-[#FF0040]/10 text-[#FF0040]'
+                }`}>
+                  {tx.direction === 'deposit' ? 'ETH → PLS' : 'PLS → ETH'}
+                </span>
+                <span className="text-lg font-bold text-white">{formatUsd(tx.amount_usd)}</span>
+                <span className="text-sm text-gray-400">{tx.token_symbol || '--'}</span>
+                <span className="font-mono text-xs text-gray-500">{shortenAddress(tx.user_address)}</span>
+                <span className="ml-auto text-xs text-gray-500">{formatDate(tx.block_timestamp)}</span>
+                <span className="flex gap-1">
+                  {tx.tx_hash_eth && (
+                    <a href={`https://etherscan.io/tx/${tx.tx_hash_eth}`} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-[#4040E0] hover:text-[#00D4FF] transition-colors">ETH</a>
+                  )}
+                  {tx.tx_hash_pls && (
+                    <a href={`https://scan.pulsechain.com/tx/${tx.tx_hash_pls}`} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-[#8000E0] hover:text-[#D000C0] transition-colors">PLS</a>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

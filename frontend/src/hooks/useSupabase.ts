@@ -105,3 +105,30 @@ export function usePulsexDailyStats() {
     ascending: true,
   })
 }
+
+export function useBridgeWhales(minUsd = 50000) {
+  const [data, setData] = useState<BridgeTransfer[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const { data: rows, error } = await supabase
+          .from('bridge_transfers')
+          .select('id,direction,status,user_address,token_symbol,token_decimals,amount_raw,amount_usd,tx_hash_eth,tx_hash_pls,block_timestamp,chain_source')
+          .gte('amount_usd', minUsd)
+          .order('block_timestamp', { ascending: false })
+          .limit(30)
+        if (error) throw error
+        setData(rows as BridgeTransfer[])
+      } catch {
+        setData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetch()
+  }, [minUsd])
+
+  return { data, loading }
+}
