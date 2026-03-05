@@ -1,9 +1,10 @@
 export function formatUsd(value: number | null | undefined): string {
   if (value == null) return '$0'
-  if (Math.abs(value) >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(1)}K`
-  return `$${value.toFixed(2)}`
+  const abs = Math.abs(value)
+  if (abs >= 1_000_000_000) return `$${(value / 1_000_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}B`
+  if (abs >= 1_000_000) return `$${(value / 1_000_000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`
+  if (abs >= 1_000) return `$${(value / 1_000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}K`
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function formatNumber(value: number | null | undefined): string {

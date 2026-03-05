@@ -98,7 +98,7 @@ export function OverviewPage() {
                     {token.price_usd != null
                       ? token.price_usd < 0.01
                         ? `$${token.price_usd.toFixed(6)}`
-                        : `$${token.price_usd.toFixed(2)}`
+                        : `$${token.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : '--'}
                   </td>
                   <td className={`py-2.5 pr-4 text-right ${
