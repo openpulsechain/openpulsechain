@@ -88,12 +88,16 @@ def run():
     logger.info("Starting bridge aggregation...")
     _set_status("running")
 
-    try:
-        _compute_usd_prices()
-        _aggregate_daily()
-        _aggregate_tokens()
+    errors = []
+    for name, fn in [("usd_prices", _compute_usd_prices), ("daily_stats", _aggregate_daily), ("token_stats", _aggregate_tokens)]:
+        try:
+            fn()
+        except Exception as e:
+            logger.warning(f"Bridge aggregation step '{name}' failed: {e}")
+            errors.append(f"{name}: {str(e)[:200]}")
+
+    if errors:
+        _set_status("error", "; ".join(errors))
+    else:
         _set_status("idle")
         logger.info("Bridge aggregation complete")
-    except Exception as e:
-        _set_status("error", str(e)[:500])
-        logger.warning(f"Bridge aggregation failed: {e}")
