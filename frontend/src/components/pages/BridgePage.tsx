@@ -3,8 +3,15 @@ import { ArrowDownUp, Coins, Hash, DollarSign, Globe } from 'lucide-react'
 
 function WhaleIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M20.5 10.5c-.6-1.2-1.8-2.5-3.5-3.2C15.8 6.5 14 6 12 6c-3.5 0-6.5 1.5-8 4-.8 1.3-1 2.7-.8 4 .3 1.5 1.2 2.8 2.5 3.5 1 .6 2.2.8 3.3.5.8-.2 1.5-.7 2-1.3.3-.4.8-.4 1.1 0 .5.6 1.2 1.1 2 1.3 1.1.3 2.3.1 3.3-.5 1.3-.7 2.2-2 2.5-3.5.1-.5.1-1 0-1.5l1.6-1c.3-.2.3-.6.1-.8l-1.6-1.2zM8.5 13a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM3 11.5c-.3-.5-.3-1.2 0-1.8l-.8-1c-.2-.2-.5-.1-.6.1-.5.9-.6 2-.2 3 .1.2.4.3.6.1l1-.4z" />
+    <svg className={className} viewBox="0 0 32 32" fill="currentColor">
+      {/* Body — rounded whale profile facing left, tail fin up-right */}
+      <path d="M6 18c0-5 4-9 10-9 4 0 7 1.5 8.5 4l1.5-1c.5-.3 1 0 1 .5v3c0 .5-.5.8-1 .5L24.5 15c-.5 3-3 5.5-6.5 6.5-2 .5-4.5.5-7-.5C8.5 20 6 19.5 6 18z" />
+      {/* Tail fin */}
+      <path d="M25 13c1.5-2.5 3-4 4.5-3.5.5.2.5.7.2 1L27 13.5l2 1.5c.3.3.2.8-.3.9C27.5 16 26 15 25 13z" />
+      {/* Eye */}
+      <circle cx="12" cy="14.5" r="1.2" fill="white" />
+      {/* Belly line */}
+      <path d="M8 18.5c2 1 5 1.2 8 .5" stroke="white" strokeWidth="0.6" fill="none" strokeLinecap="round" opacity="0.5" />
     </svg>
   )
 }
