@@ -25,6 +25,7 @@ export interface BridgeTransfer {
   status: string
   user_address: string
   token_symbol: string | null
+  token_decimals: number | null
   amount_raw: string
   amount_usd: number | null
   message_id: string | null

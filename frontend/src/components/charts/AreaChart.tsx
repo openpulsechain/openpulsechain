@@ -30,7 +30,7 @@ export function AreaChartComponent({ data, xKey, yKey, color = '#34d399', yForma
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
         <XAxis
           dataKey={xKey}
           tickFormatter={formatDateShort}
@@ -45,7 +45,7 @@ export function AreaChartComponent({ data, xKey, yKey, color = '#34d399', yForma
           width={70}
         />
         <Tooltip
-          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+          contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}
           labelFormatter={(label) => formatDateShort(String(label))}
           formatter={(v: unknown) => [fmt(Number(v)), '']}
         />

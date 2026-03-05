@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import { formatUsd } from '../../lib/format'
 
-const COLORS = ['#34d399', '#60a5fa', '#f97316', '#a78bfa', '#f472b6', '#fbbf24', '#6ee7b7', '#93c5fd']
+const COLORS = ['#00D4FF', '#8000E0', '#FF0040', '#4040E0', '#D000C0', '#00D4FF80', '#8000E080', '#FF004080']
 
 interface PieChartProps {
   data: { name: string; value: number }[]
@@ -33,7 +33,7 @@ export function PieChartComponent({ data }: PieChartProps) {
           ))}
         </Pie>
         <Tooltip
-          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+          contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}
           formatter={(v: unknown) => [formatUsd(Number(v)), '']}
         />
         <Legend />

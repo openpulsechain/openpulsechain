@@ -10,10 +10,10 @@ interface KpiCardProps {
 
 export function KpiCard({ title, value, subtitle, icon, trend }: KpiCardProps) {
   return (
-    <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+    <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-400">{title}</span>
-        {icon && <span className="text-gray-500">{icon}</span>}
+        {icon && <span className="text-[#8000E0]/60">{icon}</span>}
       </div>
       <div className="mt-2 text-2xl font-bold text-white">{value}</div>
       <div className="mt-1 flex items-center gap-2">

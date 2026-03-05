@@ -19,11 +19,20 @@ export function OverviewPage() {
   const tvlRecent = tvl.data.slice(-180)
   const dexRecent = dex.data.slice(-180)
 
+  // Sort tokens: real market cap first, then $0
+  const sortedPrices = [...prices.data].sort((a, b) => {
+    const aCap = a.market_cap_usd ?? 0
+    const bCap = b.market_cap_usd ?? 0
+    if (aCap > 0 && bCap === 0) return -1
+    if (aCap === 0 && bCap > 0) return 1
+    return bCap - aCap
+  })
+
   if (tvl.loading && prices.loading) return <Spinner />
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">PulseChain Overview</h1>
+      <h1 className="text-2xl font-bold text-white">Overview</h1>
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -54,32 +63,32 @@ export function OverviewPage() {
       </div>
 
       {/* TVL Chart */}
-      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+      <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <h2 className="mb-4 text-lg font-semibold text-white">Total Value Locked (TVL)</h2>
         {tvlRecent.length > 0 ? (
-          <AreaChartComponent data={tvlRecent} xKey="date" yKey="tvl_usd" color="#34d399" />
+          <AreaChartComponent data={tvlRecent} xKey="date" yKey="tvl_usd" color="#00D4FF" />
         ) : (
           <p className="py-12 text-center text-gray-500">No TVL data available</p>
         )}
       </div>
 
       {/* DEX Volume Chart */}
-      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+      <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <h2 className="mb-4 text-lg font-semibold text-white">DEX Volume (PulseX)</h2>
         {dexRecent.length > 0 ? (
-          <AreaChartComponent data={dexRecent} xKey="date" yKey="volume_usd" color="#60a5fa" />
+          <AreaChartComponent data={dexRecent} xKey="date" yKey="volume_usd" color="#8000E0" />
         ) : (
           <p className="py-12 text-center text-gray-500">No DEX volume data available</p>
         )}
       </div>
 
       {/* Token Prices Table */}
-      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+      <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <h2 className="mb-4 text-lg font-semibold text-white">Token Prices</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-700 text-gray-400">
+              <tr className="border-b border-white/10 text-gray-400">
                 <th className="py-3 pr-4">Token</th>
                 <th className="py-3 pr-4 text-right">Price</th>
                 <th className="py-3 pr-4 text-right">24h Change</th>
@@ -88,8 +97,8 @@ export function OverviewPage() {
               </tr>
             </thead>
             <tbody>
-              {prices.data.map((token) => (
-                <tr key={token.id} className="border-b border-gray-800 hover:bg-gray-800/50">
+              {sortedPrices.map((token) => (
+                <tr key={token.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                   <td className="py-2.5 pr-4">
                     <span className="font-medium text-white">{token.symbol}</span>
                     <span className="ml-2 text-gray-500">{token.name}</span>

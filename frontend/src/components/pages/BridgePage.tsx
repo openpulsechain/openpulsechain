@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ArrowDownUp, Users, Hash, DollarSign } from 'lucide-react'
+import { ArrowDownUp, Coins, Hash, DollarSign } from 'lucide-react'
 import { KpiCard } from '../cards/KpiCard'
 import { TokenTable } from '../cards/TokenTable'
 import { BarChartComponent } from '../charts/BarChart'
@@ -8,6 +8,16 @@ import { PieChartComponent } from '../charts/PieChart'
 import { Spinner } from '../ui/Spinner'
 import { useBridgeDailyStats, useBridgeTokenStats, useBridgeTransfers } from '../../hooks/useSupabase'
 import { formatUsd, formatNumber, formatDate, shortenAddress } from '../../lib/format'
+
+function formatAmount(raw: string | null, decimals: number | null): string {
+  if (!raw) return '--'
+  const dec = decimals ?? 18
+  const val = Number(raw) / Math.pow(10, dec)
+  if (val >= 1_000_000) return `${(val / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 1 })}M`
+  if (val >= 1_000) return `${(val / 1_000).toLocaleString('en-US', { maximumFractionDigits: 1 })}K`
+  if (val >= 1) return val.toLocaleString('en-US', { maximumFractionDigits: 2 })
+  return val.toLocaleString('en-US', { maximumFractionDigits: 6 })
+}
 
 export function BridgePage() {
   const daily = useBridgeDailyStats()
@@ -57,7 +67,7 @@ export function BridgePage() {
           href="https://dune.com/evasentience/pulsechain-bridge-analytics"
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-lg bg-gray-800 px-3 py-1.5 text-sm text-gray-300 hover:text-white"
+          className="rounded-lg border border-[#8000E0]/30 bg-[#8000E0]/10 px-3 py-1.5 text-sm text-[#00D4FF] hover:bg-[#8000E0]/20 transition-colors"
         >
           Dune Dashboard
         </a>
@@ -86,21 +96,21 @@ export function BridgePage() {
           <KpiCard
             title="Tokens Tracked"
             value={formatNumber(tokens.data.length)}
-            icon={<Users className="h-5 w-5" />}
+            icon={<Coins className="h-5 w-5" />}
           />
         </div>
       )}
 
       {/* Daily Flows Bar Chart */}
-      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+      <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <h2 className="mb-4 text-lg font-semibold text-white">Daily Deposits vs Withdrawals</h2>
         {dailyRecent.length > 0 ? (
           <BarChartComponent
             data={dailyRecent}
             xKey="date"
             bars={[
-              { key: 'deposit_volume_usd', color: '#34d399', name: 'Deposits' },
-              { key: 'withdrawal_volume_usd', color: '#f87171', name: 'Withdrawals' },
+              { key: 'deposit_volume_usd', color: '#00D4FF', name: 'Deposits' },
+              { key: 'withdrawal_volume_usd', color: '#FF0040', name: 'Withdrawals' },
             ]}
           />
         ) : (
@@ -109,10 +119,10 @@ export function BridgePage() {
       </div>
 
       {/* Cumulative Net Flow */}
-      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+      <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <h2 className="mb-4 text-lg font-semibold text-white">Cumulative Net Flow</h2>
         {cumulativeRecent.length > 0 ? (
-          <AreaChartComponent data={cumulativeRecent} xKey="date" yKey="cumulative_net_flow" color="#60a5fa" />
+          <AreaChartComponent data={cumulativeRecent} xKey="date" yKey="cumulative_net_flow" color="#00D4FF" />
         ) : (
           <p className="py-12 text-center text-gray-500">No flow data available</p>
         )}
@@ -120,7 +130,7 @@ export function BridgePage() {
 
       {/* Token Breakdown */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+        <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
           <h2 className="mb-4 text-lg font-semibold text-white">Top Tokens by Volume</h2>
           {pieData.length > 0 ? (
             <PieChartComponent data={pieData} />
@@ -128,7 +138,7 @@ export function BridgePage() {
             <p className="py-12 text-center text-gray-500">No token data</p>
           )}
         </div>
-        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+        <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
           <h2 className="mb-4 text-lg font-semibold text-white">Token Breakdown</h2>
           <div className="max-h-[350px] overflow-y-auto">
             <TokenTable data={tokens.data.slice(0, 20)} />
@@ -137,14 +147,15 @@ export function BridgePage() {
       </div>
 
       {/* Recent Transfers */}
-      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+      <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <h2 className="mb-4 text-lg font-semibold text-white">Recent Transfers</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-700 text-gray-400">
+              <tr className="border-b border-white/10 text-gray-400">
                 <th className="py-3 pr-4">Direction</th>
                 <th className="py-3 pr-4">Token</th>
+                <th className="py-3 pr-4 text-right">Amount</th>
                 <th className="py-3 pr-4">User</th>
                 <th className="py-3 pr-4">Status</th>
                 <th className="py-3 pr-4 text-right">Time</th>
@@ -153,18 +164,21 @@ export function BridgePage() {
             </thead>
             <tbody>
               {transfers.data.map((tx) => (
-                <tr key={tx.id} className="border-b border-gray-800 hover:bg-gray-800/50">
+                <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                   <td className="py-2.5 pr-4">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       tx.direction === 'deposit'
-                        ? 'bg-emerald-500/10 text-emerald-400'
-                        : 'bg-red-500/10 text-red-400'
+                        ? 'bg-[#00D4FF]/10 text-[#00D4FF]'
+                        : 'bg-[#FF0040]/10 text-[#FF0040]'
                     }`}>
                       {tx.direction === 'deposit' ? 'ETH → PLS' : 'PLS → ETH'}
                     </span>
                   </td>
                   <td className="py-2.5 pr-4 text-white">{tx.token_symbol || '--'}</td>
-                  <td className="py-2.5 pr-4 font-mono text-gray-400">{shortenAddress(tx.user_address)}</td>
+                  <td className="py-2.5 pr-4 text-right text-gray-300 font-mono text-xs">
+                    {formatAmount(tx.amount_raw, tx.token_decimals)}
+                  </td>
+                  <td className="py-2.5 pr-4 font-mono text-gray-400 text-xs">{shortenAddress(tx.user_address)}</td>
                   <td className="py-2.5 pr-4">
                     <span className={`text-xs ${
                       tx.status === 'executed' ? 'text-emerald-400' : 'text-yellow-400'
@@ -172,14 +186,14 @@ export function BridgePage() {
                       {tx.status}
                     </span>
                   </td>
-                  <td className="py-2.5 pr-4 text-right text-gray-400">{formatDate(tx.block_timestamp)}</td>
+                  <td className="py-2.5 pr-4 text-right text-gray-400 text-xs">{formatDate(tx.block_timestamp)}</td>
                   <td className="py-2.5 text-right">
                     {tx.tx_hash_eth && (
                       <a
                         href={`https://etherscan.io/tx/${tx.tx_hash_eth}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-blue-400 hover:underline"
+                        className="text-xs text-[#4040E0] hover:text-[#00D4FF] transition-colors"
                       >
                         ETH
                       </a>
@@ -190,7 +204,7 @@ export function BridgePage() {
                         href={`https://scan.pulsechain.com/tx/${tx.tx_hash_pls}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-400 hover:underline"
+                        className="text-xs text-[#8000E0] hover:text-[#D000C0] transition-colors"
                       >
                         PLS
                       </a>

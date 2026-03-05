@@ -20,7 +20,7 @@ export function BarChartComponent({ data, xKey, bars }: BarChartProps) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <RechartsBar data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
         <XAxis
           dataKey={xKey}
           tickFormatter={formatDateShort}
@@ -35,7 +35,7 @@ export function BarChartComponent({ data, xKey, bars }: BarChartProps) {
           width={70}
         />
         <Tooltip
-          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+          contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}
           labelFormatter={(label) => formatDateShort(String(label))}
           formatter={(v: unknown) => [formatUsd(Number(v)), '']}
         />

@@ -65,7 +65,7 @@ export function useBridgeTransfers() {
     orderBy: 'block_timestamp',
     ascending: false,
     limit: 50,
-    select: 'id,direction,status,user_address,token_symbol,amount_raw,amount_usd,tx_hash_eth,tx_hash_pls,block_timestamp,chain_source',
+    select: 'id,direction,status,user_address,token_symbol,token_decimals,amount_raw,amount_usd,tx_hash_eth,tx_hash_pls,block_timestamp,chain_source',
   })
 }
 
