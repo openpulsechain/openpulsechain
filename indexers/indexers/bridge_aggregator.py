@@ -75,12 +75,21 @@ def _aggregate_tokens():
         logger.info("No token stats to aggregate (RPC not yet created, skipping)")
 
 
+def _compute_usd_prices():
+    """Compute amount_usd for new transfers using current token prices."""
+    result = supabase.rpc("compute_bridge_usd_prices", {}).execute()
+    count = result.data if result.data else 0
+    if count:
+        logger.info(f"Computed USD prices for {count} transfers")
+
+
 def run():
     """Run all aggregations."""
     logger.info("Starting bridge aggregation...")
     _set_status("running")
 
     try:
+        _compute_usd_prices()
         _aggregate_daily()
         _aggregate_tokens()
         _set_status("idle")
