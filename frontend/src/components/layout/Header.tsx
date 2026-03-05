@@ -11,7 +11,10 @@ export function Header({ activePage, onNavigate }: HeaderProps) {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           <Activity className="h-6 w-6 text-[#00D4FF]" />
-          <span className="text-lg font-bold bg-gradient-to-r from-[#00D4FF] to-[#8000E0] bg-clip-text text-transparent">OpenPulse</span>
+          <span className="text-lg font-bold">
+            <span className="bg-gradient-to-r from-[#00D4FF] to-[#8000E0] bg-clip-text text-transparent">OpenPulse</span>
+            <span className="text-[#FF0040]">chain</span>
+          </span>
         </div>
 
         <nav className="flex items-center gap-1">
