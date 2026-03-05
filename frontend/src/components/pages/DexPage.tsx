@@ -16,16 +16,27 @@ export function DexPage() {
     if (!pulsex.data.length) return null
     const last30 = pulsex.data.slice(-30)
     const volume30d = last30.reduce((s, d) => s + d.daily_volume_usd, 0)
+    const totalVolume = pulsex.data.reduce((s, d) => s + d.daily_volume_usd, 0)
     return {
       totalLiquidity: latest?.total_liquidity_usd ?? 0,
-      totalVolume: latest?.total_volume_usd ?? 0,
+      totalVolume,
       totalTxs: latest?.total_transactions ?? 0,
       volume30d,
     }
   }, [pulsex.data, latest])
 
+  // Cumulative volume computed from daily sums (subgraph totalVolumeUSD is always 0)
+  const cumulativeVolume = useMemo(() => {
+    let cumul = 0
+    return pulsex.data.map((d) => {
+      cumul += d.daily_volume_usd
+      return { date: d.date, cumulative_volume: cumul }
+    })
+  }, [pulsex.data])
+
   // Recent 180 days for charts
   const recent = pulsex.data.slice(-180)
+  const cumulativeRecent = cumulativeVolume.slice(-180)
 
   // Daily volume for bar chart (last 90 days)
   const volumeRecent = pulsex.data.slice(-90)
@@ -93,8 +104,8 @@ export function DexPage() {
       {/* Cumulative Volume */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <h2 className="mb-4 text-lg font-semibold text-white">Cumulative Volume</h2>
-        {recent.length > 0 ? (
-          <AreaChartComponent data={recent} xKey="date" yKey="total_volume_usd" color="#D000C0" />
+        {cumulativeRecent.length > 0 ? (
+          <AreaChartComponent data={cumulativeRecent} xKey="date" yKey="cumulative_volume" color="#D000C0" />
         ) : (
           <p className="py-12 text-center text-gray-500">No volume data available</p>
         )}
