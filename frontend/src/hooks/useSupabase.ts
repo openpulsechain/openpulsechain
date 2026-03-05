@@ -8,6 +8,7 @@ import type {
   NetworkDexVolume,
   TokenPrice,
   NetworkSnapshot,
+  PulsexDailyStats,
 } from '../types'
 
 function useQuery<T>(table: string, options?: {
@@ -95,5 +96,12 @@ export function useNetworkSnapshot() {
     orderBy: 'timestamp',
     ascending: false,
     limit: 1,
+  })
+}
+
+export function usePulsexDailyStats() {
+  return useQuery<PulsexDailyStats>('pulsex_daily_stats', {
+    orderBy: 'date',
+    ascending: true,
   })
 }

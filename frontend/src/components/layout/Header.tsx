@@ -17,6 +17,7 @@ export function Header({ activePage, onNavigate }: HeaderProps) {
         <nav className="flex items-center gap-1">
           {[
             { id: 'overview', label: 'Overview' },
+            { id: 'dex', label: 'DEX' },
             { id: 'bridge', label: 'Bridge' },
           ].map((page) => (
             <button

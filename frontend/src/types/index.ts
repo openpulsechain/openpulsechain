@@ -62,3 +62,11 @@ export interface NetworkSnapshot {
   base_fee_gwei: number
   timestamp: string
 }
+
+export interface PulsexDailyStats {
+  date: string
+  daily_volume_usd: number
+  total_liquidity_usd: number
+  total_volume_usd: number
+  total_transactions: number
+}

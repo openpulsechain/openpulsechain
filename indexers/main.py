@@ -41,6 +41,7 @@ def main():
     from indexers import network_dex_volume
     from indexers import token_prices
     from indexers import network_snapshot
+    from indexers import pulsex_stats
 
     indexers = [
         ("bridge_subgraph", bridge_subgraph),
@@ -49,6 +50,7 @@ def main():
         ("network_dex_volume", network_dex_volume),
         ("token_prices", token_prices),
         ("network_snapshot", network_snapshot),
+        ("pulsex_stats", pulsex_stats),
     ]
 
     results = {}

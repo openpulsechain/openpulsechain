@@ -3,6 +3,7 @@ import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
 import { OverviewPage } from './components/pages/OverviewPage'
 import { BridgePage } from './components/pages/BridgePage'
+import { DexPage } from './components/pages/DexPage'
 
 export default function App() {
   const [page, setPage] = useState('overview')
@@ -48,7 +49,9 @@ export default function App() {
       <div className="relative z-10 flex min-h-screen flex-col">
         <Header activePage={page} onNavigate={setPage} />
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
-          {page === 'overview' ? <OverviewPage /> : <BridgePage />}
+          {page === 'overview' && <OverviewPage />}
+          {page === 'dex' && <DexPage />}
+          {page === 'bridge' && <BridgePage />}
         </main>
         <Footer />
       </div>
