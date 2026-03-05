@@ -4,6 +4,7 @@ import { Footer } from './components/layout/Footer'
 import { OverviewPage } from './components/pages/OverviewPage'
 import { BridgePage } from './components/pages/BridgePage'
 import { DexPage } from './components/pages/DexPage'
+import { ApiPage } from './components/pages/ApiPage'
 
 export default function App() {
   const [page, setPage] = useState('overview')
@@ -52,6 +53,7 @@ export default function App() {
           {page === 'overview' && <OverviewPage />}
           {page === 'dex' && <DexPage />}
           {page === 'bridge' && <BridgePage />}
+          {page === 'api' && <ApiPage />}
         </main>
         <Footer />
       </div>

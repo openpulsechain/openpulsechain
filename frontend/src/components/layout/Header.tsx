@@ -19,6 +19,7 @@ export function Header({ activePage, onNavigate }: HeaderProps) {
             { id: 'overview', label: 'Overview' },
             { id: 'dex', label: 'DEX' },
             { id: 'bridge', label: 'Bridge' },
+            { id: 'api', label: 'API' },
           ].map((page) => (
             <button
               key={page.id}
