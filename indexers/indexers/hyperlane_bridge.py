@@ -57,7 +57,7 @@ CHAIN_NAMES = {
 }
 
 HYPERLANE_QUERY = """
-query($cursor: Int!, $limit: Int!) {
+query($cursor: bigint!, $limit: Int!) {
   message_view(
     where: {
       _and: [
