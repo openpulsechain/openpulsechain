@@ -81,3 +81,48 @@ export interface PulsexTopPair {
   reserve_usd: number
   total_transactions: number
 }
+
+export interface HyperlaneTransfer {
+  id: number
+  msg_id: string | null
+  direction: 'inbound' | 'outbound'
+  is_delivered: boolean
+  origin_chain_id: number
+  origin_chain_name: string | null
+  destination_chain_id: number
+  destination_chain_name: string | null
+  sender_address: string | null
+  recipient_address: string | null
+  origin_tx_sender: string | null
+  origin_tx_hash: string | null
+  destination_tx_hash: string | null
+  token_symbol: string | null
+  token_decimals: number | null
+  amount_raw: string | null
+  amount_usd: number | null
+  send_occurred_at: string
+  delivery_occurred_at: string | null
+  nonce: number
+}
+
+export interface HyperlaneDailyStats {
+  date: string
+  inbound_count: number
+  outbound_count: number
+  inbound_volume_usd: number
+  outbound_volume_usd: number
+  net_flow_usd: number
+  unique_users: number
+  unique_chains: number
+}
+
+export interface HyperlaneChainStats {
+  chain_id: number
+  chain_name: string | null
+  total_inbound_count: number
+  total_outbound_count: number
+  total_inbound_volume_usd: number
+  total_outbound_volume_usd: number
+  net_flow_usd: number
+  last_transfer_at: string | null
+}

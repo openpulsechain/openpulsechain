@@ -31,3 +31,9 @@ SUBGRAPH_PAGE_SIZE = 1000
 
 # Per-run limits (avoid timeout on Railway cron)
 BRIDGE_SYNC_MAX_PAGES = 50  # 50K records per run max
+
+# Hyperlane
+HYPERLANE_API_URL = "https://api.hyperlane.xyz/v1/graphql"
+HYPERLANE_PLS_DOMAIN = 369
+HYPERLANE_PAGE_SIZE = 100  # API max limit per query
+HYPERLANE_SYNC_MAX_PAGES = 50  # 5K records per run max

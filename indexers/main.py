@@ -37,6 +37,8 @@ def main():
 
     from indexers import bridge_subgraph
     from indexers import bridge_aggregator
+    from indexers import hyperlane_bridge
+    from indexers import hyperlane_aggregator
     from indexers import network_tvl
     from indexers import network_dex_volume
     from indexers import token_prices
@@ -47,6 +49,8 @@ def main():
     indexers = [
         ("bridge_subgraph", bridge_subgraph),
         ("bridge_aggregator", bridge_aggregator),
+        ("hyperlane_bridge", hyperlane_bridge),
+        ("hyperlane_aggregator", hyperlane_aggregator),
         ("network_tvl", network_tvl),
         ("network_dex_volume", network_dex_volume),
         ("token_prices", token_prices),

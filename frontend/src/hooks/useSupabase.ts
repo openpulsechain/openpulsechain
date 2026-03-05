@@ -10,6 +10,9 @@ import type {
   NetworkSnapshot,
   PulsexDailyStats,
   PulsexTopPair,
+  HyperlaneTransfer,
+  HyperlaneDailyStats,
+  HyperlaneChainStats,
 } from '../types'
 
 function useQuery<T>(table: string, options?: {
@@ -113,6 +116,56 @@ export function usePulsexTopPairs() {
     ascending: false,
     limit: 30,
   })
+}
+
+export function useHyperlaneDailyStats() {
+  return useQuery<HyperlaneDailyStats>('hyperlane_daily_stats', {
+    orderBy: 'date',
+    ascending: true,
+  })
+}
+
+export function useHyperlaneChainStats() {
+  return useQuery<HyperlaneChainStats>('hyperlane_chain_stats', {
+    orderBy: 'total_inbound_volume_usd',
+    ascending: false,
+  })
+}
+
+export function useHyperlaneTransfers() {
+  return useQuery<HyperlaneTransfer>('hyperlane_transfers', {
+    orderBy: 'send_occurred_at',
+    ascending: false,
+    limit: 50,
+    select: 'id,direction,is_delivered,origin_chain_id,origin_chain_name,destination_chain_id,destination_chain_name,origin_tx_sender,origin_tx_hash,destination_tx_hash,token_symbol,amount_raw,amount_usd,send_occurred_at',
+  })
+}
+
+export function useHyperlaneWhales(minUsd = 10000) {
+  const [data, setData] = useState<HyperlaneTransfer[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const { data: rows, error } = await supabase
+          .from('hyperlane_transfers')
+          .select('id,direction,is_delivered,origin_chain_id,origin_chain_name,destination_chain_id,destination_chain_name,origin_tx_sender,origin_tx_hash,destination_tx_hash,token_symbol,amount_raw,amount_usd,send_occurred_at')
+          .gte('amount_usd', minUsd)
+          .order('send_occurred_at', { ascending: false })
+          .limit(20)
+        if (error) throw error
+        setData(rows as HyperlaneTransfer[])
+      } catch {
+        setData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetch()
+  }, [minUsd])
+
+  return { data, loading }
 }
 
 export function useBridgeWhales(minUsd = 50000) {
