@@ -34,6 +34,7 @@ def run():
             .execute()
 
         last_date = last.data[0]["date"] if last.data else "2023-01-01"
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         rows = []
         for point in data:
@@ -41,7 +42,7 @@ def run():
             tvl = point.get("tvl", 0)
             date_str = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
 
-            if date_str > last_date:
+            if date_str > last_date and date_str <= today:
                 rows.append({
                     "date": date_str,
                     "tvl_usd": tvl,
