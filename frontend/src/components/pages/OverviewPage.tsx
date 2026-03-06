@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { DollarSign, TrendingUp, Fuel, Box } from 'lucide-react'
 import { KpiCard } from '../cards/KpiCard'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
+import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { useNetworkTvl, useNetworkDexVolume, useTokenPrices, useNetworkSnapshot } from '../../hooks/useSupabase'
 import { formatUsd, formatNumber, formatGwei } from '../../lib/format'
 
@@ -37,8 +38,11 @@ export function OverviewPage() {
     })
   }, [latestSnapshot, plsPrice])
 
-  const tvlRecent = tvl.data
-  const dexRecent = dex.data
+  const [tvlRange, setTvlRange] = useState<number | null>(null)
+  const [dexRange, setDexRange] = useState<number | null>(null)
+
+  const tvlRecent = tvlRange ? tvl.data.slice(-tvlRange) : tvl.data
+  const dexRecent = dexRange ? dex.data.slice(-dexRange) : dex.data
 
   // Sort tokens: real market cap first, then $0
   const sortedPrices = [...prices.data].sort((a, b) => {
@@ -85,7 +89,10 @@ export function OverviewPage() {
 
       {/* TVL Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-        <h2 className="mb-4 text-lg font-semibold text-white">Total Value Locked (TVL)</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Total Value Locked (TVL)</h2>
+          <TimeRangeSelector value={tvlRange} onChange={setTvlRange} />
+        </div>
         {tvlRecent.length > 0 ? (
           <AreaChartComponent data={tvlRecent} xKey="date" yKey="tvl_usd" color="#00D4FF" />
         ) : (
@@ -95,7 +102,10 @@ export function OverviewPage() {
 
       {/* DEX Volume Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-        <h2 className="mb-4 text-lg font-semibold text-white">DEX Volume (PulseX)</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">DEX Volume (PulseX)</h2>
+          <TimeRangeSelector value={dexRange} onChange={setDexRange} />
+        </div>
         {dexRecent.length > 0 ? (
           <AreaChartComponent data={dexRecent} xKey="date" yKey="volume_usd" color="#8000E0" />
         ) : (
