@@ -32,9 +32,7 @@ function useQuery<T>(table: string, options?: {
         if (options?.orderBy) {
           query = query.order(options.orderBy, { ascending: options.ascending ?? true })
         }
-        if (options?.limit) {
-          query = query.limit(options.limit)
-        }
+        query = query.limit(options?.limit ?? 10000)
         const { data: rows, error: err } = await query
         if (err) throw err
         setData(rows as T[])
