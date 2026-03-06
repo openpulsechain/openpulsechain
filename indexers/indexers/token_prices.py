@@ -75,9 +75,9 @@ COINGECKO_TOKENS = {
 
 
 def _fetch_gecko_terminal_price(token: dict) -> dict | None:
-    """Fetch latest price from GeckoTerminal pool OHLCV (1 candle)."""
+    """Fetch latest price from GeckoTerminal pool OHLCV (2 candles for 24h change)."""
     url = f"{GT_BASE}/networks/{token['network']}/pools/{token['pool']}/ohlcv/day"
-    params = {"aggregate": 1, "limit": 1, "currency": "usd"}
+    params = {"aggregate": 1, "limit": 2, "currency": "usd"}
     try:
         resp = requests.get(url, params=params, timeout=30)
         if resp.status_code != 200:
@@ -86,9 +86,15 @@ def _fetch_gecko_terminal_price(token: dict) -> dict | None:
         candles = resp.json().get("data", {}).get("attributes", {}).get("ohlcv_list", [])
         if not candles or candles[0][4] <= 0:
             return None
+        today_close = float(candles[0][4])
+        change_pct = None
+        if len(candles) >= 2 and candles[1][4] > 0:
+            yesterday_close = float(candles[1][4])
+            change_pct = ((today_close - yesterday_close) / yesterday_close) * 100
         return {
-            "close": float(candles[0][4]),
+            "close": today_close,
             "volume": float(candles[0][5]),
+            "change_pct": change_pct,
         }
     except Exception as e:
         logger.warning(f"GeckoTerminal error for {token['symbol']}: {e}")
@@ -97,16 +103,16 @@ def _fetch_gecko_terminal_price(token: dict) -> dict | None:
 
 def _fetch_pls_derived_price(token: dict) -> dict | None:
     """Derive PLS price: PLS_USD = PLSX_USD / PLSX_WPLS_ratio."""
-    # Get PLSX/WPLS pool in USD
+    # Get PLSX/WPLS pool in USD (includes 24h change)
     usd_data = _fetch_gecko_terminal_price(token)
     if not usd_data:
         return None
 
     time.sleep(1.5)
 
-    # Get PLSX/WPLS pool in token units (ratio)
+    # Get PLSX/WPLS pool in token units (ratio) — 2 candles for 24h change
     url = f"{GT_BASE}/networks/{token['network']}/pools/{token['pool']}/ohlcv/day"
-    params = {"aggregate": 1, "limit": 1, "currency": "token"}
+    params = {"aggregate": 1, "limit": 2, "currency": "token"}
     try:
         resp = requests.get(url, params=params, timeout=30)
         if resp.status_code != 200:
@@ -114,10 +120,19 @@ def _fetch_pls_derived_price(token: dict) -> dict | None:
         candles = resp.json().get("data", {}).get("attributes", {}).get("ohlcv_list", [])
         if not candles or candles[0][4] <= 0:
             return None
-        ratio = float(candles[0][4])
+        ratio_today = float(candles[0][4])
+        pls_price = usd_data["close"] / ratio_today
+        change_pct = None
+        if len(candles) >= 2 and candles[1][4] > 0 and usd_data.get("change_pct") is not None:
+            ratio_yesterday = float(candles[1][4])
+            yesterday_usd = usd_data["close"] / (1 + usd_data["change_pct"] / 100)
+            pls_yesterday = yesterday_usd / ratio_yesterday
+            if pls_yesterday > 0:
+                change_pct = ((pls_price - pls_yesterday) / pls_yesterday) * 100
         return {
-            "close": usd_data["close"] / ratio,
+            "close": pls_price,
             "volume": usd_data["volume"],
+            "change_pct": change_pct,
         }
     except Exception as e:
         logger.warning(f"GeckoTerminal derived error for PLS: {e}")
@@ -143,7 +158,7 @@ def _fetch_pulsechain_prices() -> list[dict]:
                 "price_usd": data["close"],
                 "volume_24h_usd": data["volume"],
                 "market_cap_usd": None,
-                "price_change_24h_pct": None,
+                "price_change_24h_pct": data.get("change_pct"),
                 "last_updated": now,
             })
             logger.info(f"  {token['symbol']}: ${data['close']:.8f} (GeckoTerminal)")
