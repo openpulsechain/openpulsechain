@@ -37,9 +37,8 @@ export function OverviewPage() {
     })
   }, [latestSnapshot, plsPrice])
 
-  // Last 180 days for charts
-  const tvlRecent = tvl.data.slice(-180)
-  const dexRecent = dex.data.slice(-180)
+  const tvlRecent = tvl.data
+  const dexRecent = dex.data
 
   // Sort tokens: real market cap first, then $0
   const sortedPrices = [...prices.data].sort((a, b) => {
