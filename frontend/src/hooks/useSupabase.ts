@@ -28,14 +28,36 @@ function useQuery<T>(table: string, options?: {
   useEffect(() => {
     const fetch = async () => {
       try {
-        let query = supabase.from(table).select(options?.select || '*')
-        if (options?.orderBy) {
-          query = query.order(options.orderBy, { ascending: options.ascending ?? true })
+        const limit = options?.limit
+        if (limit && limit <= 1000) {
+          let query = supabase.from(table).select(options?.select || '*')
+          if (options?.orderBy) {
+            query = query.order(options.orderBy, { ascending: options.ascending ?? true })
+          }
+          query = query.limit(limit)
+          const { data: rows, error: err } = await query
+          if (err) throw err
+          setData(rows as T[])
+        } else {
+          // Paginate to bypass Supabase 1000 row limit
+          const pageSize = 1000
+          let allRows: T[] = []
+          let from = 0
+          let hasMore = true
+          while (hasMore) {
+            let query = supabase.from(table).select(options?.select || '*')
+            if (options?.orderBy) {
+              query = query.order(options.orderBy, { ascending: options.ascending ?? true })
+            }
+            query = query.range(from, from + pageSize - 1)
+            const { data: rows, error: err } = await query
+            if (err) throw err
+            allRows = allRows.concat(rows as T[])
+            hasMore = (rows?.length ?? 0) === pageSize
+            from += pageSize
+          }
+          setData(allRows)
         }
-        query = query.limit(options?.limit ?? 10000)
-        const { data: rows, error: err } = await query
-        if (err) throw err
-        setData(rows as T[])
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Unknown error')
       } finally {
