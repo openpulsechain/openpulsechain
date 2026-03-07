@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, Github, Menu, X } from 'lucide-react'
+import { Github, Menu, X } from 'lucide-react'
 
 interface HeaderProps {
   activePage: string
@@ -26,7 +26,7 @@ export function Header({ activePage, onNavigate }: HeaderProps) {
     <header className="border-b border-white/5 bg-gray-950/60 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <button onClick={() => handleNav('overview')} className="flex items-center gap-3">
-          <Activity className="h-6 w-6 text-[#00D4FF]" />
+          <img src="/logo.png" alt="OpenPulsechain" className="h-7 w-7 rounded-full" />
           <span className="text-lg font-bold bg-gradient-to-r from-[#00D4FF] to-[#8000E0] bg-clip-text text-transparent">OpenPulsechain</span>
         </button>
 
