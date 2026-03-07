@@ -76,8 +76,12 @@ const BRIDGE_TABS = [
   { id: 'hyperlane', label: 'Hyperlane' },
 ]
 
+const WHALE_THRESHOLDS = [1000, 5000, 10000, 25000, 50000, 100000]
+
 export function BridgePage() {
   const [activeTab, setActiveTab] = useState('all')
+  const [omniWhaleMin, setOmniWhaleMin] = useState(50000)
+  const [hlWhaleMin, setHlWhaleMin] = useState(10000)
 
   // Bridge TVL (from on-chain balances)
   const tvl = useBridgeTvl()
@@ -86,13 +90,13 @@ export function BridgePage() {
   const daily = useBridgeDailyStats()
   const tokens = useBridgeTokenStats()
   const transfers = useBridgeTransfers()
-  const whales = useBridgeWhales(50000)
+  const whales = useBridgeWhales(omniWhaleMin)
 
   // Hyperlane data
   const hlDaily = useHyperlaneDailyStats()
   const hlChains = useHyperlaneChainStats()
   const hlTransfers = useHyperlaneTransfers()
-  const hlWhales = useHyperlaneWhales(10000)
+  const hlWhales = useHyperlaneWhales(hlWhaleMin)
 
   // OmniBridge KPIs
   const omniKpis = useMemo(() => {
@@ -224,7 +228,10 @@ export function BridgePage() {
               <div className="flex items-center gap-2 mb-4">
                 <WhaleIcon className="h-5 w-5 text-[#FF0040]" />
                 <h2 className="text-lg font-semibold text-white">OmniBridge Whale Alerts</h2>
-                <span className="text-xs text-gray-500">Transfers &gt; $50K</span>
+                <select value={omniWhaleMin} onChange={(e) => setOmniWhaleMin(Number(e.target.value))}
+                  className="ml-auto rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-gray-400 outline-none focus:border-[#FF0040]/40">
+                  {WHALE_THRESHOLDS.map((v) => <option key={v} value={v}>≥ ${v >= 1000 ? `${v / 1000}K` : v}</option>)}
+                </select>
               </div>
               <div className="space-y-2">
                 {whales.data.slice(0, 10).map((tx) => (
@@ -247,7 +254,10 @@ export function BridgePage() {
               <div className="flex items-center gap-2 mb-4">
                 <WhaleIcon className="h-5 w-5 text-[#4040E0]" />
                 <h2 className="text-lg font-semibold text-white">Hyperlane Whale Alerts</h2>
-                <span className="text-xs text-gray-500">Transfers &gt; $10K</span>
+                <select value={hlWhaleMin} onChange={(e) => setHlWhaleMin(Number(e.target.value))}
+                  className="ml-auto rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-gray-400 outline-none focus:border-[#4040E0]/40">
+                  {WHALE_THRESHOLDS.map((v) => <option key={v} value={v}>≥ ${v >= 1000 ? `${v / 1000}K` : v}</option>)}
+                </select>
               </div>
               <div className="space-y-2">
                 {hlWhales.data.slice(0, 10).map((tx) => (
@@ -326,7 +336,10 @@ export function BridgePage() {
               <div className="flex items-center gap-2 mb-4">
                 <WhaleIcon className="h-5 w-5 text-[#FF0040]" />
                 <h2 className="text-lg font-semibold text-white">Whale Alerts</h2>
-                <span className="text-xs text-gray-500">Transfers &gt; $50K</span>
+                <select value={omniWhaleMin} onChange={(e) => setOmniWhaleMin(Number(e.target.value))}
+                  className="ml-auto rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-gray-400 outline-none focus:border-[#FF0040]/40">
+                  {WHALE_THRESHOLDS.map((v) => <option key={v} value={v}>≥ ${v >= 1000 ? `${v / 1000}K` : v}</option>)}
+                </select>
               </div>
               <div className="space-y-2">
                 {whales.data.map((tx) => (
@@ -455,7 +468,10 @@ export function BridgePage() {
               <div className="flex items-center gap-2 mb-4">
                 <WhaleIcon className="h-5 w-5 text-[#4040E0]" />
                 <h2 className="text-lg font-semibold text-white">Whale Alerts</h2>
-                <span className="text-xs text-gray-500">Transfers &gt; $10K</span>
+                <select value={hlWhaleMin} onChange={(e) => setHlWhaleMin(Number(e.target.value))}
+                  className="ml-auto rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-gray-400 outline-none focus:border-[#4040E0]/40">
+                  {WHALE_THRESHOLDS.map((v) => <option key={v} value={v}>≥ ${v >= 1000 ? `${v / 1000}K` : v}</option>)}
+                </select>
               </div>
               <div className="space-y-2">
                 {hlWhales.data.map((tx) => (
