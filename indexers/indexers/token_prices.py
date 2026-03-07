@@ -106,14 +106,16 @@ def _query_subgraph_prices(addresses: list[str]) -> dict:
 
 
 def _fetch_yesterday_prices(addresses: list[str]) -> dict:
-    """Fetch yesterday's prices from token_price_history for 24h change calculation.
+    """Fetch recent prices from token_price_history for 24h change calculation.
 
-    Returns dict keyed by lowercase address with yesterday's price_usd.
+    Looks at the last 3 days and picks the most recent entry per token.
+    Returns dict keyed by lowercase address with the previous price_usd.
     """
     if not addresses:
         return {}
 
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    three_days_ago = (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     lower_addresses = [a.lower() for a in addresses]
 
     prices = {}
@@ -125,13 +127,17 @@ def _fetch_yesterday_prices(addresses: list[str]) -> dict:
         try:
             resp = (
                 supabase.table("token_price_history")
-                .select("address, price_usd")
+                .select("address, date, price_usd")
                 .in_("address", batch)
-                .eq("date", yesterday)
+                .gte("date", three_days_ago)
+                .lt("date", today)
+                .order("date", desc=True)
                 .execute()
             )
             for row in resp.data or []:
                 addr = row["address"].lower()
+                if addr in prices:
+                    continue  # Already have the most recent
                 price = row.get("price_usd")
                 if price and float(price) > 0:
                     prices[addr] = float(price)

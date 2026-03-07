@@ -186,7 +186,7 @@ export function OverviewPage() {
                   }`}>
                     {token.price_change_24h_pct != null
                       ? `${token.price_change_24h_pct >= 0 ? '+' : ''}${token.price_change_24h_pct.toFixed(2)}%`
-                      : '--'}
+                      : '0.00%'}
                   </td>
                   <td className="py-2.5 pr-4 text-right text-gray-300">
                     {formatUsd(token.market_cap_usd)}
