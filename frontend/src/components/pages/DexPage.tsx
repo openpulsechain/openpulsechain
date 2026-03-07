@@ -13,6 +13,9 @@ export function DexPage() {
 
   const latest = pulsex.data.length > 0 ? pulsex.data[pulsex.data.length - 1] : null
 
+  // Filter out days with zero data (pre-launch)
+  const validData = useMemo(() => pulsex.data.filter((d) => d.daily_volume_usd > 0 || d.total_liquidity_usd > 0), [pulsex.data])
+
   const kpis = useMemo(() => {
     if (!validData.length) return null
     const last30 = validData.slice(-30)
@@ -25,9 +28,6 @@ export function DexPage() {
       volume30d,
     }
   }, [validData, latest])
-
-  // Filter out days with zero data (pre-launch)
-  const validData = useMemo(() => pulsex.data.filter((d) => d.daily_volume_usd > 0 || d.total_liquidity_usd > 0), [pulsex.data])
 
   // Cumulative volume computed from daily sums (subgraph totalVolumeUSD is always 0)
   const cumulativeVolume = useMemo(() => {
