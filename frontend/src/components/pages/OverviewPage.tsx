@@ -184,8 +184,15 @@ export function OverviewPage() {
               {sortedPrices.map((token) => (
                 <tr key={token.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                   <td className="py-2.5 pr-4">
-                    <span className="font-medium text-white">{token.symbol}</span>
-                    <span className="ml-2 text-gray-500">{token.name}</span>
+                    <div>
+                      <span className="font-medium text-white">{token.symbol}</span>
+                      <span className="ml-2 text-gray-500">{token.name}</span>
+                    </div>
+                    {token.address && (
+                      <div className="text-xs text-gray-600 font-mono truncate max-w-[200px] sm:max-w-[300px]">
+                        {token.address}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2.5 pr-4 text-right text-white">
                     {token.price_usd != null
