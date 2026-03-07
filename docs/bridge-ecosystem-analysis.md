@@ -43,12 +43,13 @@ OpenPulsechain covers 2 of them (OmniBridge + Hyperlane), which represents ~99% 
 - **OmniBridge**: Fully indexed via ETH+PLS subgraphs. TokensEx ETH-PLS transfers are included (same contracts).
 - **Hyperlane**: Fully indexed via Hyperlane GraphQL API.
 
-### Could be tracked (future priority)
-- **TokensEx BSC-PLS**: Separate OmniBridge instance on BSC. Would need:
-  - Find BSC OmniBridge contract address
-  - Evaluate BSC-PLS bridge volume
-  - Index via BSC subgraph or RPC
-  - Priority: MEDIUM (only BSC-PLS bridge, volume unknown)
+### Evaluated — NOT worth tracking
+- **TokensEx BSC-PLS**: Custom bridge (NOT a real OmniBridge — no getBridgeMode(), owner is EOA).
+  - PLS token on BSC: `0xCa8288Eced5E6943a56be8b0C32f4Cc0a3B9BcEa` (owner: `0x311d26d7...` EOA, pre-minted 666B PLS)
+  - Vault on BSC (contract): `0xb5c2377389e478a7e0fb64af0437b3070124088a` (holds 4.83B PLS = ~$50K)
+  - BNB on PulseChain: `0x518076CCE3729eF1a3877EA3647a26e278e764FE` (name: "$Wrapped BNB from BSC (TokensExpress)", supply: 172 BNB = ~$103K)
+  - Mediator on PLS: `0xf1dfc63e10ff01b8c3d307529b47aefad2154c0e` (contract)
+  - **Total TVL: ~$153K — NEGLIGIBLE, not worth building an indexer**
 
 - **Liberty Swap**: Intent-based with own contracts. Would need:
   - Published bridge contract addresses (currently unpublished)
@@ -66,7 +67,7 @@ OpenPulsechain coverage vs PulseChainStats "7 bridges":
 
   OmniBridge ........... COVERED (includes TokensEx ETH-PLS)
   Hyperlane ............ COVERED
-  TokensEx BSC-PLS ..... GAP (separate contracts, volume unknown)
+  TokensEx BSC-PLS ..... EVALUATED — $153K TVL, not worth indexing
   Liberty Swap ......... GAP (small volume, low priority)
   ChangeNOW ............ N/A (not a bridge)
   BlockBlend ........... N/A (privacy mixer)
