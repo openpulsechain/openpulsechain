@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowLeftRight, Droplets, Hash, TrendingUp } from 'lucide-react'
 import { KpiCard } from '../cards/KpiCard'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { BarChartComponent } from '../charts/BarChart'
 import { Spinner } from '../ui/Spinner'
+import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { usePulsexDailyStats, usePulsexTopPairs } from '../../hooks/useSupabase'
 import { formatUsd, formatNumber } from '../../lib/format'
 
@@ -15,6 +16,10 @@ export function DexPage() {
 
   // Filter out days with zero data (pre-launch)
   const validData = useMemo(() => pulsex.data.filter((d) => d.daily_volume_usd > 0 || d.total_liquidity_usd > 0), [pulsex.data])
+
+  const [liqRange, setLiqRange] = useState<number | null>(null)
+  const [volRange, setVolRange] = useState<number | null>(null)
+  const [cumRange, setCumRange] = useState<number | null>(null)
 
   const kpis = useMemo(() => {
     if (!validData.length) return null
@@ -76,9 +81,12 @@ export function DexPage() {
 
       {/* Liquidity Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-        <h2 className="mb-4 text-lg font-semibold text-white">Total Liquidity (PulseX)</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Total Liquidity (PulseX)</h2>
+          <TimeRangeSelector value={liqRange} onChange={setLiqRange} />
+        </div>
         {validData.length > 0 ? (
-          <AreaChartComponent data={validData} xKey="date" yKey="total_liquidity_usd" color="#00D4FF" />
+          <AreaChartComponent data={liqRange ? validData.slice(-liqRange) : validData} xKey="date" yKey="total_liquidity_usd" color="#00D4FF" />
         ) : (
           <p className="py-12 text-center text-gray-500">No liquidity data available</p>
         )}
@@ -86,10 +94,13 @@ export function DexPage() {
 
       {/* Daily Volume Bar Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-        <h2 className="mb-4 text-lg font-semibold text-white">Daily Trading Volume</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Daily Trading Volume</h2>
+          <TimeRangeSelector value={volRange} onChange={setVolRange} />
+        </div>
         {validData.length > 0 ? (
           <BarChartComponent
-            data={validData}
+            data={volRange ? validData.slice(-volRange) : validData}
             xKey="date"
             bars={[{ key: 'daily_volume_usd', color: '#8000E0' }]}
           />
@@ -100,9 +111,12 @@ export function DexPage() {
 
       {/* Cumulative Volume */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-        <h2 className="mb-4 text-lg font-semibold text-white">Cumulative Volume</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Cumulative Volume</h2>
+          <TimeRangeSelector value={cumRange} onChange={setCumRange} />
+        </div>
         {cumulativeVolume.length > 0 ? (
-          <AreaChartComponent data={cumulativeVolume} xKey="date" yKey="cumulative_volume" color="#D000C0" />
+          <AreaChartComponent data={cumRange ? cumulativeVolume.slice(-cumRange) : cumulativeVolume} xKey="date" yKey="cumulative_volume" color="#D000C0" />
         ) : (
           <p className="py-12 text-center text-gray-500">No volume data available</p>
         )}
