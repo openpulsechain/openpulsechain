@@ -14,33 +14,29 @@ export function DexPage() {
   const latest = pulsex.data.length > 0 ? pulsex.data[pulsex.data.length - 1] : null
 
   const kpis = useMemo(() => {
-    if (!pulsex.data.length) return null
-    const last30 = pulsex.data.slice(-30)
+    if (!validData.length) return null
+    const last30 = validData.slice(-30)
     const volume30d = last30.reduce((s, d) => s + d.daily_volume_usd, 0)
-    const totalVolume = pulsex.data.reduce((s, d) => s + d.daily_volume_usd, 0)
+    const totalVolume = validData.reduce((s, d) => s + d.daily_volume_usd, 0)
     return {
       totalLiquidity: latest?.total_liquidity_usd ?? 0,
       totalVolume,
       totalTxs: latest?.total_transactions ?? 0,
       volume30d,
     }
-  }, [pulsex.data, latest])
+  }, [validData, latest])
+
+  // Filter out days with zero data (pre-launch)
+  const validData = useMemo(() => pulsex.data.filter((d) => d.daily_volume_usd > 0 || d.total_liquidity_usd > 0), [pulsex.data])
 
   // Cumulative volume computed from daily sums (subgraph totalVolumeUSD is always 0)
   const cumulativeVolume = useMemo(() => {
     let cumul = 0
-    return pulsex.data.map((d) => {
+    return validData.map((d) => {
       cumul += d.daily_volume_usd
       return { date: d.date, cumulative_volume: cumul }
     })
-  }, [pulsex.data])
-
-  // Recent 180 days for charts
-  const recent = pulsex.data.slice(-180)
-  const cumulativeRecent = cumulativeVolume.slice(-180)
-
-  // Daily volume for bar chart (last 90 days)
-  const volumeRecent = pulsex.data.slice(-90)
+  }, [validData])
 
   if (pulsex.loading) return <Spinner />
 
@@ -80,9 +76,9 @@ export function DexPage() {
 
       {/* Liquidity Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-        <h2 className="mb-4 text-lg font-semibold text-white">Total Liquidity (TVL)</h2>
-        {recent.length > 0 ? (
-          <AreaChartComponent data={recent} xKey="date" yKey="total_liquidity_usd" color="#00D4FF" />
+        <h2 className="mb-4 text-lg font-semibold text-white">Total Liquidity (PulseX)</h2>
+        {validData.length > 0 ? (
+          <AreaChartComponent data={validData} xKey="date" yKey="total_liquidity_usd" color="#00D4FF" />
         ) : (
           <p className="py-12 text-center text-gray-500">No liquidity data available</p>
         )}
@@ -91,11 +87,11 @@ export function DexPage() {
       {/* Daily Volume Bar Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <h2 className="mb-4 text-lg font-semibold text-white">Daily Trading Volume</h2>
-        {volumeRecent.length > 0 ? (
+        {validData.length > 0 ? (
           <BarChartComponent
-            data={volumeRecent}
+            data={validData}
             xKey="date"
-            bars={[{ key: 'daily_volume_usd', color: '#8000E0', name: 'Volume' }]}
+            bars={[{ key: 'daily_volume_usd', color: '#8000E0' }]}
           />
         ) : (
           <p className="py-12 text-center text-gray-500">No volume data available</p>
@@ -105,8 +101,8 @@ export function DexPage() {
       {/* Cumulative Volume */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <h2 className="mb-4 text-lg font-semibold text-white">Cumulative Volume</h2>
-        {cumulativeRecent.length > 0 ? (
-          <AreaChartComponent data={cumulativeRecent} xKey="date" yKey="cumulative_volume" color="#D000C0" />
+        {cumulativeVolume.length > 0 ? (
+          <AreaChartComponent data={cumulativeVolume} xKey="date" yKey="cumulative_volume" color="#D000C0" />
         ) : (
           <p className="py-12 text-center text-gray-500">No volume data available</p>
         )}

@@ -13,7 +13,7 @@ import { formatUsd, formatDateShort, formatDateFull } from '../../lib/format'
 interface BarChartProps {
   data: any[]
   xKey: string
-  bars: { key: string; color: string; name: string }[]
+  bars: { key: string; color: string; name?: string }[]
 }
 
 export function BarChartComponent({ data, xKey, bars }: BarChartProps) {
@@ -40,9 +40,9 @@ export function BarChartComponent({ data, xKey, bars }: BarChartProps) {
           labelFormatter={(label) => formatDateFull(String(label))}
           formatter={(v: unknown) => [formatUsd(Number(v)), '']}
         />
-        <Legend />
+        {bars.some((b) => b.name) && <Legend />}
         {bars.map((bar) => (
-          <Bar key={bar.key} dataKey={bar.key} fill={bar.color} name={bar.name} radius={[2, 2, 0, 0]} />
+          <Bar key={bar.key} dataKey={bar.key} fill={bar.color} name={bar.name || bar.key} radius={[2, 2, 0, 0]} />
         ))}
       </RechartsBar>
     </ResponsiveContainer>
