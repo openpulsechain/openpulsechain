@@ -227,7 +227,7 @@ export function OverviewPage() {
                     </div>
                     {token.address && (
                       <a
-                        href={`https://scan.pulsechain.com/address/${token.address}`}
+                        href={`https://scan.pulsechain.com/token/${token.address}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-gray-600 hover:text-[#00D4FF] font-mono truncate max-w-[200px] sm:max-w-[300px] block transition-colors"

@@ -291,7 +291,7 @@ export function TokensPage() {
                   <p className="text-gray-400 text-sm">{selectedToken.name}</p>
                   <button
                     type="button"
-                    onClick={() => window.open(`https://scan.pulsechain.com/address/${selectedToken.address}`, '_blank', 'noopener,noreferrer')}
+                    onClick={() => window.open(`https://scan.pulsechain.com/token/${selectedToken.address}`, '_blank', 'noopener,noreferrer')}
                     className="flex items-center gap-1 text-gray-500 text-xs font-mono mt-1 hover:text-[#00D4FF] transition-colors cursor-pointer"
                   >
                     {selectedToken.address}
