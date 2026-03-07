@@ -14,6 +14,8 @@ import type {
   HyperlaneTransfer,
   HyperlaneDailyStats,
   HyperlaneChainStats,
+  WhaleAddress,
+  WhaleHolding,
 } from '../types'
 
 function useQuery<T>(table: string, options?: {
@@ -222,4 +224,19 @@ export function useBridgeWhales(minUsd = 50000) {
   }, [minUsd])
 
   return { data, loading }
+}
+
+export function useWhaleAddresses() {
+  return useQuery<WhaleAddress>('whale_addresses', {
+    orderBy: 'total_usd',
+    ascending: false,
+    limit: 200,
+  })
+}
+
+export function useWhaleHoldings() {
+  return useQuery<WhaleHolding>('whale_holdings', {
+    orderBy: 'balance_usd',
+    ascending: false,
+  })
 }

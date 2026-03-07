@@ -126,6 +126,24 @@ export interface BridgeTvlToken {
   pct_of_total: number
 }
 
+export interface WhaleAddress {
+  address: string
+  total_usd: number
+  token_count: number
+  top_tokens: string | null
+  is_contract: boolean
+}
+
+export interface WhaleHolding {
+  address: string
+  token_address: string
+  token_symbol: string
+  balance: number
+  balance_usd: number
+  rank: number
+  is_contract: boolean
+}
+
 export interface HyperlaneChainStats {
   chain_id: number
   chain_name: string | null
