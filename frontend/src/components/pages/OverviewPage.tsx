@@ -44,8 +44,21 @@ export function OverviewPage() {
   const tvlRecent = tvlRange ? tvl.data.slice(-tvlRange) : tvl.data
   const dexRecent = dexRange ? dex.data.slice(-dexRange) : dex.data
 
+  // Deduplicate by symbol: keep the entry with highest volume
+  const deduped = useMemo(() => {
+    const map = new Map<string, typeof prices.data[0]>()
+    for (const token of prices.data) {
+      const key = token.symbol.toUpperCase()
+      const existing = map.get(key)
+      if (!existing || (token.volume_24h_usd ?? 0) > (existing.volume_24h_usd ?? 0)) {
+        map.set(key, token)
+      }
+    }
+    return Array.from(map.values())
+  }, [prices.data])
+
   // Sort tokens: real market cap first, then $0
-  const sortedPrices = [...prices.data].sort((a, b) => {
+  const sortedPrices = [...deduped].sort((a, b) => {
     const aCap = a.market_cap_usd ?? 0
     const bCap = b.market_cap_usd ?? 0
     if (aCap > 0 && bCap === 0) return -1
