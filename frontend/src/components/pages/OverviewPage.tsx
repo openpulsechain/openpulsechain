@@ -227,7 +227,7 @@ export function OverviewPage() {
                     </div>
                     {token.address && (
                       <a
-                        href={`https://scan.pulsechain.com/token/${token.address}`}
+                        href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${token.address}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-gray-600 hover:text-[#00D4FF] font-mono truncate max-w-[200px] sm:max-w-[300px] block transition-colors"
@@ -278,7 +278,7 @@ export function OverviewPage() {
             </li>
           </ul>
           <p className="text-gray-600 pt-1">
-            Contract addresses link to <a href="https://scan.pulsechain.com" target="_blank" rel="noopener noreferrer" className="text-[#00D4FF]/50 hover:text-[#00D4FF] transition-colors">PulseChain Scan</a> for independent verification.
+            Contract addresses link to <a href="https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/" target="_blank" rel="noopener noreferrer" className="text-[#00D4FF]/50 hover:text-[#00D4FF] transition-colors">PulseChain Explorer</a> (Otterscan) for independent verification.
             Not financial advice. Data provided for informational purposes only.
           </p>
         </div>
