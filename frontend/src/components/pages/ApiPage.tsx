@@ -523,19 +523,102 @@ export function ApiPage() {
         </div>
       </section>
 
+      {/* REST API */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Zap className="h-5 w-5 text-emerald-400" />
+          <h2 className="text-xl font-semibold">REST API</h2>
+          <span className="text-xs text-gray-500 border border-white/10 rounded px-2 py-0.5">No auth required</span>
+        </div>
+        <p className="text-gray-400 text-sm">
+          Simpler alternative to PostgREST. Standard JSON responses, no API key needed.
+          <br />
+          <span className="text-gray-500">Interactive docs available at <code className="text-[#00D4FF]">/docs</code> (Swagger UI).</span>
+        </p>
+
+        <div className="space-y-1">
+          <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Base URL</h3>
+          <CodeBlock code="https://openpulsechain-api-production.up.railway.app" />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500 border-b border-white/10">
+                <th className="py-2 pr-4">Method</th>
+                <th className="py-2 pr-4">Endpoint</th>
+                <th className="py-2 pr-4">Description</th>
+                <th className="py-2">Rate Limit</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono text-sm">
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">/api/v1/tokens</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">List tokens (paginated, sortable)</td>
+                <td className="py-2 text-gray-500 font-sans">60/min</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/tokens/{address}'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Token detail + current price</td>
+                <td className="py-2 text-gray-500 font-sans">120/min</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/tokens/{address}/price'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Current price only (fast)</td>
+                <td className="py-2 text-gray-500 font-sans">120/min</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/tokens/{address}/history'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Price history (days/date range)</td>
+                <td className="py-2 text-gray-500 font-sans">30/min</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">/api/v1/pairs</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Top PulseX trading pairs</td>
+                <td className="py-2 text-gray-500 font-sans">60/min</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">/api/v1/market/overview</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">TVL, volume, top gainers/losers</td>
+                <td className="py-2 text-gray-500 font-sans">60/min</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-300">Example: Get HEX price history</h4>
+          <CodeBlock code={`curl 'https://openpulsechain-api-production.up.railway.app/api/v1/tokens/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39/history?days=30'`} />
+        </div>
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-300">Example: Market overview</h4>
+          <CodeBlock code={`curl 'https://openpulsechain-api-production.up.railway.app/api/v1/market/overview'`} />
+        </div>
+      </section>
+
       {/* Rate Limits */}
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Rate Limits</h2>
         <div className="bg-gray-900/50 border border-white/5 rounded-lg p-4 text-sm text-gray-400 space-y-2">
-          <p>
-            This API runs on Supabase free tier. There are no hard rate limits, but please be reasonable:
-          </p>
+          <p><strong className="text-gray-300">Supabase PostgREST API:</strong></p>
           <ul className="list-disc list-inside space-y-1 text-gray-500">
-            <li>Avoid more than 60 requests/minute</li>
+            <li>No hard rate limits — be reasonable (max ~60 req/min)</li>
             <li>Use <code className="text-[#00D4FF]">limit</code> and <code className="text-[#00D4FF]">select</code> to reduce payload size</li>
             <li>Cache responses on your side when possible</li>
-            <li>Data refreshes every 5-15 minutes depending on the table</li>
           </ul>
+          <p className="mt-3"><strong className="text-gray-300">REST API (FastAPI):</strong></p>
+          <ul className="list-disc list-inside space-y-1 text-gray-500">
+            <li>30-120 requests/minute per IP (varies by endpoint)</li>
+            <li>Responses cached 30s (list/detail) to 5min (history)</li>
+            <li>429 returned when limit exceeded</li>
+          </ul>
+          <p className="mt-3 text-gray-500">Data refreshes every 5-15 minutes depending on the table.</p>
         </div>
       </section>
 

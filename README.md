@@ -1,153 +1,102 @@
-# PulseChain Analytics
+# OpenPulsechain
 
-An open-source analytics platform for the [PulseChain](https://pulsechain.com) blockchain.
+Open-source analytics platform for [PulseChain](https://pulsechain.com). Free public API, no auth required.
 
-PulseChain Analytics provides transparent, verifiable, and queryable on-chain data through a combination of Dune SQL dashboards and a self-hosted data pipeline. The project is designed to be community-driven and extensible.
+**Live:** [openpulsechain.com](https://www.openpulsechain.com) · **API Docs:** [/docs](https://openpulsechain-api-production.up.railway.app/docs) · **Dune:** [Bridge Analytics](https://dune.com/openpulsechain/pulsechain-bridge-analytics)
 
-**Disclaimer:** This project is not affiliated with PulseChain, PulseX, or any related entity. All data is provided for informational and educational purposes only. Nothing in this repository constitutes financial advice.
-
----
-
-## Table of Contents
-
-- [Motivation](#motivation)
-- [Feature Roadmap](#feature-roadmap)
-- [Architecture](#architecture)
-- [Data Sources](#data-sources)
-- [Getting Started](#getting-started)
-- [Dune Dashboards](#dune-dashboards)
-- [Community Contributions](#community-contributions)
-- [Contributing](#contributing)
-- [License](#license)
+> Not affiliated with PulseChain, PulseX, or any related entity. Data is for informational purposes only — not financial advice.
 
 ---
 
-## Motivation
+## What's included
 
-The PulseChain ecosystem currently lacks open, queryable, and community-auditable analytics tooling. Existing solutions are either closed-source and centralized, or limited in scope. PulseChain is not natively indexed by Dune Analytics, which further limits the availability of on-chain data for researchers, developers, and users.
+| Module | Description |
+|--------|-------------|
+| **Dashboard** | Web app: Overview, DEX, Tokens (2500+), Bridge, API docs |
+| **REST API** | FastAPI with 7 endpoints: tokens, prices, history, pairs, market overview |
+| **Supabase API** | PostgREST access to 14 tables (bridge transfers, token prices, DEX stats, etc.) |
+| **Indexers** | 12 Python cron jobs collecting on-chain data every 5-15 min |
+| **Dune** | 9 SQL queries + 20 visualizations for bridge analytics (Ethereum-side) |
 
-This project addresses that gap by providing:
+## Data
 
-- **Open-source SQL queries** for bridge flow analysis (Ethereum-side) via Dune Analytics.
-- **A lightweight data pipeline** aggregating free API sources (DefiLlama, CoinGecko, PulseChain RPC) into a structured database.
-- **A public REST API** for programmatic access to indexed PulseChain metrics.
-- **A web dashboard** for visual exploration of network health, liquidity, and activity.
+- **2,533 tokens** discovered from PulseX Subgraph
+- **463K+ price records** (daily, since May 2023)
+- **231K+ bridge transfers** (OmniBridge + Hyperlane)
+- **100% sovereign** token prices from PulseX `derivedUSD` — no CoinGecko dependency for PulseChain tokens
 
----
+## REST API (no auth)
 
-## Feature Roadmap
+```
+Base URL: https://openpulsechain-api-production.up.railway.app
+```
 
-| Feature | Status | Data Source | Notes |
-|---------|--------|-------------|-------|
-| Bridge inflows/outflows | In progress | Dune Analytics (ETH-side) | Ethereum bridge contract events |
-| Network overview (TVL, gas, burn, holders) | Planned | DefiLlama API, PulseChain RPC | Aggregated from multiple free APIs |
-| Whale transfer alerts | Planned | PulseChain RPC | Large-value `Transfer` event monitoring |
-| PulseX volume and liquidity | Planned | DefiLlama DEX API | Pair-level breakdown |
-| Farming yield tracking | Planned | PulseChain RPC | Pool reserve snapshots via `getReserves()` |
-| Public REST API | Planned | Supabase | Auto-generated from indexed data |
+| Endpoint | Description | Rate |
+|----------|-------------|------|
+| `GET /api/v1/tokens` | List tokens (paginated, sortable) | 60/min |
+| `GET /api/v1/tokens/{address}` | Token detail + price | 120/min |
+| `GET /api/v1/tokens/{address}/price` | Current price (fast) | 120/min |
+| `GET /api/v1/tokens/{address}/history` | Price history | 30/min |
+| `GET /api/v1/pairs` | Top PulseX pairs | 60/min |
+| `GET /api/v1/market/overview` | TVL, volume, top movers | 60/min |
 
-See [Community Contributions](#community-contributions) for features that require archive node access.
+```bash
+# Get HEX price history (last 30 days)
+curl 'https://openpulsechain-api-production.up.railway.app/api/v1/tokens/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39/history?days=30'
 
----
+# Market overview
+curl 'https://openpulsechain-api-production.up.railway.app/api/v1/market/overview'
+```
+
+Full Swagger docs: [/docs](https://openpulsechain-api-production.up.railway.app/docs)
+
+## Supabase API
+
+Direct PostgREST access to all tables. Requires the `apikey` header (anon key available on the [API page](https://www.openpulsechain.com)).
+
+```bash
+# Whale bridge transfers > $50K
+curl 'https://xojdwzmcoiaeydewjrhe.supabase.co/rest/v1/bridge_transfers?amount_usd=gte.50000&order=block_timestamp.desc&limit=20' \
+  -H "apikey: YOUR_ANON_KEY"
+```
 
 ## Architecture
 
 ```
-+-----------------------+     +--------------------+     +------------------+
-|    Data Sources       |     |    Backend         |     |    Frontend       |
-|                       |     |                    |     |                  |
-|  DefiLlama API        |---->|  PostgreSQL        |---->|  React + TS      |
-|  PulseChain RPC       |     |  (Supabase)        |     |  (Vercel)        |
-|  CoinGecko API        |     |                    |     |                  |
-|  PulseChain Explorer  |     |  Cron indexers     |     |                  |
-|  Dune Analytics       |     |  (Railway)         |     |                  |
-+-----------------------+     +--------------------+     +------------------+
+PulseX Subgraph ──┐
+DefiLlama API ────┤──> Python Indexers (Railway cron) ──> Supabase (PostgreSQL + RLS)
+PulseChain RPC ───┤                                           │
+CoinGecko API ────┘                                     ┌─────┴──────┐
+                                                        │            │
+                                                   React SPA    FastAPI
+                                                   (Railway)    (Railway)
 ```
 
-**Backend:** PostgreSQL database hosted on Supabase with Row-Level Security. Lightweight Python indexers run on Railway as scheduled cron jobs.
-
-**Frontend:** React single-page application with TypeScript and TailwindCSS, deployed on Vercel.
-
-**Dune layer:** Standalone SQL queries targeting Ethereum mainnet contracts (bridge, sacrifice). These operate independently and do not require the backend infrastructure.
-
----
-
-## Data Sources
-
-All data sources used in this project are free and publicly accessible.
-
-| Data | Provider | Endpoint | Rate Limit |
-|------|----------|----------|------------|
-| Chain TVL and protocol breakdown | DefiLlama | `api.llama.fi/v2/chains`, `api.llama.fi/protocols` | Unlimited |
-| Historical chain TVL | DefiLlama | `api.llama.fi/v2/historicalChainTvl/PulseChain` | Unlimited |
-| DEX volume by chain | DefiLlama | `api.llama.fi/overview/dexs/PulseChain` | Unlimited |
-| Token prices | CoinGecko | `api.coingecko.com/api/v3/simple/price` | 30 calls/min |
-| Gas price, block data, logs | PulseChain RPC | `rpc.pulsechain.com` | Public, rate-limited |
-| Address and contract data | PulseChain Explorer | `scan.pulsechain.com/api` | Public, rate-limited |
-| Bridge contract events | Dune Analytics | Ethereum mainnet tables | 2,500 credits/month (free tier) |
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js >= 18
-- Python >= 3.10
-- A Supabase account (free tier)
-- Git
-
-### Clone the repository
+## Getting started
 
 ```bash
 git clone https://github.com/openpulsechain/openpulsechain.git
-cd pulsechain-analytics
+cd openpulsechain
 ```
 
-Refer to each module's documentation for setup instructions:
+| Module | Setup |
+|--------|-------|
+| `frontend/` | `npm install && npm run dev` |
+| `indexers/` | `pip install -r requirements.txt` + `.env` config |
+| `api/` | `pip install -r requirements.txt && uvicorn main:app` |
 
-- [`/dune`](./dune) -- Dune Analytics SQL queries
-- [`/indexers`](./indexers) -- Python data indexers
-- [`/frontend`](./frontend) -- React web dashboard
+## Data sources
 
----
-
-## Dune Dashboards
-
-PulseChain is not natively indexed by Dune Analytics. The SQL queries in [`/dune`](./dune) target **Ethereum mainnet** to analyze bridge contract interactions (deposits, withdrawals, token flows).
-
-These queries can be copied directly into the [Dune query editor](https://dune.com) and executed on the free tier.
-
-**Live dashboard:** [dune.com/openpulsechain/pulsechain-bridge-analytics](https://dune.com/openpulsechain/pulsechain-bridge-analytics)
-
-For a detailed comparison of our data against other platforms (DefiLlama, GoPulse, PulseChainStats), see [`docs/bridge-data-comparison.md`](docs/bridge-data-comparison.md).
-
----
-
-## Community Contributions
-
-The following features require infrastructure beyond the scope of this project's budget (archive node access, high-throughput RPC). They are documented as open bounties for community contributors.
-
-| Feature | Requirement | Complexity |
-|---------|-------------|------------|
-| Wash trading detection on PulseX | Archive node, full swap history | High |
-| MEV and arbitrage tracking | Archive node with `debug_traceTransaction` | High |
-| Rug pull and honeypot monitoring | Real-time contract analysis | High |
-| Full DeFi portfolio tracker | Protocol-specific ABI decoding | Medium |
-| Telegram and Discord alert bots | Webhook infrastructure | Low |
-
-If you operate a PulseChain archive node or have access to dedicated RPC infrastructure, contributions in these areas are especially valuable. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## Contributing
-
-Contributions of all kinds are welcome: SQL queries, indexer scripts, frontend components, documentation improvements, and bug reports.
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
-
----
+| Data | Source | Cost |
+|------|--------|------|
+| Token prices (PulseChain) | PulseX Subgraph `derivedUSD` | Free |
+| Token prices (BTC/ETH/stables) | CoinGecko API | Free |
+| TVL, DEX volume | DefiLlama API | Free |
+| Gas price, blocks | PulseChain RPC | Free |
+| Bridge events (ETH-side) | Dune Analytics | Free (2500 credits/mo) |
+| Bridge events (PLS-side) | PulseChain OmniBridge Subgraph | Free |
+| Hyperlane transfers | Hyperlane Explorer API | Free |
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT](LICENSE)

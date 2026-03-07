@@ -114,6 +114,27 @@ def root(request: Request):
     }
 
 
+@app.get("/health", tags=["Info"])
+@limiter.limit("120/minute")
+def health(request: Request):
+    """Health check: verifies DB connectivity."""
+    try:
+        result = supabase.table("pulsechain_tokens").select("address", count="exact").eq("is_active", True).limit(1).execute()
+        token_count = result.count or 0
+        db_ok = token_count > 0
+    except Exception:
+        db_ok = False
+        token_count = 0
+
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "db": "connected" if db_ok else "error",
+        "active_tokens": token_count,
+        "version": API_VERSION,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # ---- Tokens ---------------------------------------------------------------
 
 SORT_MAP = {
