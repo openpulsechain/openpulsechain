@@ -13,7 +13,7 @@ export function KpiCard({ title, value, subtitle, icon, trend }: KpiCardProps) {
     <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-400">{title}</span>
-        {icon && <span className="text-[#8000E0]/60">{icon}</span>}
+        {icon && <span className="rounded-lg bg-[#00D4FF]/10 p-1.5 text-[#00D4FF]">{icon}</span>}
       </div>
       <div className="mt-2 text-2xl font-bold text-white">{value}</div>
       <div className="mt-1 flex items-center gap-2">
