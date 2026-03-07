@@ -49,6 +49,7 @@ def main():
     from indexers import token_history
     from indexers import bridge_tvl
     from indexers import whale_tracker
+    from indexers import whale_clustering
 
     indexers = [
         ("bridge_subgraph", bridge_subgraph),
@@ -65,6 +66,7 @@ def main():
         ("token_history", token_history),
         ("bridge_tvl", bridge_tvl),
         ("whale_tracker", whale_tracker),
+        ("whale_clustering", whale_clustering),
     ]
 
     results = {}
