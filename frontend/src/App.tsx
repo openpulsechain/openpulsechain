@@ -4,6 +4,7 @@ import { Footer } from './components/layout/Footer'
 import { OverviewPage } from './components/pages/OverviewPage'
 import { BridgePage } from './components/pages/BridgePage'
 import { DexPage } from './components/pages/DexPage'
+import { TokensPage } from './components/pages/TokensPage'
 import { ApiPage } from './components/pages/ApiPage'
 
 export default function App() {
@@ -52,6 +53,7 @@ export default function App() {
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
           {page === 'overview' && <OverviewPage />}
           {page === 'dex' && <DexPage />}
+          {page === 'tokens' && <TokensPage />}
           {page === 'bridge' && <BridgePage />}
           {page === 'api' && <ApiPage />}
         </main>
