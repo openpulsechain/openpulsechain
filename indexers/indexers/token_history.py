@@ -21,6 +21,9 @@ PULSEX_SUBGRAPH = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex
 MAX_PAGES_PER_TOKEN = 20
 PAGE_SIZE = 1000
 
+# Max runtime per cron run (8 minutes to stay safe within 15-min cron)
+MAX_RUNTIME_SECONDS = 8 * 60
+
 
 def _query_subgraph(query: str) -> dict:
     """Execute a GraphQL query against PulseX subgraph."""
@@ -114,8 +117,16 @@ def run():
 
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         total_synced = 0
+        tokens_processed = 0
+        run_start = time.time()
 
         for token in tokens:
+            # Check runtime limit
+            elapsed = time.time() - run_start
+            if elapsed > MAX_RUNTIME_SECONDS:
+                logger.info(f"Runtime limit reached ({elapsed:.0f}s). Will continue next run.")
+                break
+
             address = token["address"]
             symbol = token["symbol"]
 
@@ -123,6 +134,7 @@ def run():
             since_ts = _timestamp_from_date(last_date)
 
             day_datas = _fetch_token_day_datas(address, since_ts)
+            tokens_processed += 1
 
             if not day_datas:
                 continue
@@ -167,7 +179,7 @@ def run():
             "error_message": None,
         }, on_conflict="indexer_name").execute()
 
-        logger.info(f"Total: {total_synced} price records synced for {len(tokens)} tokens")
+        logger.info(f"Total: {total_synced} price records synced for {tokens_processed}/{len(tokens)} tokens")
 
     except Exception as e:
         supabase.table("sync_status").upsert({
