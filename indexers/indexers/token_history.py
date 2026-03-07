@@ -103,11 +103,12 @@ def run():
     }, on_conflict="indexer_name").execute()
 
     try:
-        # Get all active tokens
+        # Get top tokens by volume (limit to avoid Railway timeout)
         tokens_res = supabase.table("pulsechain_tokens") \
             .select("address,symbol") \
             .eq("is_active", True) \
             .order("total_volume_usd", desc=True) \
+            .limit(200) \
             .execute()
 
         tokens = tokens_res.data
