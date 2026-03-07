@@ -209,7 +209,11 @@ export function OverviewPage() {
                 <th className="py-3 pr-4">Token</th>
                 <th className="py-3 pr-4 text-right">Price</th>
                 <th className="py-3 pr-4 text-right">24h Change</th>
-                <th className="py-3 pr-4 text-right">Market Cap</th>
+                <th className="py-3 pr-4 text-right" title="Fully Diluted Valuation = Total Supply × Price">
+                  <span className="hidden sm:inline">Market Cap</span>
+                  <span className="sm:hidden">MCap</span>
+                  <span className="text-xs text-gray-500 ml-1" title="Fully Diluted Valuation for PulseChain tokens, Circulating for CoinGecko tokens">*</span>
+                </th>
                 <th className="py-3 text-right">Volume</th>
               </tr>
             </thead>
@@ -256,6 +260,27 @@ export function OverviewPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="mt-4 rounded-lg bg-white/5 border border-white/10 p-4 text-xs text-gray-500 space-y-2">
+          <p className="font-medium text-gray-400">Data Methodology</p>
+          <ul className="space-y-1 list-disc list-inside">
+            <li>
+              <strong className="text-gray-400">Prices:</strong> PulseChain tokens use <code className="text-[#00D4FF]/70">derivedUSD</code> from PulseX Subgraph (100% on-chain). Major tokens (BTC, ETH, stables) use CoinGecko.
+            </li>
+            <li>
+              <strong className="text-gray-400">Market Cap*:</strong> For PulseChain tokens, this is the <span className="text-gray-400">Fully Diluted Valuation (FDV)</span> = Total Supply × Price. No reliable circulating supply data exists on-chain for PulseChain — this is a known ecosystem limitation (PulseChain Scan also reports $0 circulating market cap). For CoinGecko tokens, this is the standard circulating market cap.
+            </li>
+            <li>
+              <strong className="text-gray-400">Volume:</strong> All-time cumulative trading volume from PulseX Subgraph (<code className="text-[#00D4FF]/70">tradeVolumeUSD</code>). Not 24h volume.
+            </li>
+            <li>
+              <strong className="text-gray-400">24h Change:</strong> Calculated from price history stored daily. Compares current price to the most recent historical price (1-3 days ago).
+            </li>
+          </ul>
+          <p className="text-gray-600 pt-1">
+            Contract addresses link to <a href="https://scan.pulsechain.com" target="_blank" rel="noopener noreferrer" className="text-[#00D4FF]/50 hover:text-[#00D4FF] transition-colors">PulseChain Scan</a> for independent verification.
+            Not financial advice. Data provided for informational purposes only.
+          </p>
         </div>
       </div>
     </div>
