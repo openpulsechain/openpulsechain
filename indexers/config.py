@@ -23,7 +23,7 @@ COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 COINGECKO_API_KEY = os.environ.get("COINGECKO_API_KEY", "")
 
 # Token lists are now defined in indexers/token_prices.py
-# PulseChain tokens: GeckoTerminal (same pools as EvaInvest)
+# PulseChain tokens: PulseX subgraph (sovereign, no GeckoTerminal)
 # Major tokens (BTC, ETH, stables): CoinGecko
 
 # Subgraph page size

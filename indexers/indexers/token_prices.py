@@ -1,12 +1,12 @@
-"""Token prices indexer — GeckoTerminal for PulseChain tokens + CoinGecko for majors.
+"""Token prices indexer — PulseX subgraph for PulseChain tokens + CoinGecko for majors.
 
-PulseChain tokens use the same GeckoTerminal pools as EvaInvest pulsechain_scraper
-to guarantee identical price sources.
+PulseChain tokens use derivedUSD from PulseX subgraph (100% sovereign, no GeckoTerminal).
+24h change is calculated from token_price_history table in Supabase.
+Major tokens (BTC, ETH, stables) still use CoinGecko.
 """
 
 import logging
-import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import requests
 
@@ -16,53 +16,9 @@ from utils.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
-GT_BASE = "https://api.geckoterminal.com/api/v2"
+PULSEX_SUBGRAPH = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex"
 
-# PulseChain tokens — same pools as EvaInvest pulsechain_scraper
-PULSECHAIN_TOKENS = [
-    {
-        "id": "pulsex",
-        "symbol": "PLSX",
-        "name": "PulseX",
-        "network": "pulsechain",
-        "pool": "0x1b45b9148791d3a104184cd5dfe5ce57193a3ee9",
-        "method": "direct",
-    },
-    {
-        "id": "hex-pulsechain",
-        "symbol": "HEX",
-        "name": "HEX (PulseChain)",
-        "network": "pulsechain",
-        "pool": "0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65",
-        "method": "direct",
-    },
-    {
-        "id": "pulsex-incentive-token",
-        "symbol": "INC",
-        "name": "Incentive",
-        "network": "pulsechain",
-        "pool": "0xf808bb6265e9ca27002c0a04562bf50d4fe37eaa",
-        "method": "direct",
-    },
-    {
-        "id": "pulsechain",
-        "symbol": "PLS",
-        "name": "PulseChain",
-        "network": "pulsechain",
-        "pool": "0x1b45b9148791d3a104184cd5dfe5ce57193a3ee9",
-        "method": "derived",  # PLS_USD = PLSX_USD / PLSX_WPLS_ratio
-    },
-    {
-        "id": "hex",
-        "symbol": "EHEX",
-        "name": "eHEX",
-        "network": "eth",
-        "pool": "0x55D5c232D921B9eAA6b37b5845E439aCD04b4DBa",
-        "method": "direct",
-    },
-]
-
-# Major tokens from CoinGecko (reliable for these)
+# Major tokens from CoinGecko (reliable for these — not PulseChain native)
 COINGECKO_TOKENS = {
     "bitcoin": {"symbol": "BTC", "name": "Bitcoin"},
     "ethereum": {"symbol": "ETH", "name": "Ethereum"},
@@ -74,96 +30,182 @@ COINGECKO_TOKENS = {
 }
 
 
-def _fetch_gecko_terminal_price(token: dict) -> dict | None:
-    """Fetch latest price from GeckoTerminal pool OHLCV (2 candles for 24h change)."""
-    url = f"{GT_BASE}/networks/{token['network']}/pools/{token['pool']}/ohlcv/day"
-    params = {"aggregate": 1, "limit": 2, "currency": "usd"}
+def _fetch_top_tokens_from_db(limit: int = 50) -> list[dict]:
+    """Fetch top tokens by volume from pulsechain_tokens table."""
     try:
-        resp = requests.get(url, params=params, timeout=30)
-        if resp.status_code != 200:
-            logger.warning(f"GeckoTerminal {resp.status_code} for {token['symbol']}")
-            return None
-        candles = resp.json().get("data", {}).get("attributes", {}).get("ohlcv_list", [])
-        if not candles or candles[0][4] <= 0:
-            return None
-        today_close = float(candles[0][4])
-        change_pct = None
-        if len(candles) >= 2 and candles[1][4] > 0:
-            yesterday_close = float(candles[1][4])
-            change_pct = ((today_close - yesterday_close) / yesterday_close) * 100
-        return {
-            "close": today_close,
-            "volume": float(candles[0][5]),
-            "change_pct": change_pct,
-        }
+        resp = (
+            supabase.table("pulsechain_tokens")
+            .select("address, symbol, name")
+            .order("total_volume_usd", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        tokens = resp.data or []
+        logger.info(f"Fetched {len(tokens)} tokens from pulsechain_tokens table")
+        return tokens
     except Exception as e:
-        logger.warning(f"GeckoTerminal error for {token['symbol']}: {e}")
-        return None
+        logger.error(f"Failed to fetch tokens from pulsechain_tokens: {e}")
+        return []
 
 
-def _fetch_pls_derived_price(token: dict) -> dict | None:
-    """Derive PLS price: PLS_USD = PLSX_USD / PLSX_WPLS_ratio."""
-    # Get PLSX/WPLS pool in USD (includes 24h change)
-    usd_data = _fetch_gecko_terminal_price(token)
-    if not usd_data:
-        return None
+def _query_subgraph_prices(addresses: list[str]) -> dict:
+    """Query PulseX subgraph for current token prices using derivedUSD.
 
-    time.sleep(1.5)
+    Returns dict keyed by lowercase address.
+    """
+    if not addresses:
+        return {}
 
-    # Get PLSX/WPLS pool in token units (ratio) — 2 candles for 24h change
-    url = f"{GT_BASE}/networks/{token['network']}/pools/{token['pool']}/ohlcv/day"
-    params = {"aggregate": 1, "limit": 2, "currency": "token"}
-    try:
-        resp = requests.get(url, params=params, timeout=30)
-        if resp.status_code != 200:
-            return None
-        candles = resp.json().get("data", {}).get("attributes", {}).get("ohlcv_list", [])
-        if not candles or candles[0][4] <= 0:
-            return None
-        ratio_today = float(candles[0][4])
-        pls_price = usd_data["close"] / ratio_today
-        change_pct = None
-        if len(candles) >= 2 and candles[1][4] > 0 and usd_data.get("change_pct") is not None:
-            ratio_yesterday = float(candles[1][4])
-            yesterday_usd = usd_data["close"] / (1 + usd_data["change_pct"] / 100)
-            pls_yesterday = yesterday_usd / ratio_yesterday
-            if pls_yesterday > 0:
-                change_pct = ((pls_price - pls_yesterday) / pls_yesterday) * 100
-        return {
-            "close": pls_price,
-            "volume": usd_data["volume"],
-            "change_pct": change_pct,
+    # Subgraph expects lowercase addresses
+    lower_addresses = [a.lower() for a in addresses]
+
+    # Query in batches of 100 to avoid subgraph limits
+    all_tokens = {}
+    batch_size = 100
+
+    for i in range(0, len(lower_addresses), batch_size):
+        batch = lower_addresses[i : i + batch_size]
+        query = """
+        {
+          tokens(where: {id_in: %s}) {
+            id
+            symbol
+            name
+            decimals
+            derivedUSD
+            tradeVolumeUSD
+            totalLiquidity
+          }
         }
-    except Exception as e:
-        logger.warning(f"GeckoTerminal derived error for PLS: {e}")
-        return None
+        """ % str(batch).replace("'", '"')
+
+        try:
+            resp = requests.post(
+                PULSEX_SUBGRAPH,
+                json={"query": query},
+                timeout=30,
+            )
+            if resp.status_code != 200:
+                logger.warning(f"PulseX subgraph returned {resp.status_code}")
+                continue
+
+            data = resp.json()
+            if "errors" in data:
+                logger.warning(f"PulseX subgraph errors: {data['errors']}")
+                continue
+
+            tokens = data.get("data", {}).get("tokens", [])
+            for t in tokens:
+                all_tokens[t["id"].lower()] = t
+
+        except Exception as e:
+            logger.warning(f"PulseX subgraph request failed: {e}")
+
+    return all_tokens
+
+
+def _fetch_yesterday_prices(addresses: list[str]) -> dict:
+    """Fetch yesterday's prices from token_price_history for 24h change calculation.
+
+    Returns dict keyed by lowercase address with yesterday's price_usd.
+    """
+    if not addresses:
+        return {}
+
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    lower_addresses = [a.lower() for a in addresses]
+
+    prices = {}
+    # Query in batches to avoid URL length limits
+    batch_size = 50
+
+    for i in range(0, len(lower_addresses), batch_size):
+        batch = lower_addresses[i : i + batch_size]
+        try:
+            resp = (
+                supabase.table("token_price_history")
+                .select("address, price_usd")
+                .in_("address", batch)
+                .eq("date", yesterday)
+                .execute()
+            )
+            for row in resp.data or []:
+                addr = row["address"].lower()
+                price = row.get("price_usd")
+                if price and float(price) > 0:
+                    prices[addr] = float(price)
+        except Exception as e:
+            logger.warning(f"Failed to fetch yesterday prices: {e}")
+
+    return prices
 
 
 def _fetch_pulsechain_prices() -> list[dict]:
-    """Fetch all PulseChain token prices from GeckoTerminal."""
+    """Fetch PulseChain token prices from PulseX subgraph (sovereign, no GeckoTerminal)."""
+    # 1. Get top tokens from database
+    db_tokens = _fetch_top_tokens_from_db(limit=50)
+    if not db_tokens:
+        logger.warning("No tokens found in pulsechain_tokens table")
+        return []
+
+    # Build address-to-metadata mapping
+    token_meta = {}
+    addresses = []
+    for t in db_tokens:
+        addr = t["address"].lower()
+        token_meta[addr] = {
+            "symbol": t["symbol"],
+            "name": t["name"],
+            "address": t["address"],
+        }
+        addresses.append(addr)
+
+    # 2. Query PulseX subgraph for current prices
+    subgraph_data = _query_subgraph_prices(addresses)
+    if not subgraph_data:
+        logger.warning("No data returned from PulseX subgraph")
+        return []
+
+    # 3. Get yesterday's prices for 24h change calculation
+    yesterday_prices = _fetch_yesterday_prices(addresses)
+
+    # 4. Build output rows
     rows = []
     now = datetime.now(timezone.utc).isoformat()
 
-    for token in PULSECHAIN_TOKENS:
-        if token["method"] == "derived":
-            data = _fetch_pls_derived_price(token)
-        else:
-            data = _fetch_gecko_terminal_price(token)
+    for addr in addresses:
+        sg = subgraph_data.get(addr)
+        if not sg:
+            continue
 
-        if data:
-            rows.append({
-                "id": token["id"],
-                "symbol": token["symbol"],
-                "name": token["name"],
-                "price_usd": data["close"],
-                "volume_24h_usd": data["volume"],
-                "market_cap_usd": None,
-                "price_change_24h_pct": data.get("change_pct"),
-                "last_updated": now,
-            })
-            logger.info(f"  {token['symbol']}: ${data['close']:.8f} (GeckoTerminal)")
+        derived_usd = float(sg.get("derivedUSD", 0))
+        if derived_usd <= 0:
+            continue
 
-        time.sleep(2)  # Rate limit: 30 req/min
+        meta = token_meta[addr]
+        volume_usd = float(sg.get("tradeVolumeUSD", 0))
+        total_liquidity = float(sg.get("totalLiquidity", 0))
+
+        # Calculate 24h change from yesterday's price in token_price_history
+        change_pct = None
+        yesterday_price = yesterday_prices.get(addr)
+        if yesterday_price and yesterday_price > 0:
+            change_pct = ((derived_usd - yesterday_price) / yesterday_price) * 100
+
+        # Use address as id for PulseChain tokens (unique identifier)
+        rows.append({
+            "id": addr,
+            "symbol": meta["symbol"],
+            "name": meta["name"],
+            "price_usd": derived_usd,
+            "volume_24h_usd": volume_usd,
+            "market_cap_usd": None,
+            "price_change_24h_pct": change_pct,
+            "last_updated": now,
+            "source": "pulsex_subgraph",
+            "address": meta["address"],
+        })
+        logger.info(f"  {meta['symbol']}: ${derived_usd:.8f} (PulseX subgraph)")
 
     return rows
 
@@ -202,20 +244,22 @@ def _fetch_coingecko_prices() -> list[dict]:
             "volume_24h_usd": price_data.get("usd_24h_vol"),
             "price_change_24h_pct": price_data.get("usd_24h_change"),
             "last_updated": now,
+            "source": "coingecko",
+            "address": None,
         })
 
     return rows
 
 
 def run():
-    logger.info("Fetching token prices (GeckoTerminal + CoinGecko)...")
+    logger.info("Fetching token prices (PulseX subgraph + CoinGecko)...")
 
     supabase.table("sync_status").update({
         "status": "running",
     }).eq("indexer_name", "token_prices").execute()
 
     try:
-        # 1. PulseChain tokens from GeckoTerminal (same source as EvaInvest)
+        # 1. PulseChain tokens from PulseX subgraph (sovereign)
         pls_rows = _fetch_pulsechain_prices()
 
         # 2. Major tokens from CoinGecko
@@ -233,7 +277,7 @@ def run():
             "error_message": None,
         }).eq("indexer_name", "token_prices").execute()
 
-        logger.info(f"Updated prices: {len(pls_rows)} PulseChain (GeckoTerminal) + {len(cg_rows)} majors (CoinGecko)")
+        logger.info(f"Updated prices: {len(pls_rows)} PulseChain (PulseX subgraph) + {len(cg_rows)} majors (CoinGecko)")
 
     except Exception as e:
         supabase.table("sync_status").update({

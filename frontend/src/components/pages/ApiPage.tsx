@@ -180,10 +180,36 @@ const ENDPOINTS: Record<string, Endpoint[]> = {
       ],
     },
   ],
-  'Network': [
+  'Tokens (Sovereign)': [
+    {
+      table: 'pulsechain_tokens',
+      description: 'All discovered PulseChain tokens (2500+ tokens, source: PulseX Subgraph)',
+      columns: [
+        { name: 'address', type: 'text (contract address)' },
+        { name: 'symbol', type: 'text' },
+        { name: 'name', type: 'text' },
+        { name: 'decimals', type: 'integer' },
+        { name: 'total_volume_usd', type: 'numeric' },
+        { name: 'total_liquidity', type: 'numeric' },
+        { name: 'is_active', type: 'boolean' },
+        { name: 'updated_at', type: 'timestamptz' },
+      ],
+    },
+    {
+      table: 'token_price_history',
+      description: 'Daily price history for all tokens since May 2023 (460K+ records, source: PulseX Subgraph)',
+      columns: [
+        { name: 'address', type: 'text (contract address)' },
+        { name: 'date', type: 'date' },
+        { name: 'price_usd', type: 'numeric' },
+        { name: 'daily_volume_usd', type: 'numeric' },
+        { name: 'total_liquidity_usd', type: 'numeric' },
+        { name: 'source', type: "text ('pulsex_subgraph')" },
+      ],
+    },
     {
       table: 'token_prices',
-      description: 'Current prices for PulseChain tokens (PLS, PLSX, HEX, INC, eHEX)',
+      description: 'Current prices for PulseChain tokens + majors (source: PulseX Subgraph)',
       columns: [
         { name: 'id', type: 'text' },
         { name: 'symbol', type: 'text' },
@@ -195,6 +221,8 @@ const ENDPOINTS: Record<string, Endpoint[]> = {
         { name: 'last_updated', type: 'timestamptz' },
       ],
     },
+  ],
+  'Network': [
     {
       table: 'network_tvl_history',
       description: 'Historical TVL for PulseChain (source: DefiLlama)',
@@ -290,6 +318,53 @@ params = {"select": "symbol,price_usd,price_change_24h_pct"}
 prices = requests.get(url, headers=headers, params=params).json()
 print(prices)`,
   },
+  tokenHistory: {
+    title: 'Token price history (sovereign) — HEX last 30 days',
+    curl: `curl '${BASE_URL}/rest/v1/token_price_history?address=eq.0x2b591e99afe9f32eaa6214f7b7629768c40eeb39&order=date.desc&limit=30&select=date,price_usd,daily_volume_usd' \\
+  -H "apikey: ${ANON_KEY}"`,
+    javascript: `const res = await fetch(
+  '${BASE_URL}/rest/v1/token_price_history?address=eq.0x2b591e99afe9f32eaa6214f7b7629768c40eeb39&order=date.desc&limit=30&select=date,price_usd,daily_volume_usd',
+  { headers: { apikey: '${ANON_KEY}' } }
+)
+const history = await res.json()
+console.log(history)`,
+    python: `import requests
+
+url = "${BASE_URL}/rest/v1/token_price_history"
+headers = {"apikey": "${ANON_KEY}"}
+params = {
+    "address": "eq.0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+    "order": "date.desc", "limit": 30,
+    "select": "date,price_usd,daily_volume_usd"
+}
+
+history = requests.get(url, headers=headers, params=params).json()
+print(history)  # HEX daily prices from PulseX Subgraph`,
+  },
+  tokenDiscovery: {
+    title: 'Top tokens by volume (sovereign)',
+    curl: `curl '${BASE_URL}/rest/v1/pulsechain_tokens?is_active=eq.true&order=total_volume_usd.desc&limit=20&select=address,symbol,name,total_volume_usd' \\
+  -H "apikey: ${ANON_KEY}"`,
+    javascript: `const res = await fetch(
+  '${BASE_URL}/rest/v1/pulsechain_tokens?is_active=eq.true&order=total_volume_usd.desc&limit=20&select=address,symbol,name,total_volume_usd',
+  { headers: { apikey: '${ANON_KEY}' } }
+)
+const tokens = await res.json()
+console.log(tokens)`,
+    python: `import requests
+
+url = "${BASE_URL}/rest/v1/pulsechain_tokens"
+headers = {"apikey": "${ANON_KEY}"}
+params = {
+    "is_active": "eq.true",
+    "order": "total_volume_usd.desc",
+    "limit": 20,
+    "select": "address,symbol,name,total_volume_usd"
+}
+
+tokens = requests.get(url, headers=headers, params=params).json()
+print(tokens)  # 2500+ tokens from PulseX Subgraph`,
+  },
   hyperlane: {
     title: 'Hyperlane chain breakdown',
     curl: `curl '${BASE_URL}/rest/v1/hyperlane_chain_stats?order=total_inbound_volume_usd.desc' \\
@@ -367,9 +442,9 @@ export function ApiPage() {
           Public API
         </h1>
         <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-          Free, no auth required, real-time PulseChain data.
+          Free, no auth required, sovereign PulseChain data.
           <br />
-          <span className="text-gray-500">The only open API for PulseChain bridges, DEX, and network data.</span>
+          <span className="text-gray-500">The only open API for PulseChain tokens, bridges, DEX, and network data — 100% on-chain, zero third-party dependency.</span>
         </p>
       </div>
 
@@ -414,7 +489,7 @@ export function ApiPage() {
         <div className="flex items-center gap-2">
           <Database className="h-5 w-5 text-[#00D4FF]" />
           <h2 className="text-xl font-semibold">Endpoints</h2>
-          <span className="text-gray-500 text-sm">12 tables</span>
+          <span className="text-gray-500 text-sm">14 tables</span>
         </div>
 
         {Object.entries(ENDPOINTS).map(([category, endpoints]) => (
