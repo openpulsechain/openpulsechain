@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { X, Search, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
@@ -128,101 +128,32 @@ export function TokensPage() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
-  // Token detail view
-  if (selectedToken) {
-    return (
-      <div className="space-y-6">
-        <button
-          onClick={() => { setSelectedToken(null); setHistory([]) }}
-          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to token list
-        </button>
+  const closeModal = useCallback(() => {
+    setSelectedToken(null)
+    setHistory([])
+  }, [])
 
-        {/* Token header */}
-        <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-white">{selectedToken.symbol}</h1>
-              <p className="text-gray-400 text-sm">{selectedToken.name}</p>
-              <p className="text-gray-500 text-xs font-mono mt-1">{selectedToken.address}</p>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-white">
-                {selectedToken.price_usd != null
-                  ? selectedToken.price_usd < 0.01
-                    ? `$${selectedToken.price_usd.toFixed(8)}`
-                    : `$${selectedToken.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
-                  : '--'}
-              </div>
-              {selectedToken.price_change_24h_pct != null && (
-                <span className={`text-sm font-medium ${selectedToken.price_change_24h_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {selectedToken.price_change_24h_pct >= 0 ? '+' : ''}{selectedToken.price_change_24h_pct.toFixed(2)}%
-                  <span className="text-gray-500 ml-1">24h</span>
-                </span>
-              )}
-            </div>
-          </div>
+  const overlayRef = useRef<HTMLDivElement>(null)
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/5">
-            <div>
-              <div className="text-xs text-gray-500">Total Volume</div>
-              <div className="text-sm font-medium text-white">{formatUsd(selectedToken.total_volume_usd)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Liquidity</div>
-              <div className="text-sm font-medium text-white">{formatUsd(selectedToken.total_liquidity)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Decimals</div>
-              <div className="text-sm font-medium text-white">{selectedToken.decimals}</div>
-            </div>
-          </div>
-        </div>
+  // Close modal on Escape
+  useEffect(() => {
+    if (!selectedToken) return
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal()
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [selectedToken, closeModal])
 
-        {/* Price chart */}
-        <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-          <h2 className="mb-4 text-lg font-semibold text-white">Price History</h2>
-          {historyLoading ? (
-            <Spinner />
-          ) : history.length > 0 ? (
-            <AreaChartComponent
-              data={history}
-              xKey="date"
-              yKey="price_usd"
-              color="#00D4FF"
-              yFormatter={(v) => v < 0.01 ? `$${v.toFixed(6)}` : `$${v.toFixed(4)}`}
-            />
-          ) : (
-            <p className="py-12 text-center text-gray-500">No price history available</p>
-          )}
-        </div>
-
-        {/* Volume chart */}
-        <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-          <h2 className="mb-4 text-lg font-semibold text-white">Daily Volume</h2>
-          {historyLoading ? (
-            <Spinner />
-          ) : history.filter(h => h.daily_volume_usd > 0).length > 0 ? (
-            <AreaChartComponent
-              data={history}
-              xKey="date"
-              yKey="daily_volume_usd"
-              color="#8000E0"
-            />
-          ) : (
-            <p className="py-12 text-center text-gray-500">No volume data available</p>
-          )}
-        </div>
-
-        {/* Data source */}
-        <div className="text-xs text-gray-600 text-center">
-          Source: PulseX Subgraph (graph.pulsechain.com) — 100% on-chain, sovereign data
-        </div>
-      </div>
-    )
-  }
+  // Prevent body scroll when modal open
+  useEffect(() => {
+    if (selectedToken) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [selectedToken])
 
   // Token list view
   return (
@@ -329,6 +260,115 @@ export function TokensPage() {
       <div className="text-xs text-gray-600 text-center">
         Source: PulseX Subgraph (graph.pulsechain.com) — 100% on-chain, sovereign data
       </div>
+
+      {/* Token Detail Modal */}
+      {selectedToken && (
+        <div
+          ref={overlayRef}
+          onClick={(e) => { if (e.target === overlayRef.current) closeModal() }}
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4 pt-12 sm:pt-16"
+        >
+          <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-gray-900 shadow-2xl">
+            {/* Close button */}
+            <button
+              onClick={closeModal}
+              className="absolute top-4 right-4 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors z-10"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="p-5 sm:p-6 space-y-5">
+              {/* Token header */}
+              <div className="flex items-center justify-between flex-wrap gap-4 pr-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{selectedToken.symbol}</h2>
+                  <p className="text-gray-400 text-sm">{selectedToken.name}</p>
+                  <a
+                    href={`https://scan.pulsechain.com/address/${selectedToken.address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-gray-500 text-xs font-mono mt-1 hover:text-[#00D4FF] transition-colors"
+                  >
+                    {selectedToken.address}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-white">
+                    {selectedToken.price_usd != null
+                      ? selectedToken.price_usd < 0.01
+                        ? `$${selectedToken.price_usd.toFixed(8)}`
+                        : `$${selectedToken.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+                      : '--'}
+                  </div>
+                  {selectedToken.price_change_24h_pct != null && (
+                    <span className={`text-sm font-medium ${selectedToken.price_change_24h_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {selectedToken.price_change_24h_pct >= 0 ? '+' : ''}{selectedToken.price_change_24h_pct.toFixed(2)}%
+                      <span className="text-gray-500 ml-1">24h</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/5">
+                <div>
+                  <div className="text-xs text-gray-500">Total Volume</div>
+                  <div className="text-sm font-medium text-white">{formatUsd(selectedToken.total_volume_usd)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Liquidity</div>
+                  <div className="text-sm font-medium text-white">{formatUsd(selectedToken.total_liquidity)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Decimals</div>
+                  <div className="text-sm font-medium text-white">{selectedToken.decimals}</div>
+                </div>
+              </div>
+
+              {/* Price chart */}
+              <div className="rounded-xl border border-white/5 bg-gray-900/60 p-4">
+                <h3 className="mb-3 text-sm font-semibold text-white">Price History</h3>
+                {historyLoading ? (
+                  <Spinner />
+                ) : history.length > 0 ? (
+                  <AreaChartComponent
+                    data={history}
+                    xKey="date"
+                    yKey="price_usd"
+                    color="#00D4FF"
+                    yFormatter={(v) => v < 0.01 ? `$${v.toFixed(6)}` : `$${v.toFixed(4)}`}
+                  />
+                ) : (
+                  <p className="py-8 text-center text-gray-500 text-sm">No price history available</p>
+                )}
+              </div>
+
+              {/* Volume chart */}
+              <div className="rounded-xl border border-white/5 bg-gray-900/60 p-4">
+                <h3 className="mb-3 text-sm font-semibold text-white">Daily Volume</h3>
+                {historyLoading ? (
+                  <Spinner />
+                ) : history.filter(h => h.daily_volume_usd > 0).length > 0 ? (
+                  <AreaChartComponent
+                    data={history}
+                    xKey="date"
+                    yKey="daily_volume_usd"
+                    color="#8000E0"
+                  />
+                ) : (
+                  <p className="py-8 text-center text-gray-500 text-sm">No volume data available</p>
+                )}
+              </div>
+
+              {/* Source */}
+              <div className="text-xs text-gray-600 text-center">
+                Source: PulseX Subgraph — 100% on-chain data
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
