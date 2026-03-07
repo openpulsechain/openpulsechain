@@ -2,7 +2,7 @@
 
 Open-source analytics platform for [PulseChain](https://pulsechain.com). Free public API, no auth required.
 
-**Live:** [openpulsechain.com](https://www.openpulsechain.com) · **API Docs:** [/docs](https://openpulsechain-api-production.up.railway.app/docs) · **Dune:** [Bridge Analytics](https://dune.com/openpulsechain/pulsechain-bridge-analytics)
+**Live:** [openpulsechain.com](https://www.openpulsechain.com) · **API Docs:** [/docs](https://api.openpulsechain.com/docs) · **Dune:** [Bridge Analytics](https://dune.com/openpulsechain/pulsechain-bridge-analytics)
 
 > Not affiliated with PulseChain, PulseX, or any related entity. Data is for informational purposes only — not financial advice.
 
@@ -28,7 +28,7 @@ Open-source analytics platform for [PulseChain](https://pulsechain.com). Free pu
 ## REST API (no auth)
 
 ```
-Base URL: https://openpulsechain-api-production.up.railway.app
+Base URL: https://api.openpulsechain.com
 ```
 
 | Endpoint | Description | Rate |
@@ -42,13 +42,13 @@ Base URL: https://openpulsechain-api-production.up.railway.app
 
 ```bash
 # Get HEX price history (last 30 days)
-curl 'https://openpulsechain-api-production.up.railway.app/api/v1/tokens/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39/history?days=30'
+curl 'https://api.openpulsechain.com/api/v1/tokens/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39/history?days=30'
 
 # Market overview
-curl 'https://openpulsechain-api-production.up.railway.app/api/v1/market/overview'
+curl 'https://api.openpulsechain.com/api/v1/market/overview'
 ```
 
-Full Swagger docs: [/docs](https://openpulsechain-api-production.up.railway.app/docs)
+Full Swagger docs: [/docs](https://api.openpulsechain.com/docs)
 
 ## Supabase API
 

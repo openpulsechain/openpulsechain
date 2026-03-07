@@ -538,7 +538,7 @@ export function ApiPage() {
 
         <div className="space-y-1">
           <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Base URL</h3>
-          <CodeBlock code="https://openpulsechain-api-production.up.railway.app" />
+          <CodeBlock code="https://api.openpulsechain.com" />
         </div>
 
         <div className="overflow-x-auto">
@@ -594,11 +594,11 @@ export function ApiPage() {
 
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-300">Example: Get HEX price history</h4>
-          <CodeBlock code={`curl 'https://openpulsechain-api-production.up.railway.app/api/v1/tokens/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39/history?days=30'`} />
+          <CodeBlock code={`curl 'https://api.openpulsechain.com/api/v1/tokens/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39/history?days=30'`} />
         </div>
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-300">Example: Market overview</h4>
-          <CodeBlock code={`curl 'https://openpulsechain-api-production.up.railway.app/api/v1/market/overview'`} />
+          <CodeBlock code={`curl 'https://api.openpulsechain.com/api/v1/market/overview'`} />
         </div>
       </section>
 
