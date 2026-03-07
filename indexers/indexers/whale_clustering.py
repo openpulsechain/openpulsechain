@@ -164,6 +164,34 @@ def run():
         all_links = []   # list of {from, to, link_type, detail}
         funder_groups = defaultdict(list)  # funder -> [whale addresses]
 
+        # 1b. Load bridge users upfront (needed during per-whale loop)
+        bridge_users = set()
+        try:
+            omni = supabase.table("bridge_transfers") \
+                .select("user_address") \
+                .eq("direction", "deposit") \
+                .execute()
+            for row in (omni.data or []):
+                a = (row.get("user_address") or "").lower()
+                if a:
+                    bridge_users.add(a)
+
+            hyper = supabase.table("hyperlane_transfers") \
+                .select("origin_tx_sender") \
+                .eq("direction", "inbound") \
+                .execute()
+            for row in (hyper.data or []):
+                a = (row.get("origin_tx_sender") or "").lower()
+                if a:
+                    bridge_users.add(a)
+
+            logger.info(f"Loaded {len(bridge_users)} unique bridge user addresses")
+        except Exception as e:
+            logger.warning(f"Failed to load bridge data: {e}")
+
+        # Track token senders to whales (for bridge lineage)
+        token_senders_to_whale = defaultdict(list)  # sender -> [(whale, symbol)]
+
         # 2. For each whale, find funder + direct links
         for i, whale in enumerate(whales):
             addr = whale["address"]
@@ -205,6 +233,13 @@ def run():
                         "updated_at": now,
                     })
 
+                # Track ALL incoming token senders (for bridge lineage)
+                for tx in token_in:
+                    sender = tx.get("from", {}).get("hash", "").lower()
+                    symbol = tx.get("token", {}).get("symbol", "?")
+                    if sender and sender not in INFRA_ADDRESSES:
+                        token_senders_to_whale[sender].append((addr, symbol))
+
             # Rate limit (0.3s between requests, ~4 requests per whale)
             time.sleep(0.3)
 
@@ -238,68 +273,53 @@ def run():
 
         all_links.extend(cluster_links)
 
-        # 3b. Bridge lineage — find whales funded by known bridge users
-        bridge_users = set()
-        try:
-            # OmniBridge users (deposits = ETH→PLS)
-            omni = supabase.table("bridge_transfers") \
-                .select("user_address") \
-                .eq("direction", "deposit") \
-                .execute()
-            for row in (omni.data or []):
-                addr = (row.get("user_address") or "").lower()
-                if addr:
-                    bridge_users.add(addr)
-
-            # Hyperlane users (inbound = other chain → PLS)
-            hyper = supabase.table("hyperlane_transfers") \
-                .select("origin_tx_sender") \
-                .eq("direction", "inbound") \
-                .execute()
-            for row in (hyper.data or []):
-                addr = (row.get("origin_tx_sender") or "").lower()
-                if addr:
-                    bridge_users.add(addr)
-
-            logger.info(f"  Loaded {len(bridge_users)} unique bridge user addresses")
-        except Exception as e:
-            logger.warning(f"  Failed to load bridge data: {e}")
-
-        # Check which whales ARE bridge users (bridged then hold)
-        bridge_whales = whale_set & bridge_users
-        logger.info(f"  {len(bridge_whales)} whales are direct bridge users")
-
-        # Check which whale funders are bridge users
-        # If funder bridged in AND funded multiple whales → very strong cluster
+        # 3b. Bridge lineage — cross-reference token senders with bridge users
         bridge_links = []
+        bridge_token_groups = defaultdict(list)  # bridge_sender -> [whale_addresses]
+
+        # Check all token senders: if sender is a bridge user → bridge_funded
+        for sender, recipients in token_senders_to_whale.items():
+            if sender in bridge_users:
+                unique_whales = list(set(r[0] for r in recipients))
+                tokens = list(set(r[1] for r in recipients))
+                bridge_token_groups[sender] = unique_whales
+
+                for w in unique_whales:
+                    bridge_links.append({
+                        "address_from": sender,
+                        "address_to": w,
+                        "link_type": "bridge_funded",
+                        "detail": f"bridge user sent {', '.join(tokens[:3])}",
+                        "updated_at": now,
+                    })
+
+                # Link daughter whales to each other
+                if len(unique_whales) >= 2:
+                    for j in range(len(unique_whales)):
+                        for k in range(j + 1, len(unique_whales)):
+                            bridge_links.append({
+                                "address_from": unique_whales[j],
+                                "address_to": unique_whales[k],
+                                "link_type": "bridge_siblings",
+                                "detail": f"same bridge user {sender[:12]}...",
+                                "updated_at": now,
+                            })
+
+        # Also check PLS funders that are bridge users
         for funder, funded_whales in funder_groups.items():
-            if funder in bridge_users:
+            if funder in bridge_users and funder not in bridge_token_groups:
                 for w in funded_whales:
                     bridge_links.append({
                         "address_from": funder,
                         "address_to": w,
                         "link_type": "bridge_funded",
-                        "detail": "funder is a bridge user",
+                        "detail": "bridge user sent PLS",
                         "updated_at": now,
                     })
-                if len(funded_whales) >= 2:
-                    # Link daughters to each other with bridge context
-                    for j in range(len(funded_whales)):
-                        for k in range(j + 1, len(funded_whales)):
-                            bridge_links.append({
-                                "address_from": funded_whales[j],
-                                "address_to": funded_whales[k],
-                                "link_type": "bridge_siblings",
-                                "detail": "same bridge user funded both",
-                                "updated_at": now,
-                            })
 
-        # Also: whales who themselves bridged AND funded other whales
+        # Mark whales who themselves bridged
+        bridge_whales = whale_set & bridge_users
         for whale_addr in bridge_whales:
-            if whale_addr in funder_groups:
-                # This whale bridged in AND sent to other whales
-                continue  # Already handled above
-            # Mark whale as bridge user (self-funded via bridge)
             bridge_links.append({
                 "address_from": whale_addr,
                 "address_to": whale_addr,
@@ -308,9 +328,9 @@ def run():
                 "updated_at": now,
             })
 
-        logger.info(f"  Bridge lineage: {len(bridge_links)} links "
-                     f"({len(bridge_whales)} bridge whales, "
-                     f"{sum(1 for f in funder_groups if f in bridge_users)} bridge funders)")
+        logger.info(f"  Bridge lineage: {len(bridge_links)} links — "
+                     f"{len(bridge_token_groups)} bridge senders to whales, "
+                     f"{len(bridge_whales)} whales are bridge users")
         all_links.extend(bridge_links)
 
         # 4. Deduplicate links (keep unique from-to-type combinations)
