@@ -18,11 +18,14 @@ logger = logging.getLogger(__name__)
 PULSEX_SUBGRAPH = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex"
 
 # Max pages per token per run (avoid Railway timeout)
-MAX_PAGES_PER_TOKEN = 20
+MAX_PAGES_PER_TOKEN = 5
 PAGE_SIZE = 1000
 
-# Max runtime per cron run (8 minutes to stay safe within 15-min cron)
-MAX_RUNTIME_SECONDS = 8 * 60
+# Max runtime per cron run (5 minutes to stay safe within 15-min cron)
+MAX_RUNTIME_SECONDS = 5 * 60
+
+# Max tokens per cron run (incremental updates only — bulk done locally)
+MAX_TOKENS_PER_RUN = 50
 
 
 def _query_subgraph(query: str) -> dict:
@@ -108,7 +111,7 @@ def run():
             .select("address,symbol") \
             .eq("is_active", True) \
             .order("total_volume_usd", desc=True) \
-            .limit(200) \
+            .limit(MAX_TOKENS_PER_RUN) \
             .execute()
 
         tokens = tokens_res.data
@@ -170,7 +173,7 @@ def run():
                 total_synced += len(rows)
                 logger.info(f"  {symbol}: {len(rows)} days synced")
 
-            time.sleep(0.5)  # Rate limit subgraph
+            time.sleep(0.2)  # Rate limit subgraph
 
         supabase.table("sync_status").upsert({
             "indexer_name": "token_history",
