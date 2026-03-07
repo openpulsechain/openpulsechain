@@ -16,6 +16,7 @@ import type {
   HyperlaneChainStats,
   WhaleAddress,
   WhaleHolding,
+  WhaleLink,
 } from '../types'
 
 function useQuery<T>(table: string, options?: {
@@ -237,6 +238,13 @@ export function useWhaleAddresses() {
 export function useWhaleHoldings() {
   return useQuery<WhaleHolding>('whale_holdings', {
     orderBy: 'balance_usd',
+    ascending: false,
+  })
+}
+
+export function useWhaleLinks() {
+  return useQuery<WhaleLink>('whale_links', {
+    orderBy: 'id',
     ascending: false,
   })
 }

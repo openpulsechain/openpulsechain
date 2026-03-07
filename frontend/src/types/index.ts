@@ -144,6 +144,15 @@ export interface WhaleHolding {
   is_contract: boolean
 }
 
+export interface WhaleLink {
+  id: number
+  address_from: string
+  address_to: string
+  link_type: string
+  detail: string | null
+  updated_at: string
+}
+
 export interface HyperlaneChainStats {
   chain_id: number
   chain_name: string | null

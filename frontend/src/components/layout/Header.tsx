@@ -11,6 +11,7 @@ const PAGES = [
   { id: 'dex', label: 'DEX' },
   { id: 'tokens', label: 'Tokens' },
   { id: 'bridge', label: 'Bridge' },
+  { id: 'whales', label: 'Whales' },
   { id: 'api', label: 'API' },
 ]
 
