@@ -75,6 +75,7 @@ def _query_subgraph_prices(addresses: list[str]) -> dict:
             derivedUSD
             tradeVolumeUSD
             totalLiquidity
+            totalSupply
           }
         }
         """ % str(batch).replace("'", '"')
@@ -186,6 +187,17 @@ def _fetch_pulsechain_prices() -> list[dict]:
         volume_usd = float(sg.get("tradeVolumeUSD", 0))
         total_liquidity = float(sg.get("totalLiquidity", 0))
 
+        # Calculate market cap from totalSupply and derivedUSD
+        market_cap = None
+        try:
+            total_supply_raw = float(sg.get("totalSupply", 0))
+            decimals = int(sg.get("decimals", 18))
+            if total_supply_raw > 0:
+                total_supply = total_supply_raw / (10 ** decimals)
+                market_cap = derived_usd * total_supply
+        except (ValueError, TypeError):
+            pass
+
         # Calculate 24h change from yesterday's price in token_price_history
         change_pct = None
         yesterday_price = yesterday_prices.get(addr)
@@ -199,7 +211,7 @@ def _fetch_pulsechain_prices() -> list[dict]:
             "name": meta["name"],
             "price_usd": derived_usd,
             "volume_24h_usd": volume_usd,
-            "market_cap_usd": None,
+            "market_cap_usd": market_cap,
             "price_change_24h_pct": change_pct,
             "last_updated": now,
             "source": "pulsex_subgraph",
