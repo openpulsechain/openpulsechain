@@ -3,9 +3,10 @@
 Heuristics:
 1. Common funding source: if 2+ whales received their first PLS from the same address
 2. Direct transfers: whale A sent PLS or tokens to whale B
-3. Shared contract interactions: same staking/DEX patterns (future)
+3. Bridge lineage: bridge user → distributes to multiple PLS addresses (strongest signal)
+4. Shared contract interactions: same staking/DEX patterns (future)
 
-Uses PulseChain Scan API v2 for transaction history.
+Uses PulseChain Scan API v2 for transaction history + Supabase bridge data.
 """
 
 import logging
@@ -237,6 +238,81 @@ def run():
 
         all_links.extend(cluster_links)
 
+        # 3b. Bridge lineage — find whales funded by known bridge users
+        bridge_users = set()
+        try:
+            # OmniBridge users (deposits = ETH→PLS)
+            omni = supabase.table("bridge_transfers") \
+                .select("user_address") \
+                .eq("direction", "deposit") \
+                .execute()
+            for row in (omni.data or []):
+                addr = (row.get("user_address") or "").lower()
+                if addr:
+                    bridge_users.add(addr)
+
+            # Hyperlane users (inbound = other chain → PLS)
+            hyper = supabase.table("hyperlane_transfers") \
+                .select("origin_tx_sender") \
+                .eq("direction", "inbound") \
+                .execute()
+            for row in (hyper.data or []):
+                addr = (row.get("origin_tx_sender") or "").lower()
+                if addr:
+                    bridge_users.add(addr)
+
+            logger.info(f"  Loaded {len(bridge_users)} unique bridge user addresses")
+        except Exception as e:
+            logger.warning(f"  Failed to load bridge data: {e}")
+
+        # Check which whales ARE bridge users (bridged then hold)
+        bridge_whales = whale_set & bridge_users
+        logger.info(f"  {len(bridge_whales)} whales are direct bridge users")
+
+        # Check which whale funders are bridge users
+        # If funder bridged in AND funded multiple whales → very strong cluster
+        bridge_links = []
+        for funder, funded_whales in funder_groups.items():
+            if funder in bridge_users:
+                for w in funded_whales:
+                    bridge_links.append({
+                        "address_from": funder,
+                        "address_to": w,
+                        "link_type": "bridge_funded",
+                        "detail": "funder is a bridge user",
+                        "updated_at": now,
+                    })
+                if len(funded_whales) >= 2:
+                    # Link daughters to each other with bridge context
+                    for j in range(len(funded_whales)):
+                        for k in range(j + 1, len(funded_whales)):
+                            bridge_links.append({
+                                "address_from": funded_whales[j],
+                                "address_to": funded_whales[k],
+                                "link_type": "bridge_siblings",
+                                "detail": "same bridge user funded both",
+                                "updated_at": now,
+                            })
+
+        # Also: whales who themselves bridged AND funded other whales
+        for whale_addr in bridge_whales:
+            if whale_addr in funder_groups:
+                # This whale bridged in AND sent to other whales
+                continue  # Already handled above
+            # Mark whale as bridge user (self-funded via bridge)
+            bridge_links.append({
+                "address_from": whale_addr,
+                "address_to": whale_addr,
+                "link_type": "bridge_user",
+                "detail": "bridged assets to PulseChain",
+                "updated_at": now,
+            })
+
+        logger.info(f"  Bridge lineage: {len(bridge_links)} links "
+                     f"({len(bridge_whales)} bridge whales, "
+                     f"{sum(1 for f in funder_groups if f in bridge_users)} bridge funders)")
+        all_links.extend(bridge_links)
+
         # 4. Deduplicate links (keep unique from-to-type combinations)
         seen = set()
         unique_links = []
@@ -269,9 +345,14 @@ def run():
         funding_clusters = sum(1 for v in funder_groups.values() if len(v) >= 2)
         direct_links = sum(1 for l in unique_links if l["link_type"] == "direct_transfer")
         token_links = sum(1 for l in unique_links if l["link_type"] == "token_transfer")
+        bridge_funded = sum(1 for l in unique_links if l["link_type"] == "bridge_funded")
+        bridge_sibling = sum(1 for l in unique_links if l["link_type"] == "bridge_siblings")
+        bridge_self = sum(1 for l in unique_links if l["link_type"] == "bridge_user")
 
         logger.info(f"Clustering complete: {funding_clusters} funding clusters, "
-                     f"{direct_links} direct PLS links, {token_links} token links")
+                     f"{direct_links} direct PLS, {token_links} token, "
+                     f"{bridge_funded} bridge-funded, {bridge_sibling} bridge-siblings, "
+                     f"{bridge_self} bridge-users")
         _set_status("idle")
 
     except Exception as e:

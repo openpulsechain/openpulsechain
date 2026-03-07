@@ -26,6 +26,9 @@ const LINK_COLORS: Record<string, string> = {
   same_funder: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   direct_transfer: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   token_transfer: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+  bridge_funded: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+  bridge_siblings: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+  bridge_user: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
 }
 
 function LinkBadge({ type }: { type: string }) {
@@ -200,6 +203,9 @@ export function WhalesPage() {
         <LinkBadge type="same_funder" />
         <LinkBadge type="direct_transfer" />
         <LinkBadge type="token_transfer" />
+        <LinkBadge type="bridge_funded" />
+        <LinkBadge type="bridge_siblings" />
+        <LinkBadge type="bridge_user" />
       </div>
 
       {/* Whale Table */}
