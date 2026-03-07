@@ -4,24 +4,38 @@ Public, free, no auth required.
 """
 
 import os
-from datetime import datetime, date, timedelta
+import re
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional, Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from supabase import create_client, Client
 
 load_dotenv()
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+# Use anon key for read-only access (respects RLS, no write access)
+SUPABASE_KEY = os.environ["SUPABASE_ANON_KEY"]
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 API_VERSION = "0.1.0"
 SOURCE = "PulseX Subgraph (graph.pulsechain.com)"
 LICENSE = "Open Data"
+
+# Address regex: 0x + 40 hex chars
+ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+
+# ---------------------------------------------------------------------------
+# Rate limiter
+# ---------------------------------------------------------------------------
+
+limiter = Limiter(key_func=get_remote_address)
 
 # ---------------------------------------------------------------------------
 # App & middleware
@@ -35,11 +49,14 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
 
@@ -52,7 +69,7 @@ def _meta() -> dict:
     return {
         "source": SOURCE,
         "license": LICENSE,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -60,8 +77,21 @@ def _cache(response: Response, max_age: int = 30):
     response.headers["Cache-Control"] = f"public, max-age={max_age}"
 
 
-def _normalize_address(address: str) -> str:
-    return address.strip().lower()
+def _validate_address(address: str) -> str:
+    """Validate and normalize an Ethereum address. Raises 400 if invalid."""
+    addr = address.strip().lower()
+    if not ADDRESS_RE.match(addr):
+        raise HTTPException(status_code=400, detail="Invalid address format. Expected: 0x + 40 hex chars")
+    return addr
+
+
+def _validate_date(date_str: str) -> str:
+    """Validate ISO date format. Raises 400 if invalid."""
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+        return date_str
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {date_str}. Expected: YYYY-MM-DD")
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +102,8 @@ def _normalize_address(address: str) -> str:
 # ---- Root -----------------------------------------------------------------
 
 @app.get("/", tags=["Info"])
-def root():
+@limiter.limit("120/minute")
+def root(request: Request):
     """API info and version."""
     return {
         "name": "OpenPulsechain API",
@@ -93,7 +124,9 @@ SORT_MAP = {
 
 
 @app.get("/api/v1/tokens", tags=["Tokens"])
+@limiter.limit("60/minute")
 def list_tokens(
+    request: Request,
     response: Response,
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -120,19 +153,19 @@ def list_tokens(
     if addresses:
         prices_result = (
             supabase.table("token_prices")
-            .select("symbol, price_usd, price_change_24h_pct")
-            .in_("symbol", list({t["symbol"] for t in tokens}))
+            .select("id, price_usd, price_change_24h_pct")
+            .in_("id", [a.lower() for a in addresses])
             .execute()
         )
         for p in (prices_result.data or []):
-            prices_map[p["symbol"]] = {
+            prices_map[p["id"]] = {
                 "price_usd": p["price_usd"],
                 "price_change_24h_pct": p["price_change_24h_pct"],
             }
 
     for t in tokens:
         t["address"] = t["address"].lower()
-        price_info = prices_map.get(t["symbol"], {})
+        price_info = prices_map.get(t["address"], {})
         t["price_usd"] = price_info.get("price_usd")
         t["price_change_24h_pct"] = price_info.get("price_change_24h_pct")
 
@@ -156,10 +189,11 @@ def list_tokens(
 
 
 @app.get("/api/v1/tokens/{address}", tags=["Tokens"])
-def get_token(address: str, response: Response):
+@limiter.limit("120/minute")
+def get_token(address: str, request: Request, response: Response):
     """Token details with current price and 24h change."""
     _cache(response, 30)
-    addr = _normalize_address(address)
+    addr = _validate_address(address)
 
     result = (
         supabase.table("pulsechain_tokens")
@@ -200,8 +234,10 @@ def get_token(address: str, response: Response):
 
 
 @app.get("/api/v1/tokens/{address}/history", tags=["Tokens"])
+@limiter.limit("30/minute")
 def token_history(
     address: str,
+    request: Request,
     response: Response,
     days: int = Query(30, ge=1, le=1000),
     start_date: Optional[str] = Query(None, description="ISO date, e.g. 2025-01-01"),
@@ -209,7 +245,13 @@ def token_history(
 ):
     """OHLCV-style price history for a token."""
     _cache(response, 300)
-    addr = _normalize_address(address)
+    addr = _validate_address(address)
+
+    # Validate dates if provided
+    if start_date:
+        start_date = _validate_date(start_date)
+    if end_date:
+        end_date = _validate_date(end_date)
 
     # Verify token exists
     exists = (
@@ -236,6 +278,7 @@ def token_history(
         .gte("date", d_start)
         .lte("date", d_end)
         .order("date", desc=False)
+        .limit(1000)
         .execute()
     )
 
@@ -248,13 +291,13 @@ def token_history(
 
 
 @app.get("/api/v1/tokens/{address}/price", tags=["Tokens"])
-def token_price(address: str, response: Response):
+@limiter.limit("120/minute")
+def token_price(address: str, request: Request, response: Response):
     """Current price only (fast endpoint)."""
     _cache(response, 30)
-    addr = _normalize_address(address)
+    addr = _validate_address(address)
 
     # Try token_prices first (fastest)
-    # Need to resolve symbol from address
     token_result = (
         supabase.table("pulsechain_tokens")
         .select("symbol")
@@ -322,7 +365,9 @@ def token_price(address: str, response: Response):
 # ---- Pairs ----------------------------------------------------------------
 
 @app.get("/api/v1/pairs", tags=["Pairs"])
+@limiter.limit("60/minute")
 def list_pairs(
+    request: Request,
     response: Response,
     limit: int = Query(50, ge=1, le=500),
 ):
@@ -347,7 +392,8 @@ def list_pairs(
 # ---- Market Overview -------------------------------------------------------
 
 @app.get("/api/v1/market/overview", tags=["Market"])
-def market_overview(response: Response):
+@limiter.limit("60/minute")
+def market_overview(request: Request, response: Response):
     """Network-level overview: TVL, volume, token count, top movers."""
     _cache(response, 30)
 
