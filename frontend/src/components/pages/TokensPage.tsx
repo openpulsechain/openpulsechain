@@ -3,6 +3,7 @@ import { X, Search, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react
 import { supabase } from '../../lib/supabase'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
+import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { formatUsd } from '../../lib/format'
 
 interface Token {
@@ -38,6 +39,8 @@ export function TokensPage() {
   const [selectedToken, setSelectedToken] = useState<TokenWithPrice | null>(null)
   const [history, setHistory] = useState<PriceHistory[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [priceRange, setPriceRange] = useState<number | null>(null)
+  const [volRange, setVolRange] = useState<number | null>(null)
 
   const fetchTokens = useCallback(async () => {
     setLoading(true)
@@ -123,6 +126,8 @@ export function TokensPage() {
 
   const handleSelectToken = (token: TokenWithPrice) => {
     setSelectedToken(token)
+    setPriceRange(null)
+    setVolRange(null)
     fetchHistory(token.address)
   }
 
@@ -328,12 +333,15 @@ export function TokensPage() {
 
               {/* Price chart */}
               <div className="rounded-xl border border-white/5 bg-gray-900/60 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-white">Price History</h3>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-white">Price History</h3>
+                  <TimeRangeSelector value={priceRange} onChange={setPriceRange} />
+                </div>
                 {historyLoading ? (
                   <Spinner />
                 ) : history.length > 0 ? (
                   <AreaChartComponent
-                    data={history}
+                    data={priceRange ? history.slice(-priceRange) : history}
                     xKey="date"
                     yKey="price_usd"
                     color="#00D4FF"
@@ -346,12 +354,15 @@ export function TokensPage() {
 
               {/* Volume chart */}
               <div className="rounded-xl border border-white/5 bg-gray-900/60 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-white">Daily Volume</h3>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-white">Daily Volume</h3>
+                  <TimeRangeSelector value={volRange} onChange={setVolRange} />
+                </div>
                 {historyLoading ? (
                   <Spinner />
                 ) : history.filter(h => h.daily_volume_usd > 0).length > 0 ? (
                   <AreaChartComponent
-                    data={history}
+                    data={volRange ? history.slice(-volRange) : history}
                     xKey="date"
                     yKey="daily_volume_usd"
                     color="#8000E0"
