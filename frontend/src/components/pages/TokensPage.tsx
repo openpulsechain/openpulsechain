@@ -269,6 +269,7 @@ export function TokensPage() {
       {/* Token Detail Modal */}
       {selectedToken && (
         <div
+          key={selectedToken.address}
           ref={overlayRef}
           onClick={(e) => { if (e.target === overlayRef.current) closeModal() }}
           className="fixed inset-0 z-50 flex items-start justify-center backdrop-blur-md overflow-y-auto p-4 pt-12 sm:pt-16"
