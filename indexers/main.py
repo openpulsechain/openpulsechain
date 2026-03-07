@@ -47,6 +47,7 @@ def main():
     from indexers import pulsex_pairs
     from indexers import token_discovery
     from indexers import token_history
+    from indexers import bridge_tvl
 
     indexers = [
         ("bridge_subgraph", bridge_subgraph),
@@ -61,6 +62,7 @@ def main():
         ("pulsex_pairs", pulsex_pairs),
         ("token_discovery", token_discovery),
         ("token_history", token_history),
+        ("bridge_tvl", bridge_tvl),
     ]
 
     results = {}

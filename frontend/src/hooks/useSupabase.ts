@@ -190,25 +190,11 @@ export function useHyperlaneWhales(minUsd = 10000) {
 }
 
 export function useBridgeTvl() {
-  const [data, setData] = useState<BridgeTvlToken[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetch = async () => {
-      try {
-        const { data: rows, error } = await supabase.rpc('get_bridge_tvl')
-        if (error) throw error
-        setData((rows || []) as BridgeTvlToken[])
-      } catch {
-        setData([])
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetch()
-  }, [])
-
-  return { data, loading }
+  return useQuery<BridgeTvlToken>('bridge_tvl_tokens', {
+    orderBy: 'tvl_usd',
+    ascending: false,
+    limit: 50,
+  })
 }
 
 export function useBridgeWhales(minUsd = 50000) {

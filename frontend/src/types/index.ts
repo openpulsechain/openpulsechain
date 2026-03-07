@@ -123,6 +123,7 @@ export interface BridgeTvlToken {
   net_amount: number
   price_usd: number
   tvl_usd: number
+  pct_of_total: number
 }
 
 export interface HyperlaneChainStats {

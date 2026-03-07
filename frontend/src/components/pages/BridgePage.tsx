@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { ArrowDownUp, Coins, Hash, DollarSign, Globe } from 'lucide-react'
+import { ArrowDownUp, Coins, Hash, DollarSign, Globe, Lock } from 'lucide-react'
 
 function WhaleIcon({ className }: { className?: string }) {
   return (
@@ -23,7 +23,7 @@ import { PieChartComponent } from '../charts/PieChart'
 import { Tabs } from '../ui/Tabs'
 import { Spinner } from '../ui/Spinner'
 import {
-  useBridgeDailyStats, useBridgeTokenStats, useBridgeTransfers, useBridgeWhales,
+  useBridgeDailyStats, useBridgeTokenStats, useBridgeTransfers, useBridgeWhales, useBridgeTvl,
   useHyperlaneDailyStats, useHyperlaneChainStats, useHyperlaneTransfers, useHyperlaneWhales,
 } from '../../hooks/useSupabase'
 import { formatUsd, formatNumber, formatDate, shortenAddress } from '../../lib/format'
@@ -78,6 +78,9 @@ const BRIDGE_TABS = [
 
 export function BridgePage() {
   const [activeTab, setActiveTab] = useState('all')
+
+  // Bridge TVL (from on-chain balances)
+  const tvl = useBridgeTvl()
 
   // OmniBridge data
   const daily = useBridgeDailyStats()
@@ -148,6 +151,14 @@ export function BridgePage() {
     }))
   }, [hlChains.data])
 
+  // Bridge TVL KPIs
+  const totalTvl = useMemo(() => {
+    if (!tvl.data.length) return 0
+    return tvl.data.reduce((s, t) => s + t.tvl_usd, 0)
+  }, [tvl.data])
+
+  const topTvlTokens = useMemo(() => tvl.data.slice(0, 10), [tvl.data])
+
   if (daily.loading && tokens.loading && hlDaily.loading) return <Spinner />
 
   return (
@@ -169,6 +180,18 @@ export function BridgePage() {
       {/* ====================== ALL BRIDGES ====================== */}
       {activeTab === 'all' && (
         <>
+          {/* Bridge TVL Hero */}
+          {totalTvl > 0 && (
+            <div className="rounded-xl border border-[#00D4FF]/20 bg-gradient-to-r from-[#00D4FF]/5 to-[#8000E0]/5 backdrop-blur-sm p-6">
+              <div className="flex items-center gap-3 mb-1">
+                <Lock className="h-6 w-6 text-[#00D4FF]" />
+                <h2 className="text-lg font-semibold text-gray-400">Bridge TVL</h2>
+              </div>
+              <div className="text-3xl sm:text-4xl font-bold text-white">{formatUsd(totalTvl)}</div>
+              <p className="text-xs text-gray-500 mt-1">Value locked in OmniBridge contract on Ethereum (on-chain balances × current prices)</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <KpiCard
               title="Total Volume"
@@ -244,6 +267,45 @@ export function BridgePage() {
             </div>
           )}
 
+          {/* Top Tokens by TVL */}
+          {topTvlTokens.length > 0 && (
+            <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Lock className="h-5 w-5 text-[#00D4FF]" />
+                <h2 className="text-lg font-semibold text-white">Top Tokens by TVL</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-gray-400">
+                      <th className="py-3 pr-4">#</th>
+                      <th className="py-3 pr-4">Token</th>
+                      <th className="py-3 pr-4 text-right">TVL</th>
+                      <th className="py-3 pr-4 text-right">% of Total</th>
+                      <th className="py-3 text-right">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topTvlTokens.map((t, i) => (
+                      <tr key={t.token_symbol} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-2.5 pr-4 text-gray-500">{i + 1}</td>
+                        <td className="py-2.5 pr-4 font-medium text-white">{t.token_symbol}</td>
+                        <td className="py-2.5 pr-4 text-right text-white">{formatUsd(t.tvl_usd)}</td>
+                        <td className="py-2.5 pr-4 text-right text-gray-400">
+                          {t.pct_of_total != null ? `${t.pct_of_total.toFixed(1)}%` : '--'}
+                        </td>
+                        <td className="py-2.5 text-right text-gray-400">
+                          {t.price_usd > 0
+                            ? t.price_usd < 0.01 ? `$${t.price_usd.toFixed(6)}` : `$${t.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : '--'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
 
