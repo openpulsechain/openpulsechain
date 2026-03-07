@@ -44,7 +44,7 @@ const EXPLORER_URLS: Record<number, { name: string; url: string }> = {
   56: { name: 'BSC', url: 'https://bscscan.com/tx/' },
   100: { name: 'GNOSIS', url: 'https://gnosisscan.io/tx/' },
   137: { name: 'POLY', url: 'https://polygonscan.com/tx/' },
-  369: { name: 'PLS', url: 'https://scan.pulsechain.com/tx/' },
+  369: { name: 'PLS', url: 'https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/tx/' },
   8453: { name: 'BASE', url: 'https://basescan.org/tx/' },
   42161: { name: 'ARB', url: 'https://arbiscan.io/tx/' },
   43114: { name: 'AVAX', url: 'https://subnets.avax.network/c-chain/tx/' },
@@ -357,7 +357,7 @@ export function BridgePage() {
                           className="text-xs text-[#4040E0] hover:text-[#00D4FF] transition-colors">ETH</a>
                       )}
                       {tx.tx_hash_pls && (
-                        <a href={`https://scan.pulsechain.com/tx/${tx.tx_hash_pls}`} target="_blank" rel="noopener noreferrer"
+                        <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/tx/${tx.tx_hash_pls}`} target="_blank" rel="noopener noreferrer"
                           className="text-xs text-[#8000E0] hover:text-[#D000C0] transition-colors">PLS</a>
                       )}
                     </span>
@@ -438,7 +438,7 @@ export function BridgePage() {
                         )}
                         {tx.tx_hash_eth && tx.tx_hash_pls && ' | '}
                         {tx.tx_hash_pls && (
-                          <a href={`https://scan.pulsechain.com/tx/${tx.tx_hash_pls}`} target="_blank" rel="noopener noreferrer"
+                          <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/tx/${tx.tx_hash_pls}`} target="_blank" rel="noopener noreferrer"
                             className="text-xs text-[#8000E0] hover:text-[#D000C0] transition-colors">PLS</a>
                         )}
                       </td>

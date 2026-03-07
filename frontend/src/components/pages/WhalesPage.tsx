@@ -5,7 +5,7 @@ import { useWhaleAddresses, useWhaleHoldings, useWhaleLinks } from '../../hooks/
 import { formatUsd, shortenAddress } from '../../lib/format'
 import type { WhaleAddress, WhaleHolding, WhaleLink } from '../../types'
 
-const SCAN_URL = 'https://scan.pulsechain.com/#/address'
+const SCAN_URL = 'https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address'
 
 function AddressLink({ address }: { address: string }) {
   return (
