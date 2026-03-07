@@ -289,15 +289,14 @@ export function TokensPage() {
                 <div>
                   <h2 className="text-2xl font-bold text-white">{selectedToken.symbol}</h2>
                   <p className="text-gray-400 text-sm">{selectedToken.name}</p>
-                  <a
-                    href={`https://scan.pulsechain.com/address/${selectedToken.address}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-gray-500 text-xs font-mono mt-1 hover:text-[#00D4FF] transition-colors"
+                  <button
+                    type="button"
+                    onClick={() => window.open(`https://scan.pulsechain.com/address/${selectedToken.address}`, '_blank', 'noopener,noreferrer')}
+                    className="flex items-center gap-1 text-gray-500 text-xs font-mono mt-1 hover:text-[#00D4FF] transition-colors cursor-pointer"
                   >
                     {selectedToken.address}
                     <ExternalLink className="h-3 w-3" />
-                  </a>
+                  </button>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-white">
