@@ -45,6 +45,8 @@ def main():
     from indexers import network_snapshot
     from indexers import pulsex_stats
     from indexers import pulsex_pairs
+    from indexers import token_discovery
+    from indexers import token_history
 
     indexers = [
         ("bridge_subgraph", bridge_subgraph),
@@ -57,6 +59,8 @@ def main():
         ("network_snapshot", network_snapshot),
         ("pulsex_stats", pulsex_stats),
         ("pulsex_pairs", pulsex_pairs),
+        ("token_discovery", token_discovery),
+        ("token_history", token_history),
     ]
 
     results = {}
