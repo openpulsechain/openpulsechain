@@ -44,18 +44,48 @@ export function OverviewPage() {
   const tvlRecent = tvlRange ? tvl.data.slice(-tvlRange) : tvl.data
   const dexRecent = dexRange ? dex.data.slice(-dexRange) : dex.data
 
-  // Deduplicate by symbol: keep the entry with highest volume
+  // Known reliable tokens: prefer CoinGecko source for majors, PulseX for native
+  // Filter out Ethereum fork copies with wrong prices (e.g. USDC at $0.0006)
+  const cleanPrices = useMemo(() => {
+    // Stablecoin symbols that should be ~$1 — filter out copies with wrong price
+    const STABLES = new Set(['USDT', 'USDC', 'DAI'])
+    return prices.data.filter((t) => {
+      const price = t.price_usd ?? 0
+      if (STABLES.has(t.symbol.toUpperCase()) && t.source === 'pulsex_subgraph') {
+        // Keep only bridged stables with price close to $1 (±10%)
+        if (price < 0.9 || price > 1.1) return false
+      }
+      // Filter WBTC copies with wrong price (should be ~$60K+)
+      if (t.symbol.toUpperCase() === 'WBTC' && t.source === 'pulsex_subgraph' && price < 10000) return false
+      // Filter WETH copies with wrong price (should be ~$1500+)
+      if (t.symbol.toUpperCase() === 'WETH' && t.source === 'pulsex_subgraph' && price < 500) return false
+      return true
+    })
+  }, [prices.data])
+
+  // Deduplicate by symbol: prefer CoinGecko source, then highest market cap
   const deduped = useMemo(() => {
     const map = new Map<string, typeof prices.data[0]>()
-    for (const token of prices.data) {
+    for (const token of cleanPrices) {
       const key = token.symbol.toUpperCase()
       const existing = map.get(key)
-      if (!existing || (token.volume_24h_usd ?? 0) > (existing.volume_24h_usd ?? 0)) {
+      if (!existing) {
         map.set(key, token)
+      } else {
+        // Prefer CoinGecko for majors (more reliable market cap)
+        const existingIsCG = existing.source === 'coingecko'
+        const newIsCG = token.source === 'coingecko'
+        if (newIsCG && !existingIsCG) {
+          map.set(key, token)
+        } else if (!newIsCG && existingIsCG) {
+          // keep existing
+        } else if ((token.market_cap_usd ?? 0) > (existing.market_cap_usd ?? 0)) {
+          map.set(key, token)
+        }
       }
     }
     return Array.from(map.values())
-  }, [prices.data])
+  }, [cleanPrices])
 
   // Filter out tokens with negligible price or zero market cap
   const filtered = deduped.filter((t) => (t.price_usd ?? 0) >= 0.0000001 && (t.market_cap_usd ?? 0) > 0)
@@ -180,7 +210,7 @@ export function OverviewPage() {
                 <th className="py-3 pr-4 text-right">Price</th>
                 <th className="py-3 pr-4 text-right">24h Change</th>
                 <th className="py-3 pr-4 text-right">Market Cap</th>
-                <th className="py-3 text-right">24h Volume</th>
+                <th className="py-3 text-right">Volume</th>
               </tr>
             </thead>
             <tbody>
@@ -192,9 +222,14 @@ export function OverviewPage() {
                       <span className="ml-2 text-gray-500">{token.name}</span>
                     </div>
                     {token.address && (
-                      <div className="text-xs text-gray-600 font-mono truncate max-w-[200px] sm:max-w-[300px]">
+                      <a
+                        href={`https://scan.pulsechain.com/address/${token.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-gray-600 hover:text-[#00D4FF] font-mono truncate max-w-[200px] sm:max-w-[300px] block transition-colors"
+                      >
                         {token.address}
-                      </div>
+                      </a>
                     )}
                   </td>
                   <td className="py-2.5 pr-4 text-right text-white">

@@ -54,6 +54,8 @@ export interface TokenPrice {
   volume_24h_usd: number | null
   price_change_24h_pct: number | null
   last_updated: string
+  address: string | null
+  source: string | null
 }
 
 export interface NetworkSnapshot {
