@@ -118,6 +118,13 @@ export interface HyperlaneDailyStats {
   unique_chains: number
 }
 
+export interface BridgeTvlToken {
+  token_symbol: string
+  net_amount: number
+  price_usd: number
+  tvl_usd: number
+}
+
 export interface HyperlaneChainStats {
   chain_id: number
   chain_name: string | null
