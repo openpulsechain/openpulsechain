@@ -57,7 +57,21 @@ export function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Overview</h1>
+      {/* Hero */}
+      <div className="rounded-xl border border-white/5 bg-gray-900/30 backdrop-blur-sm p-6 sm:p-8 text-center">
+        <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-[#00D4FF] to-[#8000E0] bg-clip-text text-transparent">
+          PulseChain Analytics
+        </h1>
+        <p className="mt-2 text-gray-400 max-w-xl mx-auto">
+          Open-source, sovereign data for PulseChain. 2500+ tokens, bridge flows, DEX volume — powered by PulseX Subgraph.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3 mt-4">
+          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-[#00D4FF]">Free API</span>
+          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-[#00D4FF]">100% On-chain</span>
+          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-[#00D4FF]">Open Source</span>
+          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-[#00D4FF]">No Auth Required</span>
+        </div>
+      </div>
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
