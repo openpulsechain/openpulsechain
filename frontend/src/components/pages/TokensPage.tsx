@@ -271,7 +271,7 @@ export function TokensPage() {
         <div
           ref={overlayRef}
           onClick={(e) => { if (e.target === overlayRef.current) closeModal() }}
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-4 pt-12 sm:pt-16"
+          className="fixed inset-0 z-50 flex items-start justify-center backdrop-blur-md overflow-y-auto p-4 pt-12 sm:pt-16"
         >
           <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-gray-900 shadow-2xl">
             {/* Close button */}
