@@ -57,8 +57,11 @@ export function OverviewPage() {
     return Array.from(map.values())
   }, [prices.data])
 
-  // Sort tokens: real market cap first, then $0
-  const sortedPrices = [...deduped].sort((a, b) => {
+  // Filter out tokens with negligible price or zero market cap
+  const filtered = deduped.filter((t) => (t.price_usd ?? 0) >= 0.0000001 && (t.market_cap_usd ?? 0) > 0)
+
+  // Sort tokens by market cap
+  const sortedPrices = [...filtered].sort((a, b) => {
     const aCap = a.market_cap_usd ?? 0
     const bCap = b.market_cap_usd ?? 0
     if (aCap > 0 && bCap === 0) return -1
