@@ -82,7 +82,7 @@ export function AlertsPage() {
           Scam Radar
         </h1>
         <p className="text-gray-400 mt-1">
-          Real-time alerts for suspicious on-chain activity: LP removals, whale dumps, and more.
+          Real-time alerts for suspicious on-chain activity. Monitors LP removals (potential rug pulls), large whale dumps, and unusual mint events. Scanned every 30 minutes, auto-refreshed every 2 minutes.
         </p>
       </div>
 

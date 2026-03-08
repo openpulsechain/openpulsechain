@@ -167,8 +167,10 @@ export function TokensPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Tokens</h1>
-          <p className="text-sm text-gray-500">{total.toLocaleString()} active tokens from PulseX Subgraph</p>
+          <h1 className="text-2xl font-bold text-white">Token Explorer</h1>
+          <p className="text-gray-400 mt-1">
+            Browse {total.toLocaleString()} PulseChain tokens with prices, volume, and liquidity. Click any token to view its price history.
+          </p>
         </div>
 
         {/* Search */}

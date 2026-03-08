@@ -189,9 +189,14 @@ export function BridgePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Bridge Analytics</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Bridge Analytics</h1>
+          <p className="text-gray-400 mt-1">
+            Monitor capital flows between Ethereum and PulseChain. Track OmniBridge and Hyperlane volumes, net flows, whale transfers, and token distribution across bridges.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <ShareButton title="Bridge Analytics" text="PulseChain bridge flows and whale alerts" />
           <a
           href="https://dune.com/openpulsechain/pulsechain-bridge-analytics"

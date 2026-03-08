@@ -202,6 +202,14 @@ export function IntelligencePage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-white">Market Intelligence</h1>
+        <p className="text-gray-400 mt-1">
+          On-chain intelligence powered by AI analysis of crypto Twitter and blockchain data. Each conclusion is backed by evidence — tweets, transactions, and address profiling — ranked by risk level.
+        </p>
+      </div>
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">

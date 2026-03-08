@@ -97,7 +97,7 @@ export function SmartMoneyPage() {
             Smart Money
           </h1>
           <p className="text-gray-400 mt-1">
-            Track large swaps and top wallets on PulseChain DEXes.
+            Track large swaps (&gt;$5K) and top wallets by volume on PulseX. Identify what smart money is buying and selling in real time. Auto-refreshed every 60 seconds.
           </p>
         </div>
         <div className="flex items-center gap-2">

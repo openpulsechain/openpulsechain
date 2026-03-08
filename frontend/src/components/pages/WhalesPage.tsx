@@ -155,8 +155,13 @@ export function WhalesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Whale Tracker</h1>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Whale Tracker</h1>
+          <p className="text-gray-400 mt-1">
+            Map the largest PulseChain holders: multi-token portfolios, funding clusters, and direct connections between whale wallets. Identify coordinated activity across addresses.
+          </p>
+        </div>
         <ShareButton title="Whale Tracker" text="PulseChain whale wallets and holdings" />
       </div>
 

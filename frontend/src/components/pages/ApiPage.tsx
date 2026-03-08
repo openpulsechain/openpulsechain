@@ -444,7 +444,7 @@ export function ApiPage() {
         <p className="text-gray-400 text-lg max-w-2xl mx-auto">
           Free, no auth required, sovereign PulseChain data.
           <br />
-          <span className="text-gray-500">The only open API for PulseChain tokens, bridges, DEX, and network data — 100% on-chain, zero third-party dependency.</span>
+          <span className="text-gray-500">Access token prices, safety scores, bridge data, smart money feeds, and wallet analysis. Built for developers who want to integrate PulseChain data into their own projects.</span>
         </p>
       </div>
 

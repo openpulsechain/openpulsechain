@@ -47,7 +47,12 @@ export function DexPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">PulseX DEX Analytics</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-white">PulseX DEX Analytics</h1>
+        <p className="text-gray-400 mt-1">
+          Track PulseX trading activity: daily volume, total liquidity, and transaction count. All data sourced directly from the PulseX Subgraph.
+        </p>
+      </div>
 
       {/* KPI Row */}
       {kpis && (

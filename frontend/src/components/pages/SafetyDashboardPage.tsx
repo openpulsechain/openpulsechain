@@ -104,7 +104,7 @@ export function SafetyDashboardPage() {
           Token Safety Scanner
         </h1>
         <p className="text-gray-400 mt-1">
-          Automated safety analysis for PulseChain tokens. Check any token for honeypots, contract risks, and holder concentration.
+          Automated safety analysis for PulseChain tokens. Each token receives a score from 0 to 100 based on 5 criteria: honeypot detection, contract verification, liquidity health, holder concentration, and token age. Search any token address to get its full safety report.
         </p>
       </div>
 
