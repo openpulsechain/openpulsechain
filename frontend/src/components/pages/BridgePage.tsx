@@ -22,6 +22,7 @@ import { AreaChartComponent } from '../charts/AreaChart'
 import { PieChartComponent } from '../charts/PieChart'
 import { Tabs } from '../ui/Tabs'
 import { Spinner } from '../ui/Spinner'
+import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import {
   useBridgeDailyStats, useBridgeTokenStats, useBridgeTransfers, useBridgeWhales, useBridgeTvl,
   useHyperlaneDailyStats, useHyperlaneChainStats, useHyperlaneTransfers, useHyperlaneWhales,
@@ -82,6 +83,10 @@ export function BridgePage() {
   const [activeTab, setActiveTab] = useState('all')
   const [omniWhaleMin, setOmniWhaleMin] = useState(50000)
   const [hlWhaleMin, setHlWhaleMin] = useState(10000)
+  const [omniRange, setOmniRange] = useState<number | null>(90)
+  const [omniFlowRange, setOmniFlowRange] = useState<number | null>(180)
+  const [hlRange, setHlRange] = useState<number | null>(90)
+  const [hlFlowRange, setHlFlowRange] = useState<number | null>(180)
 
   // Bridge TVL (from on-chain balances)
   const tvl = useBridgeTvl()
@@ -121,7 +126,7 @@ export function BridgePage() {
   }, [hlDaily.data, hlChains.data])
 
   // OmniBridge charts
-  const dailyRecent = daily.data.slice(-90)
+  const dailyRecent = omniRange ? daily.data.slice(-omniRange) : daily.data
   const cumulativeFlow = useMemo(() => {
     let cumul = 0
     return daily.data.map((d) => {
@@ -129,7 +134,7 @@ export function BridgePage() {
       return { date: d.date, cumulative_net_flow: cumul }
     })
   }, [daily.data])
-  const cumulativeRecent = cumulativeFlow.slice(-180)
+  const cumulativeRecent = omniFlowRange ? cumulativeFlow.slice(-omniFlowRange) : cumulativeFlow
   const pieData = useMemo(() => {
     const top = tokens.data.slice(0, 8)
     return top.map((t) => ({
@@ -139,7 +144,7 @@ export function BridgePage() {
   }, [tokens.data])
 
   // Hyperlane charts
-  const hlDailyRecent = hlDaily.data.slice(-90)
+  const hlDailyRecent = hlRange ? hlDaily.data.slice(-hlRange) : hlDaily.data
   const hlCumulativeFlow = useMemo(() => {
     let cumul = 0
     return hlDaily.data.map((d) => {
@@ -147,7 +152,7 @@ export function BridgePage() {
       return { date: d.date, cumulative_net_flow: cumul }
     })
   }, [hlDaily.data])
-  const hlCumulativeRecent = hlCumulativeFlow.slice(-180)
+  const hlCumulativeRecent = hlFlowRange ? hlCumulativeFlow.slice(-hlFlowRange) : hlCumulativeFlow
   const hlPieData = useMemo(() => {
     return hlChains.data.slice(0, 8).map((c) => ({
       name: c.chain_name || `Chain ${c.chain_id}`,
@@ -162,6 +167,22 @@ export function BridgePage() {
   }, [tvl.data])
 
   const topTvlTokens = useMemo(() => tvl.data.slice(0, 10), [tvl.data])
+
+  // Volume change metrics (7d and 30d)
+  const volumeChanges = useMemo(() => {
+    if (!daily.data.length) return null
+    const now = daily.data.slice(-7)
+    const prev7 = daily.data.slice(-14, -7)
+    const now30 = daily.data.slice(-30)
+    const prev30 = daily.data.slice(-60, -30)
+    const vol7 = now.reduce((s, d) => s + d.deposit_volume_usd + d.withdrawal_volume_usd, 0)
+    const volPrev7 = prev7.reduce((s, d) => s + d.deposit_volume_usd + d.withdrawal_volume_usd, 0)
+    const vol30 = now30.reduce((s, d) => s + d.deposit_volume_usd + d.withdrawal_volume_usd, 0)
+    const volPrev30 = prev30.reduce((s, d) => s + d.deposit_volume_usd + d.withdrawal_volume_usd, 0)
+    const pct7 = volPrev7 > 0 ? ((vol7 - volPrev7) / volPrev7) * 100 : 0
+    const pct30 = volPrev30 > 0 ? ((vol30 - volPrev30) / volPrev30) * 100 : 0
+    return { vol7, pct7, vol30, pct30 }
+  }, [daily.data])
 
   if (daily.loading && tokens.loading && hlDaily.loading) return <Spinner />
 
@@ -193,6 +214,24 @@ export function BridgePage() {
               </div>
               <div className="text-3xl sm:text-4xl font-bold text-white">{formatUsd(totalTvl)}</div>
               <p className="text-xs text-gray-500 mt-1">Value locked in OmniBridge contract on Ethereum (on-chain balances × current prices)</p>
+              {volumeChanges && (
+                <div className="flex gap-6 mt-3">
+                  <div>
+                    <span className="text-xs text-gray-500">7D Volume </span>
+                    <span className="text-sm font-medium text-white">{formatUsd(volumeChanges.vol7)}</span>
+                    <span className={`ml-1 text-xs font-medium ${volumeChanges.pct7 >= 0 ? 'text-emerald-400' : 'text-[#FF0040]'}`}>
+                      {volumeChanges.pct7 >= 0 ? '+' : ''}{volumeChanges.pct7.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500">30D Volume </span>
+                    <span className="text-sm font-medium text-white">{formatUsd(volumeChanges.vol30)}</span>
+                    <span className={`ml-1 text-xs font-medium ${volumeChanges.pct30 >= 0 ? 'text-emerald-400' : 'text-[#FF0040]'}`}>
+                      {volumeChanges.pct30 >= 0 ? '+' : ''}{volumeChanges.pct30.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -368,7 +407,10 @@ export function BridgePage() {
           )}
 
           <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-            <h2 className="mb-4 text-lg font-semibold text-white">Daily Deposits vs Withdrawals</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Daily Deposits vs Withdrawals</h2>
+              <TimeRangeSelector value={omniRange} onChange={setOmniRange} />
+            </div>
             {dailyRecent.length > 0 ? (
               <BarChartComponent data={dailyRecent} xKey="date" bars={[
                 { key: 'deposit_volume_usd', color: '#00D4FF', name: 'Deposits' },
@@ -380,7 +422,10 @@ export function BridgePage() {
           </div>
 
           <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-            <h2 className="mb-4 text-lg font-semibold text-white">Cumulative Net Flow</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Cumulative Net Flow</h2>
+              <TimeRangeSelector value={omniFlowRange} onChange={setOmniFlowRange} />
+            </div>
             {cumulativeRecent.length > 0 ? (
               <AreaChartComponent data={cumulativeRecent} xKey="date" yKey="cumulative_net_flow" color="#00D4FF" />
             ) : (
@@ -508,7 +553,10 @@ export function BridgePage() {
           )}
 
           <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-            <h2 className="mb-4 text-lg font-semibold text-white">Daily Inbound vs Outbound</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Daily Inbound vs Outbound</h2>
+              <TimeRangeSelector value={hlRange} onChange={setHlRange} />
+            </div>
             {hlDailyRecent.length > 0 ? (
               <BarChartComponent data={hlDailyRecent} xKey="date" bars={[
                 { key: 'inbound_volume_usd', color: '#00D4FF', name: 'Inbound' },
@@ -520,7 +568,10 @@ export function BridgePage() {
           </div>
 
           <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-            <h2 className="mb-4 text-lg font-semibold text-white">Cumulative Net Flow</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Cumulative Net Flow</h2>
+              <TimeRangeSelector value={hlFlowRange} onChange={setHlFlowRange} />
+            </div>
             {hlCumulativeRecent.length > 0 ? (
               <AreaChartComponent data={hlCumulativeRecent} xKey="date" yKey="cumulative_net_flow" color="#4040E0" />
             ) : (
