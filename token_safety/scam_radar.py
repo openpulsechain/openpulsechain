@@ -155,6 +155,36 @@ def run_scan(since_minutes: int = 30) -> list[dict]:
     all_alerts.extend(lp_alerts)
     logger.info(f"  Found {len(lp_alerts)} LP removal alerts")
 
+    # 2. Check whale dumps on tokens with recent LP alerts
+    token_addresses_seen = set()
+    for alert in lp_alerts:
+        for addr_key in ("token0_address", "token1_address"):
+            addr = alert.get(addr_key, "")
+            if addr and addr not in token_addresses_seen:
+                token_addresses_seen.add(addr)
+
+    for addr in list(token_addresses_seen)[:20]:
+        try:
+            # Get total supply from Scan API
+            resp = requests.get(f"{SCAN_API_URL}/api/v2/tokens/{addr}", timeout=10)
+            if resp.status_code != 200:
+                continue
+            token_data = resp.json()
+            total_supply_str = token_data.get("total_supply", "0")
+            decimals = int(token_data.get("decimals", "18") or "18")
+            total_supply = int(total_supply_str) / (10 ** decimals) if total_supply_str else 0
+
+            if total_supply > 0:
+                logger.info(f"  Checking whale dumps for {addr[:10]}...")
+                dump_alerts = check_large_transfers(addr, total_supply)
+                all_alerts.extend(dump_alerts)
+                if dump_alerts:
+                    logger.info(f"    Found {len(dump_alerts)} whale dump alerts")
+
+            time.sleep(0.5)  # Rate limit
+        except Exception as e:
+            logger.warning(f"  Whale dump check error for {addr[:10]}: {str(e)[:80]}")
+
     return all_alerts
 
 

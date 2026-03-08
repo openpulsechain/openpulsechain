@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { Routes, Route, useLocation, useNavigate, Link } from 'react-router-dom'
 import { SEO } from './components/SEO'
 import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
@@ -18,6 +18,19 @@ const SafetyDashboardPage = lazy(() => import('./components/pages/SafetyDashboar
 const AlertsPage = lazy(() => import('./components/pages/AlertsPage').then(m => ({ default: m.AlertsPage })))
 const SmartMoneyPage = lazy(() => import('./components/pages/SmartMoneyPage').then(m => ({ default: m.SmartMoneyPage })))
 const WalletProfilePage = lazy(() => import('./components/pages/WalletProfilePage').then(m => ({ default: m.WalletProfilePage })))
+
+function NotFoundPage() {
+  return (
+    <div className="flex flex-col items-center justify-center py-32 text-center">
+      <p className="text-6xl font-bold text-[#8000E0] mb-4">404</p>
+      <h1 className="text-2xl font-bold text-white mb-2">Page not found</h1>
+      <p className="text-gray-400 mb-8">The page you're looking for doesn't exist or has been moved.</p>
+      <Link to="/" className="px-6 py-3 rounded-lg bg-[#8000E0]/20 text-[#00D4FF] border border-[#8000E0]/30 hover:bg-[#8000E0]/30 transition-colors font-medium">
+        Back to Overview
+      </Link>
+    </div>
+  )
+}
 
 function PageLoader() {
   return (
@@ -128,6 +141,7 @@ export default function App() {
               <Route path="/smart-money" element={<SmartMoneyPage />} />
               <Route path="/wallet/:address" element={<WalletProfilePage />} />
               <Route path="/token/:address" element={<TokenSafetyPage />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
         </main>
