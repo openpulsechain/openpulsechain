@@ -12,6 +12,7 @@ import { TokenSafetyPage } from './components/pages/TokenSafetyPage'
 import { SafetyDashboardPage } from './components/pages/SafetyDashboardPage'
 import { AlertsPage } from './components/pages/AlertsPage'
 import { SmartMoneyPage } from './components/pages/SmartMoneyPage'
+import { WalletProfilePage } from './components/pages/WalletProfilePage'
 
 const ROUTE_TO_PAGE: Record<string, string> = {
   '/': 'overview',
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="/safety" element={<SafetyDashboardPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/smart-money" element={<SmartMoneyPage />} />
+            <Route path="/wallet/:address" element={<WalletProfilePage />} />
             <Route path="/token/:address" element={<TokenSafetyPage />} />
           </Routes>
         </main>
