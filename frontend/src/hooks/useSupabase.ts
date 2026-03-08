@@ -17,6 +17,8 @@ import type {
   WhaleAddress,
   WhaleHolding,
   WhaleLink,
+  IntelConclusion,
+  LlmAnalysis,
 } from '../types'
 
 function useQuery<T>(table: string, options?: {
@@ -244,6 +246,20 @@ export function useWhaleHoldings() {
 
 export function useWhaleLinks() {
   return useQuery<WhaleLink>('whale_links', {
+    orderBy: 'id',
+    ascending: false,
+  })
+}
+
+export function useIntelConclusions() {
+  return useQuery<IntelConclusion>('research_intel_conclusions', {
+    orderBy: 'last_seen',
+    ascending: false,
+  })
+}
+
+export function useLlmAnalyses() {
+  return useQuery<LlmAnalysis>('research_llm_analysis', {
     orderBy: 'id',
     ascending: false,
   })

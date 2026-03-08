@@ -163,3 +163,27 @@ export interface HyperlaneChainStats {
   net_flow_usd: number
   last_transfer_at: string | null
 }
+
+export interface IntelConclusion {
+  id: number
+  conclusion_type: string
+  subject: string
+  title: string
+  summary: string
+  evidence: string | null
+  addresses_involved: string[] | null
+  tokens_involved: string[] | null
+  risk_level: string
+  tweet_count: number
+  first_seen: string
+  last_seen: string
+  is_active: boolean
+}
+
+export interface LlmAnalysis {
+  id: number
+  sentiment: string | null
+  action_detected: string | null
+  risk_level: string | null
+  summary: string | null
+}

@@ -7,6 +7,7 @@ import { DexPage } from './components/pages/DexPage'
 import { TokensPage } from './components/pages/TokensPage'
 import { ApiPage } from './components/pages/ApiPage'
 import { WhalesPage } from './components/pages/WhalesPage'
+import { IntelligencePage } from './components/pages/IntelligencePage'
 
 export default function App() {
   const [page, setPage] = useState('overview')
@@ -57,6 +58,7 @@ export default function App() {
           {page === 'tokens' && <TokensPage />}
           {page === 'bridge' && <BridgePage />}
           {page === 'whales' && <WhalesPage />}
+          {page === 'intelligence' && <IntelligencePage />}
           {page === 'api' && <ApiPage />}
         </main>
         <Footer />
