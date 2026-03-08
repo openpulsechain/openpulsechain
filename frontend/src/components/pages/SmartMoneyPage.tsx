@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, Clock, Loader2, RefreshCw } from 'lucide-react'
+import { TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, RefreshCw } from 'lucide-react'
 
 const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
 
@@ -149,103 +149,116 @@ export function SmartMoneyPage() {
           <Loader2 className="h-8 w-8 animate-spin text-[#00D4FF]" />
         </div>
       ) : tab === 'swaps' ? (
-        /* Recent Swaps */
+        /* Recent Swaps — Table */
         recentSwaps.length === 0 ? (
           <div className="text-center py-16 text-gray-500">No large swaps in the last 6 hours.</div>
         ) : (
-          <div className="space-y-2">
-            {recentSwaps.map((swap, i) => (
-              <div
-                key={swap.tx_id || i}
-                className="rounded-xl border border-white/5 bg-gray-900/50 p-4 hover:bg-gray-900/70 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-red-400 flex items-center gap-1 text-sm">
-                      <ArrowDownRight className="h-3.5 w-3.5" />
-                      {swap.sold_symbol}
-                    </span>
-                    <span className="text-gray-500">→</span>
-                    <span
-                      className="text-emerald-400 flex items-center gap-1 text-sm cursor-pointer hover:underline"
-                      onClick={() => navigate(`/token/${swap.bought_address}`)}
-                    >
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                      {swap.bought_symbol}
-                    </span>
-                  </div>
-
-                  <span className="text-white font-medium">
-                    ${swap.amount_usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                  </span>
-
-                  <span
-                    className="text-xs text-gray-500 font-mono hidden sm:inline cursor-pointer hover:text-[#00D4FF] transition-colors"
-                    onClick={() => navigate(`/wallet/${swap.wallet}`)}
+          <div className="rounded-xl border border-white/5 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/5 bg-gray-900/50">
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">Swap</th>
+                  <th className="text-right px-4 py-3 text-gray-400 font-medium">Amount</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Wallet</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium hidden md:table-cell">DEX</th>
+                  <th className="text-right px-4 py-3 text-gray-400 font-medium">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSwaps.map((swap, i) => (
+                  <tr
+                    key={swap.tx_id || i}
+                    className="border-b border-white/5 hover:bg-white/5 transition-colors"
                   >
-                    <Wallet className="h-3 w-3 inline mr-1" />
-                    {shortenAddr(swap.wallet)}
-                  </span>
-
-                  <span className="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {formatTime(swap.timestamp)}
-                  </span>
-                </div>
-              </div>
-            ))}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-red-400 flex items-center gap-0.5">
+                          <ArrowDownRight className="h-3.5 w-3.5" />
+                          {swap.sold_symbol}
+                        </span>
+                        <span className="text-gray-600">→</span>
+                        <span
+                          className="text-emerald-400 flex items-center gap-0.5 cursor-pointer hover:underline"
+                          onClick={() => navigate(`/token/${swap.bought_address}`)}
+                        >
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                          {swap.bought_symbol}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="text-right px-4 py-3 font-medium text-white">
+                      ${swap.amount_usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <span
+                        className="text-gray-500 font-mono cursor-pointer hover:text-[#00D4FF] transition-colors"
+                        onClick={() => navigate(`/wallet/${swap.wallet}`)}
+                      >
+                        {shortenAddr(swap.wallet)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell text-gray-500">
+                      {swap.dex}
+                    </td>
+                    <td className="text-right px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {formatTime(swap.timestamp)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )
       ) : (
-        /* Top Wallets */
+        /* Top Wallets — Table */
         !feed || feed.top_wallets.length === 0 ? (
           <div className="text-center py-16 text-gray-500">No smart money data available.</div>
         ) : (
-          <div className="space-y-4">
-            {feed.top_wallets.map((wallet, i) => (
-              <div
-                key={wallet.wallet}
-                className="rounded-xl border border-white/5 bg-gray-900/50 p-5 hover:bg-gray-900/70 transition-colors cursor-pointer"
-                onClick={() => navigate(`/wallet/${wallet.wallet}`)}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-bold text-gray-500 w-8">#{i + 1}</span>
-                    <div>
-                      <p className="font-mono text-sm text-[#00D4FF] hover:underline">{shortenAddr(wallet.wallet)}</p>
-                      <p className="text-xs text-gray-500">{wallet.swap_count} swaps</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-white">
+          <div className="rounded-xl border border-white/5 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/5 bg-gray-900/50">
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium w-8">#</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium">Wallet</th>
+                  <th className="text-right px-4 py-3 text-gray-400 font-medium">Volume (24h)</th>
+                  <th className="text-right px-4 py-3 text-gray-400 font-medium">Swaps</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium hidden md:table-cell">Top Buys</th>
+                  <th className="text-left px-4 py-3 text-gray-400 font-medium hidden lg:table-cell">Top Sells</th>
+                </tr>
+              </thead>
+              <tbody>
+                {feed.top_wallets.map((wallet, i) => (
+                  <tr
+                    key={wallet.wallet}
+                    className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/wallet/${wallet.wallet}`)}
+                  >
+                    <td className="px-4 py-3 text-gray-500 font-bold">{i + 1}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-[#00D4FF] hover:underline">{shortenAddr(wallet.wallet)}</span>
+                    </td>
+                    <td className="text-right px-4 py-3 font-medium text-white">
                       ${wallet.total_volume_usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </p>
-                    <p className="text-xs text-gray-500">24h volume</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1.5">Top Buys</p>
-                    {wallet.top_buys.slice(0, 3).map(([symbol, usd]) => (
-                      <div key={symbol} className="flex justify-between text-emerald-400">
-                        <span>{symbol}</span>
-                        <span>${Number(usd).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    </td>
+                    <td className="text-right px-4 py-3 text-gray-400">{wallet.swap_count}</td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      <div className="flex gap-2">
+                        {wallet.top_buys.slice(0, 3).map(([symbol]) => (
+                          <span key={symbol} className="text-emerald-400 text-xs bg-emerald-400/10 px-1.5 py-0.5 rounded">{symbol}</span>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1.5">Top Sells</p>
-                    {wallet.top_sells.slice(0, 3).map(([symbol, usd]) => (
-                      <div key={symbol} className="flex justify-between text-red-400">
-                        <span>{symbol}</span>
-                        <span>${Number(usd).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      <div className="flex gap-2">
+                        {wallet.top_sells.slice(0, 3).map(([symbol]) => (
+                          <span key={symbol} className="text-red-400 text-xs bg-red-400/10 px-1.5 py-0.5 rounded">{symbol}</span>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )
       )}
