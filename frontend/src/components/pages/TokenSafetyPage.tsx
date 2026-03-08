@@ -119,11 +119,15 @@ function BoolBadge({ value, trueLabel, falseLabel }: { value: boolean | null; tr
   )
 }
 
+// Token Safety API base URL (Railway service)
+const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || ''
+
 export function TokenSafetyPage() {
   const { address } = useParams<{ address: string }>()
   const [safety, setSafety] = useState<SafetyScore | null>(null)
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null)
   const [loading, setLoading] = useState(true)
+  const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -131,16 +135,48 @@ export function TokenSafetyPage() {
 
     const addr = address.toLowerCase()
 
-    // Fetch safety score
+    // 1. Try Supabase cache first
     supabase
       .from('token_safety_scores')
       .select('*')
       .eq('token_address', addr)
       .single()
       .then(({ data, error: err }) => {
-        if (err) setError('No safety score available yet for this token.')
-        else setSafety(data)
-        setLoading(false)
+        if (data && !err) {
+          setSafety(data)
+          setLoading(false)
+        } else if (SAFETY_API) {
+          // 2. Not in cache — call Token Safety API for live analysis
+          setAnalyzing(true)
+          setLoading(false)
+          fetch(`${SAFETY_API}/api/v1/token/${addr}/safety?fresh=true`)
+            .then(r => r.json())
+            .then(json => {
+              if (json.data) {
+                // Re-fetch from Supabase to get the saved result
+                supabase
+                  .from('token_safety_scores')
+                  .select('*')
+                  .eq('token_address', addr)
+                  .single()
+                  .then(({ data: refreshed }) => {
+                    if (refreshed) setSafety(refreshed)
+                    else setError('Analysis completed but score not found.')
+                    setAnalyzing(false)
+                  })
+              } else {
+                setError('Analysis failed. Try again later.')
+                setAnalyzing(false)
+              }
+            })
+            .catch(() => {
+              setError('Safety API unavailable. Try again later.')
+              setAnalyzing(false)
+            })
+        } else {
+          setError('No safety score available yet for this token.')
+          setLoading(false)
+        }
       })
 
     // Fetch token info
@@ -158,6 +194,17 @@ export function TokenSafetyPage() {
     return (
       <div className="flex items-center justify-center py-32">
         <Loader2 className="h-8 w-8 animate-spin text-[#00D4FF]" />
+      </div>
+    )
+  }
+
+  if (analyzing) {
+    return (
+      <div className="text-center py-20">
+        <Loader2 className="h-12 w-12 animate-spin text-[#00D4FF] mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-gray-300 mb-2">Analyzing Token...</h2>
+        <p className="text-gray-500">Running honeypot simulation, contract analysis, LP check, and holder scan.</p>
+        <p className="text-gray-600 text-sm mt-2">This may take 10-15 seconds.</p>
       </div>
     )
   }

@@ -201,13 +201,52 @@ def token_deployer(address: str, request: Request, response: Response):
     return {"data": result}
 
 
+# ── Cron endpoints (called by Railway cron or external scheduler) ──
+
+CRON_SECRET = os.environ.get("CRON_SECRET", "")
+
+
+@app.get("/cron/radar")
+def cron_radar(request: Request, secret: str = Query("")):
+    """Run scam radar scan. Protected by CRON_SECRET."""
+    if CRON_SECRET and secret != CRON_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid secret")
+
+    from scam_radar import run_scan, save_alerts
+    from db import supabase
+
+    alerts = run_scan(since_minutes=30)
+    saved = 0
+    if alerts:
+        saved = save_alerts(alerts, supabase)
+    return {"alerts_found": len(alerts), "alerts_saved": saved}
+
+
+@app.get("/cron/batch")
+def cron_batch(request: Request, secret: str = Query(""), limit: int = Query(100, ge=1, le=1000)):
+    """Run batch token safety analysis. Protected by CRON_SECRET."""
+    if CRON_SECRET and secret != CRON_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid secret")
+
+    import threading
+
+    def _run():
+        run_batch(max_tokens=limit)
+
+    # Run in background thread to avoid timeout
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return {"status": "started", "max_tokens": limit}
+
+
 # ── Batch mode ────────────────────────────────────────────────────
 
-def run_batch():
+def run_batch(max_tokens: int = 1000):
     """Analyze all active tokens (for cron job)."""
     logger.info("Starting batch token safety analysis...")
     tokens = get_all_tokens_to_analyze()
-    logger.info(f"Found {len(tokens)} tokens to analyze")
+    tokens = tokens[:max_tokens]
+    logger.info(f"Found {len(tokens)} tokens to analyze (limit={max_tokens})")
 
     analyzed = 0
     errors = 0

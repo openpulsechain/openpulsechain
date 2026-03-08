@@ -19,6 +19,7 @@ interface Token {
 interface TokenWithPrice extends Token {
   price_usd: number | null
   price_change_24h_pct: number | null
+  volume_24h_usd: number | null
 }
 
 interface PriceHistory {
@@ -71,15 +72,15 @@ export function TokensPage() {
 
       // Enrich with prices
       const addresses = tokenList.map(t => t.address.toLowerCase())
-      let pricesMap: Record<string, { price_usd: number | null; price_change_24h_pct: number | null }> = {}
+      let pricesMap: Record<string, { price_usd: number | null; price_change_24h_pct: number | null; volume_24h_usd: number | null }> = {}
 
       if (addresses.length > 0) {
         const { data: prices } = await supabase
           .from('token_prices')
-          .select('id, price_usd, price_change_24h_pct')
+          .select('id, price_usd, price_change_24h_pct, volume_24h_usd')
           .in('id', addresses)
         for (const p of (prices || [])) {
-          pricesMap[p.id] = { price_usd: p.price_usd, price_change_24h_pct: p.price_change_24h_pct }
+          pricesMap[p.id] = { price_usd: p.price_usd, price_change_24h_pct: p.price_change_24h_pct, volume_24h_usd: p.volume_24h_usd }
         }
       }
 
@@ -87,6 +88,7 @@ export function TokensPage() {
         ...t,
         price_usd: pricesMap[t.address.toLowerCase()]?.price_usd ?? null,
         price_change_24h_pct: pricesMap[t.address.toLowerCase()]?.price_change_24h_pct ?? null,
+        volume_24h_usd: pricesMap[t.address.toLowerCase()]?.volume_24h_usd ?? null,
       }))
 
       setTokens(enriched)
@@ -196,7 +198,7 @@ export function TokensPage() {
                     <th className="py-3 pr-4">Token</th>
                     <th className="py-3 pr-4 text-right">Price</th>
                     <th className="py-3 pr-4 text-right">24h</th>
-                    <th className="py-3 pr-4 text-right">Volume (All Time)</th>
+                    <th className="py-3 pr-4 text-right">Volume (24h)</th>
                     <th className="py-3 text-right">Liquidity</th>
                   </tr>
                 </thead>
@@ -226,7 +228,7 @@ export function TokensPage() {
                           ? `${token.price_change_24h_pct >= 0 ? '+' : ''}${token.price_change_24h_pct.toFixed(2)}%`
                           : '--'}
                       </td>
-                      <td className="py-2.5 pr-4 text-right text-gray-300">{formatUsd(token.total_volume_usd)}</td>
+                      <td className="py-2.5 pr-4 text-right text-gray-300">{token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : formatUsd(token.total_volume_usd)}</td>
                       <td className="py-2.5 text-right text-gray-300">{formatUsd(token.total_liquidity)}</td>
                     </tr>
                   ))}
