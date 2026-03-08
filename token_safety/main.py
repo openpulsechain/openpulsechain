@@ -10,10 +10,12 @@ import sys
 import json
 import logging
 import time
+import asyncio
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import uvicorn
 
 from analyzer import analyze_token
@@ -27,11 +29,76 @@ logging.basicConfig(
 )
 logger = logging.getLogger("token_safety")
 
+# ── Background Scheduler ─────────────────────────────────────────
+
+RADAR_INTERVAL_MIN = int(os.environ.get("RADAR_INTERVAL_MIN", "30"))
+BATCH_INTERVAL_HOURS = int(os.environ.get("BATCH_INTERVAL_HOURS", "12"))
+BATCH_LIMIT = int(os.environ.get("BATCH_LIMIT", "200"))
+ENABLE_SCHEDULER = os.environ.get("ENABLE_SCHEDULER", "true").lower() == "true"
+
+
+async def _scheduler_loop():
+    """Background scheduler: runs radar every 30min, batch every 12h."""
+    await asyncio.sleep(30)  # Wait 30s after startup before first run
+    logger.info(f"Scheduler started: radar every {RADAR_INTERVAL_MIN}min, batch every {BATCH_INTERVAL_HOURS}h")
+
+    radar_interval = RADAR_INTERVAL_MIN * 60
+    batch_interval = BATCH_INTERVAL_HOURS * 3600
+    last_radar = 0
+    last_batch = 0
+
+    while True:
+        now = time.time()
+
+        # Scam Radar
+        if now - last_radar >= radar_interval:
+            try:
+                logger.info("[CRON] Running Scam Radar scan...")
+                from scam_radar import run_scan, save_alerts
+                from db import supabase
+                alerts = run_scan(since_minutes=RADAR_INTERVAL_MIN)
+                saved = 0
+                if alerts:
+                    saved = save_alerts(alerts, supabase)
+                logger.info(f"[CRON] Radar: {len(alerts)} alerts, {saved} saved")
+            except Exception as e:
+                logger.error(f"[CRON] Radar error: {e}")
+            last_radar = time.time()
+
+        # Batch analysis
+        if now - last_batch >= batch_interval:
+            try:
+                logger.info(f"[CRON] Running batch analysis (limit={BATCH_LIMIT})...")
+                import threading
+                t = threading.Thread(target=run_batch, args=(BATCH_LIMIT,), daemon=True)
+                t.start()
+            except Exception as e:
+                logger.error(f"[CRON] Batch error: {e}")
+            last_batch = time.time()
+
+        await asyncio.sleep(60)  # Check every minute
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start background scheduler on app startup."""
+    task = None
+    if ENABLE_SCHEDULER:
+        task = asyncio.create_task(_scheduler_loop())
+        logger.info("Background scheduler enabled")
+    else:
+        logger.info("Background scheduler disabled (ENABLE_SCHEDULER=false)")
+    yield
+    if task:
+        task.cancel()
+
+
 # FastAPI app
 app = FastAPI(
     title="OpenPulsechain Token Safety",
     description="Token safety scoring for PulseChain tokens.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -58,7 +125,14 @@ def _validate_address(address: str) -> str:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "token_safety", "timestamp": datetime.now(timezone.utc).isoformat()}
+    return {
+        "status": "ok",
+        "service": "token_safety",
+        "scheduler_enabled": ENABLE_SCHEDULER,
+        "radar_interval_min": RADAR_INTERVAL_MIN,
+        "batch_interval_hours": BATCH_INTERVAL_HOURS,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @app.get("/api/v1/token/{address}/safety")
