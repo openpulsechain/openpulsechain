@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, RefreshCw } from 'lucide-react'
+import { ShareButton } from '../ui/ShareButton'
 
 const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
 
@@ -54,8 +55,11 @@ export function SmartMoneyPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'wallets' | 'swaps'>('swaps')
 
+  // Auto-refresh every 60 seconds
   useEffect(() => {
     loadData()
+    const interval = setInterval(() => loadData(), 60_000)
+    return () => clearInterval(interval)
   }, [])
 
   async function loadData() {
@@ -96,12 +100,15 @@ export function SmartMoneyPage() {
             Track large swaps and top wallets on PulseChain DEXes.
           </p>
         </div>
-        <button
-          onClick={loadData}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-        >
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <ShareButton title="Smart Money Tracker" text="Real-time large swaps on PulseChain" />
+          <button
+            onClick={loadData}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+          >
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

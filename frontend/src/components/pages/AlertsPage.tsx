@@ -39,8 +39,11 @@ export function AlertsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
 
+  // Auto-refresh every 2 minutes
   useEffect(() => {
     loadAlerts()
+    const interval = setInterval(() => loadAlerts(), 120_000)
+    return () => clearInterval(interval)
   }, [])
 
   async function loadAlerts() {

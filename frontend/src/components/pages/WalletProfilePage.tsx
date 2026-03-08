@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Wallet, ArrowUpRight, ArrowDownRight, ExternalLink, Loader2, Clock } from 'lucide-react'
+import { ShareButton } from '../ui/ShareButton'
 
 const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
 
@@ -75,7 +76,7 @@ export function WalletProfilePage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-[#8000E0]/10 border border-[#8000E0]/20">
+          <div className="p-3 rounded-xl bg-[#8000E0]/10 border border-[#8000E0]/20 shrink-0">
             <Wallet className="h-8 w-8 text-[#8000E0]" />
           </div>
           <div>
@@ -91,6 +92,9 @@ export function WalletProfilePage() {
                 Explorer <ExternalLink className="h-3 w-3" />
               </a>
             </p>
+          </div>
+          <div className="ml-auto shrink-0">
+            <ShareButton title={`Wallet ${shortenAddr(address || '')}`} text="PulseChain wallet profile on OpenPulsechain" />
           </div>
         </div>
       </div>

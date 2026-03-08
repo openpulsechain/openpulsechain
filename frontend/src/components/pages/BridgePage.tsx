@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { ArrowDownUp, Coins, Hash, DollarSign, Globe, Lock } from 'lucide-react'
+import { ShareButton } from '../ui/ShareButton'
 
 function WhaleIcon({ className }: { className?: string }) {
   return (
@@ -190,14 +191,17 @@ export function BridgePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Bridge Analytics</h1>
-        <a
+        <div className="flex items-center gap-2">
+          <ShareButton title="Bridge Analytics" text="PulseChain bridge flows and whale alerts" />
+          <a
           href="https://dune.com/openpulsechain/pulsechain-bridge-analytics"
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-lg border border-[#8000E0]/30 bg-[#8000E0]/10 px-3 py-1.5 text-sm text-[#00D4FF] hover:bg-[#8000E0]/20 transition-colors"
         >
           Dune Dashboard
-        </a>
+          </a>
+        </div>
       </div>
 
       <Tabs tabs={BRIDGE_TABS} active={activeTab} onChange={setActiveTab} />

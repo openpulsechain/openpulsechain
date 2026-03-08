@@ -1,6 +1,7 @@
 import { useState, useMemo, Fragment } from 'react'
 import { ExternalLink, ChevronDown, ChevronUp, Link2 } from 'lucide-react'
 import { Spinner } from '../ui/Spinner'
+import { ShareButton } from '../ui/ShareButton'
 import { useWhaleAddresses, useWhaleHoldings, useWhaleLinks } from '../../hooks/useSupabase'
 import { formatUsd, shortenAddress } from '../../lib/format'
 import type { WhaleAddress, WhaleHolding, WhaleLink } from '../../types'
@@ -154,6 +155,11 @@ export function WhalesPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Whale Tracker</h1>
+        <ShareButton title="Whale Tracker" text="PulseChain whale wallets and holdings" />
+      </div>
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4">

@@ -13,6 +13,15 @@ export function Footer() {
         </a>
         {' | '}
         <a
+          href="https://x.com/openpulsechain"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-gray-400 hover:text-[#00D4FF] transition-colors"
+        >
+          X/Twitter
+        </a>
+        {' | '}
+        <a
           href="https://dune.com/openpulsechain/pulsechain-bridge-analytics"
           target="_blank"
           rel="noopener noreferrer"

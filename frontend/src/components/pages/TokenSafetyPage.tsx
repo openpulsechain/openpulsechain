@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2 } from 'lucide-react'
+import { ShareButton } from '../ui/ShareButton'
 import { supabase } from '../../lib/supabase'
 
 interface SafetyScore {
@@ -245,6 +246,10 @@ export function TokenSafetyPage() {
             <span className={`px-3 py-1 rounded-lg border text-lg font-bold ${GRADE_COLORS[grade]}`}>
               Grade {grade}
             </span>
+            <ShareButton
+              title={`${tokenInfo?.symbol || 'Token'} Safety Score: ${safety.score}/100 (Grade ${grade})`}
+              text="Check any PulseChain token on OpenPulsechain"
+            />
           </div>
 
           <p className="text-sm text-gray-400 font-mono mb-3">

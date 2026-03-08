@@ -1,19 +1,31 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { SEO } from './components/SEO'
 import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
-import { OverviewPage } from './components/pages/OverviewPage'
-import { BridgePage } from './components/pages/BridgePage'
-import { DexPage } from './components/pages/DexPage'
-import { TokensPage } from './components/pages/TokensPage'
-import { ApiPage } from './components/pages/ApiPage'
-import { WhalesPage } from './components/pages/WhalesPage'
-import { IntelligencePage } from './components/pages/IntelligencePage'
-import { TokenSafetyPage } from './components/pages/TokenSafetyPage'
-import { SafetyDashboardPage } from './components/pages/SafetyDashboardPage'
-import { AlertsPage } from './components/pages/AlertsPage'
-import { SmartMoneyPage } from './components/pages/SmartMoneyPage'
-import { WalletProfilePage } from './components/pages/WalletProfilePage'
+import { Loader2 } from 'lucide-react'
+
+// Lazy-loaded pages for code splitting
+const OverviewPage = lazy(() => import('./components/pages/OverviewPage').then(m => ({ default: m.OverviewPage })))
+const BridgePage = lazy(() => import('./components/pages/BridgePage').then(m => ({ default: m.BridgePage })))
+const DexPage = lazy(() => import('./components/pages/DexPage').then(m => ({ default: m.DexPage })))
+const TokensPage = lazy(() => import('./components/pages/TokensPage').then(m => ({ default: m.TokensPage })))
+const ApiPage = lazy(() => import('./components/pages/ApiPage').then(m => ({ default: m.ApiPage })))
+const WhalesPage = lazy(() => import('./components/pages/WhalesPage').then(m => ({ default: m.WhalesPage })))
+const IntelligencePage = lazy(() => import('./components/pages/IntelligencePage').then(m => ({ default: m.IntelligencePage })))
+const TokenSafetyPage = lazy(() => import('./components/pages/TokenSafetyPage').then(m => ({ default: m.TokenSafetyPage })))
+const SafetyDashboardPage = lazy(() => import('./components/pages/SafetyDashboardPage').then(m => ({ default: m.SafetyDashboardPage })))
+const AlertsPage = lazy(() => import('./components/pages/AlertsPage').then(m => ({ default: m.AlertsPage })))
+const SmartMoneyPage = lazy(() => import('./components/pages/SmartMoneyPage').then(m => ({ default: m.SmartMoneyPage })))
+const WalletProfilePage = lazy(() => import('./components/pages/WalletProfilePage').then(m => ({ default: m.WalletProfilePage })))
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center py-32">
+      <Loader2 className="h-8 w-8 animate-spin text-[#00D4FF]" />
+    </div>
+  )
+}
 
 const ROUTE_TO_PAGE: Record<string, string> = {
   '/': 'overview',
@@ -102,20 +114,22 @@ export default function App() {
       <div className="relative z-10 flex min-h-screen flex-col">
         <Header activePage={activePage} onNavigate={handleNavigate} />
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
-          <Routes>
-            <Route path="/" element={<OverviewPage />} />
-            <Route path="/dex" element={<DexPage />} />
-            <Route path="/tokens" element={<TokensPage />} />
-            <Route path="/bridge" element={<BridgePage />} />
-            <Route path="/whales" element={<WhalesPage />} />
-            <Route path="/intelligence" element={<IntelligencePage />} />
-            <Route path="/api" element={<ApiPage />} />
-            <Route path="/safety" element={<SafetyDashboardPage />} />
-            <Route path="/alerts" element={<AlertsPage />} />
-            <Route path="/smart-money" element={<SmartMoneyPage />} />
-            <Route path="/wallet/:address" element={<WalletProfilePage />} />
-            <Route path="/token/:address" element={<TokenSafetyPage />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<OverviewPage />} />
+              <Route path="/dex" element={<DexPage />} />
+              <Route path="/tokens" element={<TokensPage />} />
+              <Route path="/bridge" element={<BridgePage />} />
+              <Route path="/whales" element={<WhalesPage />} />
+              <Route path="/intelligence" element={<IntelligencePage />} />
+              <Route path="/api" element={<ApiPage />} />
+              <Route path="/safety" element={<SafetyDashboardPage />} />
+              <Route path="/alerts" element={<AlertsPage />} />
+              <Route path="/smart-money" element={<SmartMoneyPage />} />
+              <Route path="/wallet/:address" element={<WalletProfilePage />} />
+              <Route path="/token/:address" element={<TokenSafetyPage />} />
+            </Routes>
+          </Suspense>
         </main>
         <Footer />
       </div>

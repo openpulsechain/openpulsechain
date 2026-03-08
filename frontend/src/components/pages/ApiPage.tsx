@@ -592,6 +592,77 @@ export function ApiPage() {
           </table>
         </div>
 
+        <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mt-8">Token Safety API</h3>
+        <p className="text-gray-500 text-sm">Base URL: <code className="text-[#00D4FF]">https://safety.openpulsechain.com</code></p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500 border-b border-white/10">
+                <th className="py-2 pr-4">Method</th>
+                <th className="py-2 pr-4">Endpoint</th>
+                <th className="py-2 pr-4">Description</th>
+                <th className="py-2">Params</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono text-sm">
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/token/{address}/safety'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Token safety score (honeypot, contract, LP, holders)</td>
+                <td className="py-2 text-gray-500 font-sans">fresh=true</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">/api/v1/tokens/safety/batch</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Recent safety scores for all tokens</td>
+                <td className="py-2 text-gray-500 font-sans">limit=20</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">/api/v1/alerts/recent</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Scam radar alerts (LP pulls, whale dumps, suspicious mints)</td>
+                <td className="py-2 text-gray-500 font-sans">limit, alert_type</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/deployer/{address}'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Deployer reputation (serial rugger detection)</td>
+                <td className="py-2 text-gray-500 font-sans">fresh=true</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/token/{address}/deployer'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Deployer reputation for a specific token</td>
+                <td className="py-2 text-gray-500 font-sans">-</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">/api/v1/smart-money/feed</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Smart money feed (top wallets by volume)</td>
+                <td className="py-2 text-gray-500 font-sans">hours, min_usd</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">/api/v1/smart-money/swaps</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Recent large swaps across PulseX</td>
+                <td className="py-2 text-gray-500 font-sans">minutes, min_usd</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/wallet/{address}/swaps'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Wallet swap history</td>
+                <td className="py-2 text-gray-500 font-sans">-</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/wallet/{address}/balances'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Wallet token balances</td>
+                <td className="py-2 text-gray-500 font-sans">-</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-300">Example: Get HEX price history</h4>
           <CodeBlock code={`curl 'https://api.openpulsechain.com/api/v1/tokens/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39/history?days=30'`} />
@@ -599,6 +670,18 @@ export function ApiPage() {
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-300">Example: Market overview</h4>
           <CodeBlock code={`curl 'https://api.openpulsechain.com/api/v1/market/overview'`} />
+        </div>
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-300">Example: Token safety score</h4>
+          <CodeBlock code={`curl 'https://safety.openpulsechain.com/api/v1/token/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39/safety'`} />
+        </div>
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-300">Example: Smart money large swaps</h4>
+          <CodeBlock code={`curl 'https://safety.openpulsechain.com/api/v1/smart-money/swaps?minutes=60&min_usd=5000'`} />
+        </div>
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-300">Example: Scam radar alerts</h4>
+          <CodeBlock code={`curl 'https://safety.openpulsechain.com/api/v1/alerts/recent?limit=10'`} />
         </div>
       </section>
 
