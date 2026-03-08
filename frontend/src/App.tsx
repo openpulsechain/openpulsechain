@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
 import { OverviewPage } from './components/pages/OverviewPage'
@@ -8,9 +8,34 @@ import { TokensPage } from './components/pages/TokensPage'
 import { ApiPage } from './components/pages/ApiPage'
 import { WhalesPage } from './components/pages/WhalesPage'
 import { IntelligencePage } from './components/pages/IntelligencePage'
+import { TokenSafetyPage } from './components/pages/TokenSafetyPage'
+import { SafetyDashboardPage } from './components/pages/SafetyDashboardPage'
+import { AlertsPage } from './components/pages/AlertsPage'
+
+const ROUTE_TO_PAGE: Record<string, string> = {
+  '/': 'overview',
+  '/dex': 'dex',
+  '/tokens': 'tokens',
+  '/bridge': 'bridge',
+  '/whales': 'whales',
+  '/intelligence': 'intelligence',
+  '/api': 'api',
+  '/safety': 'safety',
+  '/alerts': 'alerts',
+}
 
 export default function App() {
-  const [page, setPage] = useState('overview')
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // Determine active page from URL
+  const activePage = ROUTE_TO_PAGE[location.pathname] ||
+    (location.pathname.startsWith('/token/') ? 'safety' : 'overview')
+
+  const handleNavigate = (page: string) => {
+    const route = Object.entries(ROUTE_TO_PAGE).find(([, p]) => p === page)
+    if (route) navigate(route[0])
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[#050510] text-gray-100 overflow-hidden relative">
@@ -51,15 +76,20 @@ export default function App() {
 
       {/* Content */}
       <div className="relative z-10 flex min-h-screen flex-col">
-        <Header activePage={page} onNavigate={setPage} />
+        <Header activePage={activePage} onNavigate={handleNavigate} />
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
-          {page === 'overview' && <OverviewPage />}
-          {page === 'dex' && <DexPage />}
-          {page === 'tokens' && <TokensPage />}
-          {page === 'bridge' && <BridgePage />}
-          {page === 'whales' && <WhalesPage />}
-          {page === 'intelligence' && <IntelligencePage />}
-          {page === 'api' && <ApiPage />}
+          <Routes>
+            <Route path="/" element={<OverviewPage />} />
+            <Route path="/dex" element={<DexPage />} />
+            <Route path="/tokens" element={<TokensPage />} />
+            <Route path="/bridge" element={<BridgePage />} />
+            <Route path="/whales" element={<WhalesPage />} />
+            <Route path="/intelligence" element={<IntelligencePage />} />
+            <Route path="/api" element={<ApiPage />} />
+            <Route path="/safety" element={<SafetyDashboardPage />} />
+            <Route path="/alerts" element={<AlertsPage />} />
+            <Route path="/token/:address" element={<TokenSafetyPage />} />
+          </Routes>
         </main>
         <Footer />
       </div>

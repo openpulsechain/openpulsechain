@@ -476,3 +476,72 @@ def market_overview(request: Request, response: Response):
         },
         "meta": _meta(),
     }
+
+
+# ---- Token Safety --------------------------------------------------------
+
+@app.get("/api/v1/tokens/{address}/safety", tags=["Safety"])
+@limiter.limit("30/minute")
+def token_safety(address: str, request: Request, response: Response):
+    """Token safety score (honeypot, contract, LP, holders)."""
+    _cache(response, 300)
+    addr = _validate_address(address)
+
+    result = (
+        supabase.table("token_safety_scores")
+        .select("*")
+        .eq("token_address", addr)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail=f"No safety score for {addr}. Request analysis at /token/{addr}")
+
+    data = result.data[0]
+    # Remove internal fields
+    data.pop("analysis_details", None)
+    data.pop("created_at", None)
+    data.pop("updated_at", None)
+
+    return {"data": data, "meta": _meta()}
+
+
+@app.get("/api/v1/safety/recent", tags=["Safety"])
+@limiter.limit("30/minute")
+def safety_recent(
+    request: Request,
+    response: Response,
+    limit: int = Query(20, ge=1, le=100),
+    grade: Optional[str] = Query(None, description="Filter by grade: A, B, C, D, F"),
+):
+    """Recent safety scores, optionally filtered by grade."""
+    _cache(response, 60)
+
+    query = supabase.table("token_safety_scores").select(
+        "token_address, score, grade, risks, is_honeypot, is_verified, "
+        "total_liquidity_usd, holder_count, top10_pct, buy_tax_pct, sell_tax_pct, analyzed_at"
+    )
+
+    if grade and grade.upper() in ("A", "B", "C", "D", "F"):
+        query = query.eq("grade", grade.upper())
+
+    result = query.order("analyzed_at", desc=True).limit(limit).execute()
+
+    return {"data": result.data or [], "count": len(result.data or []), "meta": _meta()}
+
+
+@app.get("/api/v1/safety/honeypots", tags=["Safety"])
+@limiter.limit("30/minute")
+def safety_honeypots(request: Request, response: Response, limit: int = Query(50, ge=1, le=200)):
+    """List detected honeypot tokens."""
+    _cache(response, 60)
+
+    result = (
+        supabase.table("token_safety_scores")
+        .select("token_address, score, grade, risks, buy_tax_pct, sell_tax_pct, analyzed_at")
+        .eq("is_honeypot", True)
+        .order("analyzed_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+
+    return {"data": result.data or [], "count": len(result.data or []), "meta": _meta()}

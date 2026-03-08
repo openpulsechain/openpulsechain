@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Github, Menu, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Github, Menu, X, Shield, AlertTriangle } from 'lucide-react'
 
 interface HeaderProps {
   activePage: string
@@ -7,45 +8,43 @@ interface HeaderProps {
 }
 
 const PAGES = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'dex', label: 'DEX' },
-  { id: 'tokens', label: 'Tokens' },
-  { id: 'bridge', label: 'Bridge' },
-  { id: 'whales', label: 'Whales' },
-  { id: 'intelligence', label: 'Intel' },
-  { id: 'api', label: 'API' },
+  { id: 'overview', label: 'Overview', path: '/' },
+  { id: 'dex', label: 'DEX', path: '/dex' },
+  { id: 'tokens', label: 'Tokens', path: '/tokens' },
+  { id: 'safety', label: 'Safety', path: '/safety', icon: Shield },
+  { id: 'alerts', label: 'Alerts', path: '/alerts', icon: AlertTriangle },
+  { id: 'bridge', label: 'Bridge', path: '/bridge' },
+  { id: 'whales', label: 'Whales', path: '/whales' },
+  { id: 'intelligence', label: 'Intel', path: '/intelligence' },
+  { id: 'api', label: 'API', path: '/api' },
 ]
 
-export function Header({ activePage, onNavigate }: HeaderProps) {
+export function Header({ activePage }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
-
-  const handleNav = (id: string) => {
-    onNavigate(id)
-    setMenuOpen(false)
-  }
 
   return (
     <header className="border-b border-white/5 bg-gray-950/60 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-1.5">
-        <button onClick={() => handleNav('overview')} className="flex items-center gap-1.5">
+        <Link to="/" className="flex items-center gap-1.5">
           <img src="/logo.png" alt="OpenPulsechain" className="h-11 w-11 rounded-full" />
           <span className="text-lg font-bold bg-gradient-to-r from-[#00D4FF] to-[#8000E0] bg-clip-text text-transparent">OpenPulsechain</span>
-        </button>
+        </Link>
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
           {PAGES.map((page) => (
-            <button
+            <Link
               key={page.id}
-              onClick={() => handleNav(page.id)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              to={page.path}
+              className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                 activePage === page.id
                   ? 'bg-[#8000E0]/20 text-[#00D4FF] border border-[#8000E0]/30'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
+              } ${page.id === 'safety' ? 'text-emerald-400' : ''}`}
             >
+              {page.icon && <page.icon className="h-4 w-4" />}
               {page.label}
-            </button>
+            </Link>
           ))}
           <a
             href="https://github.com/openpulsechain/openpulsechain"
@@ -70,17 +69,19 @@ export function Header({ activePage, onNavigate }: HeaderProps) {
       {menuOpen && (
         <div className="md:hidden border-t border-white/5 bg-gray-950/90 backdrop-blur-xl px-4 py-3 space-y-1">
           {PAGES.map((page) => (
-            <button
+            <Link
               key={page.id}
-              onClick={() => handleNav(page.id)}
-              className={`block w-full text-left rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+              to={page.path}
+              onClick={() => setMenuOpen(false)}
+              className={`flex items-center gap-2 w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                 activePage === page.id
                   ? 'bg-[#8000E0]/20 text-[#00D4FF]'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
             >
+              {page.icon && <page.icon className="h-4 w-4" />}
               {page.label}
-            </button>
+            </Link>
           ))}
           <a
             href="https://github.com/openpulsechain/openpulsechain"
