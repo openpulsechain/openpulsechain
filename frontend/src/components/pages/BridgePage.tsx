@@ -272,18 +272,33 @@ export function BridgePage() {
                   {WHALE_THRESHOLDS.map((v) => <option key={v} value={v}>≥ ${v >= 1000 ? `${v / 1000}K` : v}</option>)}
                 </select>
               </div>
-              <div className="space-y-2">
-                {whales.data.slice(0, 10).map((tx) => (
-                  <div key={tx.id} className="flex items-center gap-3 rounded-lg bg-white/5 px-4 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      tx.direction === 'deposit' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
-                    }`}>{tx.direction === 'deposit' ? 'ETH → PLS' : 'PLS → ETH'}</span>
-                    <span className="text-lg font-bold text-white">{formatUsd(tx.amount_usd)}</span>
-                    <span className="text-sm text-gray-400">{tx.token_symbol || '--'}</span>
-                    <span className="font-mono text-xs text-gray-500">{shortenAddress(tx.user_address)}</span>
-                    <span className="ml-auto text-xs text-gray-500">{formatDate(tx.block_timestamp)}</span>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-gray-400">
+                      <th className="py-3 pr-4">Direction</th>
+                      <th className="py-3 pr-4 text-right">Amount</th>
+                      <th className="py-3 pr-4">Token</th>
+                      <th className="py-3 pr-4 hidden sm:table-cell">Wallet</th>
+                      <th className="py-3 text-right">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {whales.data.slice(0, 10).map((tx) => (
+                      <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-2.5 pr-4">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            tx.direction === 'deposit' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
+                          }`}>{tx.direction === 'deposit' ? 'ETH → PLS' : 'PLS → ETH'}</span>
+                        </td>
+                        <td className="py-2.5 pr-4 text-right font-bold text-white">{formatUsd(tx.amount_usd)}</td>
+                        <td className="py-2.5 pr-4 text-gray-400">{tx.token_symbol || '--'}</td>
+                        <td className="py-2.5 pr-4 font-mono text-xs text-gray-500 hidden sm:table-cell">{shortenAddress(tx.user_address)}</td>
+                        <td className="py-2.5 text-right text-xs text-gray-500">{formatDate(tx.block_timestamp)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -298,20 +313,35 @@ export function BridgePage() {
                   {WHALE_THRESHOLDS.map((v) => <option key={v} value={v}>≥ ${v >= 1000 ? `${v / 1000}K` : v}</option>)}
                 </select>
               </div>
-              <div className="space-y-2">
-                {hlWhales.data.slice(0, 10).map((tx) => (
-                  <div key={tx.id} className="flex items-center gap-3 rounded-lg bg-white/5 px-4 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      tx.direction === 'inbound' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
-                    }`}>{tx.direction === 'inbound'
-                      ? `${chainLabel(tx.origin_chain_name)} → PLS`
-                      : `PLS → ${chainLabel(tx.destination_chain_name)}`}</span>
-                    <span className="text-lg font-bold text-white">{formatUsd(tx.amount_usd)}</span>
-                    <span className="text-sm text-gray-400">{tx.token_symbol || '--'}</span>
-                    <span className="font-mono text-xs text-gray-500">{shortenAddress(tx.origin_tx_sender || '')}</span>
-                    <span className="ml-auto text-xs text-gray-500">{formatDate(tx.send_occurred_at)}</span>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-gray-400">
+                      <th className="py-3 pr-4">Route</th>
+                      <th className="py-3 pr-4 text-right">Amount</th>
+                      <th className="py-3 pr-4">Token</th>
+                      <th className="py-3 pr-4 hidden sm:table-cell">Wallet</th>
+                      <th className="py-3 text-right">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hlWhales.data.slice(0, 10).map((tx) => (
+                      <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-2.5 pr-4">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            tx.direction === 'inbound' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
+                          }`}>{tx.direction === 'inbound'
+                            ? `${chainLabel(tx.origin_chain_name)} → PLS`
+                            : `PLS → ${chainLabel(tx.destination_chain_name)}`}</span>
+                        </td>
+                        <td className="py-2.5 pr-4 text-right font-bold text-white">{formatUsd(tx.amount_usd)}</td>
+                        <td className="py-2.5 pr-4 text-gray-400">{tx.token_symbol || '--'}</td>
+                        <td className="py-2.5 pr-4 font-mono text-xs text-gray-500 hidden sm:table-cell">{shortenAddress(tx.origin_tx_sender || '')}</td>
+                        <td className="py-2.5 text-right text-xs text-gray-500">{formatDate(tx.send_occurred_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -380,28 +410,46 @@ export function BridgePage() {
                   {WHALE_THRESHOLDS.map((v) => <option key={v} value={v}>≥ ${v >= 1000 ? `${v / 1000}K` : v}</option>)}
                 </select>
               </div>
-              <div className="space-y-2">
-                {whales.data.map((tx) => (
-                  <div key={tx.id} className="flex items-center gap-3 rounded-lg bg-white/5 px-4 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      tx.direction === 'deposit' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
-                    }`}>{tx.direction === 'deposit' ? 'ETH → PLS' : 'PLS → ETH'}</span>
-                    <span className="text-lg font-bold text-white">{formatUsd(tx.amount_usd)}</span>
-                    <span className="text-sm text-gray-400">{tx.token_symbol || '--'}</span>
-                    <span className="font-mono text-xs text-gray-500">{shortenAddress(tx.user_address)}</span>
-                    <span className="ml-auto text-xs text-gray-500">{formatDate(tx.block_timestamp)}</span>
-                    <span className="flex gap-1">
-                      {tx.tx_hash_eth && (
-                        <a href={`https://etherscan.io/tx/${tx.tx_hash_eth}`} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-[#4040E0] hover:text-[#00D4FF] transition-colors">ETH</a>
-                      )}
-                      {tx.tx_hash_pls && (
-                        <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/tx/${tx.tx_hash_pls}`} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-[#8000E0] hover:text-[#D000C0] transition-colors">PLS</a>
-                      )}
-                    </span>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-gray-400">
+                      <th className="py-3 pr-4">Direction</th>
+                      <th className="py-3 pr-4 text-right">Amount</th>
+                      <th className="py-3 pr-4">Token</th>
+                      <th className="py-3 pr-4 hidden sm:table-cell">Wallet</th>
+                      <th className="py-3 pr-4 text-right">Time</th>
+                      <th className="py-3 text-right">Tx</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {whales.data.map((tx) => (
+                      <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-2.5 pr-4">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            tx.direction === 'deposit' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
+                          }`}>{tx.direction === 'deposit' ? 'ETH → PLS' : 'PLS → ETH'}</span>
+                        </td>
+                        <td className="py-2.5 pr-4 text-right font-bold text-white">{formatUsd(tx.amount_usd)}</td>
+                        <td className="py-2.5 pr-4 text-gray-400">{tx.token_symbol || '--'}</td>
+                        <td className="py-2.5 pr-4 font-mono text-xs text-gray-500 hidden sm:table-cell">{shortenAddress(tx.user_address)}</td>
+                        <td className="py-2.5 pr-4 text-right text-xs text-gray-500">{formatDate(tx.block_timestamp)}</td>
+                        <td className="py-2.5 text-right">
+                          <span className="flex gap-1 justify-end">
+                            {tx.tx_hash_eth && (
+                              <a href={`https://etherscan.io/tx/${tx.tx_hash_eth}`} target="_blank" rel="noopener noreferrer"
+                                className="text-xs text-[#4040E0] hover:text-[#00D4FF] transition-colors">ETH</a>
+                            )}
+                            {tx.tx_hash_pls && (
+                              <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/tx/${tx.tx_hash_pls}`} target="_blank" rel="noopener noreferrer"
+                                className="text-xs text-[#8000E0] hover:text-[#D000C0] transition-colors">PLS</a>
+                            )}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -518,36 +566,54 @@ export function BridgePage() {
                   {WHALE_THRESHOLDS.map((v) => <option key={v} value={v}>≥ ${v >= 1000 ? `${v / 1000}K` : v}</option>)}
                 </select>
               </div>
-              <div className="space-y-2">
-                {hlWhales.data.map((tx) => (
-                  <div key={tx.id} className="flex items-center gap-3 rounded-lg bg-white/5 px-4 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      tx.direction === 'inbound' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
-                    }`}>{tx.direction === 'inbound'
-                      ? `${chainLabel(tx.origin_chain_name)} → PLS`
-                      : `PLS → ${chainLabel(tx.destination_chain_name)}`}</span>
-                    <span className="text-lg font-bold text-white">{formatUsd(tx.amount_usd)}</span>
-                    <span className="text-sm text-gray-400">{tx.token_symbol || '--'}</span>
-                    <span className="font-mono text-xs text-gray-500">{shortenAddress(tx.origin_tx_sender || '')}</span>
-                    <span className="ml-auto text-xs text-gray-500">{formatDate(tx.send_occurred_at)}</span>
-                    <span className="flex gap-1">
-                      {tx.origin_tx_hash && (() => {
-                        const exp = EXPLORER_URLS[tx.origin_chain_id]
-                        return exp ? (
-                          <a href={`${exp.url}${tx.origin_tx_hash}`} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-[#4040E0] hover:text-[#00D4FF] transition-colors">{exp.name}</a>
-                        ) : null
-                      })()}
-                      {tx.destination_tx_hash && (() => {
-                        const exp = EXPLORER_URLS[tx.destination_chain_id]
-                        return exp ? (
-                          <a href={`${exp.url}${tx.destination_tx_hash}`} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-[#8000E0] hover:text-[#D000C0] transition-colors">{exp.name}</a>
-                        ) : null
-                      })()}
-                    </span>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-gray-400">
+                      <th className="py-3 pr-4">Route</th>
+                      <th className="py-3 pr-4 text-right">Amount</th>
+                      <th className="py-3 pr-4">Token</th>
+                      <th className="py-3 pr-4 hidden sm:table-cell">Wallet</th>
+                      <th className="py-3 pr-4 text-right">Time</th>
+                      <th className="py-3 text-right">Tx</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hlWhales.data.map((tx) => (
+                      <tr key={tx.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-2.5 pr-4">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            tx.direction === 'inbound' ? 'bg-[#00D4FF]/10 text-[#00D4FF]' : 'bg-[#FF0040]/10 text-[#FF0040]'
+                          }`}>{tx.direction === 'inbound'
+                            ? `${chainLabel(tx.origin_chain_name)} → PLS`
+                            : `PLS → ${chainLabel(tx.destination_chain_name)}`}</span>
+                        </td>
+                        <td className="py-2.5 pr-4 text-right font-bold text-white">{formatUsd(tx.amount_usd)}</td>
+                        <td className="py-2.5 pr-4 text-gray-400">{tx.token_symbol || '--'}</td>
+                        <td className="py-2.5 pr-4 font-mono text-xs text-gray-500 hidden sm:table-cell">{shortenAddress(tx.origin_tx_sender || '')}</td>
+                        <td className="py-2.5 pr-4 text-right text-xs text-gray-500">{formatDate(tx.send_occurred_at)}</td>
+                        <td className="py-2.5 text-right">
+                          <span className="flex gap-1 justify-end">
+                            {tx.origin_tx_hash && (() => {
+                              const exp = EXPLORER_URLS[tx.origin_chain_id]
+                              return exp ? (
+                                <a href={`${exp.url}${tx.origin_tx_hash}`} target="_blank" rel="noopener noreferrer"
+                                  className="text-xs text-[#4040E0] hover:text-[#00D4FF] transition-colors">{exp.name}</a>
+                              ) : null
+                            })()}
+                            {tx.destination_tx_hash && (() => {
+                              const exp = EXPLORER_URLS[tx.destination_chain_id]
+                              return exp ? (
+                                <a href={`${exp.url}${tx.destination_tx_hash}`} target="_blank" rel="noopener noreferrer"
+                                  className="text-xs text-[#8000E0] hover:text-[#D000C0] transition-colors">{exp.name}</a>
+                              ) : null
+                            })()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
