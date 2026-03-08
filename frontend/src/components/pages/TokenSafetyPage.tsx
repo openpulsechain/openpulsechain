@@ -120,7 +120,7 @@ function BoolBadge({ value, trueLabel, falseLabel }: { value: boolean | null; tr
 }
 
 // Token Safety API base URL (Railway service)
-const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || ''
+const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
 
 export function TokenSafetyPage() {
   const { address } = useParams<{ address: string }>()
