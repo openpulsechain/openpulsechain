@@ -179,7 +179,10 @@ export function SmartMoneyPage() {
                     ${swap.amount_usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </span>
 
-                  <span className="text-xs text-gray-500 font-mono hidden sm:inline">
+                  <span
+                    className="text-xs text-gray-500 font-mono hidden sm:inline cursor-pointer hover:text-[#00D4FF] transition-colors"
+                    onClick={() => navigate(`/wallet/${swap.wallet}`)}
+                  >
                     <Wallet className="h-3 w-3 inline mr-1" />
                     {shortenAddr(swap.wallet)}
                   </span>
@@ -202,13 +205,14 @@ export function SmartMoneyPage() {
             {feed.top_wallets.map((wallet, i) => (
               <div
                 key={wallet.wallet}
-                className="rounded-xl border border-white/5 bg-gray-900/50 p-5"
+                className="rounded-xl border border-white/5 bg-gray-900/50 p-5 hover:bg-gray-900/70 transition-colors cursor-pointer"
+                onClick={() => navigate(`/wallet/${wallet.wallet}`)}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <span className="text-lg font-bold text-gray-500 w-8">#{i + 1}</span>
                     <div>
-                      <p className="font-mono text-sm text-gray-300">{shortenAddr(wallet.wallet)}</p>
+                      <p className="font-mono text-sm text-[#00D4FF] hover:underline">{shortenAddr(wallet.wallet)}</p>
                       <p className="text-xs text-gray-500">{wallet.swap_count} swaps</p>
                     </div>
                   </div>

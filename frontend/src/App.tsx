@@ -1,4 +1,5 @@
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { SEO } from './components/SEO'
 import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
 import { OverviewPage } from './components/pages/OverviewPage'
@@ -25,6 +26,19 @@ const ROUTE_TO_PAGE: Record<string, string> = {
   '/safety': 'safety',
   '/alerts': 'alerts',
   '/smart-money': 'smart-money',
+}
+
+const PAGE_SEO: Record<string, { title: string; description: string }> = {
+  overview: { title: 'PulseChain Analytics', description: 'Real-time PulseChain network stats: TVL, gas prices, token prices, DEX volume. Free open-source analytics.' },
+  dex: { title: 'DEX Analytics', description: 'PulseX DEX analytics: daily volume, top trading pairs, liquidity depth. Real-time PulseChain DEX data.' },
+  tokens: { title: 'Token Explorer', description: 'Browse 2500+ PulseChain tokens: prices, volume, liquidity. Search and filter the full PulseChain token list.' },
+  bridge: { title: 'Bridge Monitor', description: 'PulseChain bridge analytics: track cross-chain flows, bridge volume, and asset transfers between Ethereum and PulseChain.' },
+  whales: { title: 'Whale Tracker', description: 'Track PulseChain whale wallets: large transfers, top holders, whale accumulation and distribution patterns.' },
+  intelligence: { title: 'Market Intelligence', description: 'PulseChain market intelligence: on-chain signals, trend analysis, and network activity insights.' },
+  api: { title: 'Free Public API', description: 'Free PulseChain API: token prices, DEX stats, bridge data, safety scores. No auth required, open-source.' },
+  safety: { title: 'Token Safety Scanner', description: 'PulseChain token safety scores: honeypot detection, contract analysis, LP checks, holder distribution. Protect yourself from scams.' },
+  alerts: { title: 'Scam Radar Alerts', description: 'Real-time PulseChain scam alerts: LP removals, whale dumps, suspicious mints. Stay safe with automated threat detection.' },
+  'smart-money': { title: 'Smart Money Tracker', description: 'Track smart money on PulseChain: large swaps, top wallets by volume, whale activity on PulseX DEX.' },
 }
 
 export default function App() {
@@ -76,6 +90,13 @@ export default function App() {
           style={{ animation: 'liquid-2 30s ease-in-out infinite', animationDelay: '7s' }}
         />
       </div>
+
+      {/* SEO */}
+      <SEO
+        title={PAGE_SEO[activePage]?.title}
+        description={PAGE_SEO[activePage]?.description}
+        path={location.pathname}
+      />
 
       {/* Content */}
       <div className="relative z-10 flex min-h-screen flex-col">
