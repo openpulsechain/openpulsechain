@@ -97,7 +97,7 @@ export function Header({ activePage }: HeaderProps) {
     <header className="border-b border-white/5 bg-gray-950/60 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-1.5">
         <Link to="/" className="flex items-center gap-1.5">
-          <img src="/logo.png" alt="OpenPulsechain" className="h-8 w-8" />
+          <img src="/logo.png" alt="OpenPulsechain" className="h-8 w-auto" />
           <span className="text-lg font-bold bg-gradient-to-r from-[#00D4FF] to-[#8000E0] bg-clip-text text-transparent">OpenPulsechain</span>
         </Link>
 
