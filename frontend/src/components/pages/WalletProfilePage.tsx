@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Wallet, ArrowUpRight, ArrowDownRight, ExternalLink, Loader2, Clock } from 'lucide-react'
 
-const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://openpulsechain-production-8166.up.railway.app'
+const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || ''
 
 interface Balance {
   token_address: string

@@ -329,11 +329,18 @@ def wallet_balances(address: str, request: Request, response: Response):
 CRON_SECRET = os.environ.get("CRON_SECRET", "")
 
 
+def _check_cron_secret(secret: str):
+    """Validate cron secret. Blocks access if CRON_SECRET is not configured."""
+    if not CRON_SECRET:
+        raise HTTPException(status_code=403, detail="CRON_SECRET not configured")
+    if secret != CRON_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid secret")
+
+
 @app.get("/cron/radar")
 def cron_radar(request: Request, secret: str = Query("")):
     """Run scam radar scan. Protected by CRON_SECRET."""
-    if CRON_SECRET and secret != CRON_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid secret")
+    _check_cron_secret(secret)
 
     from scam_radar import run_scan, save_alerts
     from db import supabase
@@ -348,8 +355,7 @@ def cron_radar(request: Request, secret: str = Query("")):
 @app.get("/cron/batch")
 def cron_batch(request: Request, secret: str = Query(""), limit: int = Query(100, ge=1, le=1000)):
     """Run batch token safety analysis. Protected by CRON_SECRET."""
-    if CRON_SECRET and secret != CRON_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid secret")
+    _check_cron_secret(secret)
 
     import threading
 

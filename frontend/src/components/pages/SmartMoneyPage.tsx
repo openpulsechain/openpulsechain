@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, Clock, Loader2, RefreshCw } from 'lucide-react'
 
-const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://openpulsechain-production-8166.up.railway.app'
+const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || ''
 
 interface Swap {
   dex: string
