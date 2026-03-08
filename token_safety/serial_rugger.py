@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Serial Rugger Detection — Deployer reputation scoring.
 Analyzes deployer history:

@@ -1,7 +1,9 @@
 """Database operations for token safety scores."""
+from __future__ import annotations
 
 import json
 import logging
+from typing import Optional
 from supabase import create_client
 from config import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
@@ -64,7 +66,7 @@ def save_score(analysis: dict) -> bool:
         return False
 
 
-def get_score(token_address: str) -> dict | None:
+def get_score(token_address: str) -> Optional[dict]:
     """Get cached safety score for a token."""
     try:
         result = supabase.table("token_safety_scores").select("*").eq(
@@ -76,7 +78,7 @@ def get_score(token_address: str) -> dict | None:
         return None
 
 
-def get_all_tokens_to_analyze() -> list[str]:
+def get_all_tokens_to_analyze() -> list:
     """Get list of active token addresses to analyze."""
     try:
         result = supabase.table("pulsechain_tokens").select("address").eq(

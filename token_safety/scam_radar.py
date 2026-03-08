@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Scam Radar — Real-time monitoring for suspicious on-chain events.
 Monitors:
