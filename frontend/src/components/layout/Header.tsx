@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Github, Menu, X, Shield, AlertTriangle } from 'lucide-react'
+import { Github, Menu, X, Shield, AlertTriangle, TrendingUp } from 'lucide-react'
 
 interface HeaderProps {
   activePage: string
@@ -13,6 +13,7 @@ const PAGES = [
   { id: 'tokens', label: 'Tokens', path: '/tokens' },
   { id: 'safety', label: 'Safety', path: '/safety', icon: Shield },
   { id: 'alerts', label: 'Alerts', path: '/alerts', icon: AlertTriangle },
+  { id: 'smart-money', label: 'Smart $', path: '/smart-money', icon: TrendingUp },
   { id: 'bridge', label: 'Bridge', path: '/bridge' },
   { id: 'whales', label: 'Whales', path: '/whales' },
   { id: 'intelligence', label: 'Intel', path: '/intelligence' },

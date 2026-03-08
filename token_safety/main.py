@@ -201,6 +201,55 @@ def token_deployer(address: str, request: Request, response: Response):
     return {"data": result}
 
 
+# ── Smart Money ───────────────────────────────────────────────────
+
+@app.get("/api/v1/smart-money/feed")
+def smart_money_feed(
+    request: Request,
+    response: Response,
+    hours: int = Query(24, ge=1, le=168),
+    min_usd: float = Query(5000, ge=100),
+):
+    """Smart money feed: top wallets by volume + their recent activity."""
+    response.headers["Cache-Control"] = "public, max-age=300"
+    from smart_money import build_smart_money_feed
+    return build_smart_money_feed(since_hours=hours, min_usd=min_usd)
+
+
+@app.get("/api/v1/smart-money/swaps")
+def smart_money_swaps(
+    request: Request,
+    response: Response,
+    minutes: int = Query(60, ge=5, le=1440),
+    min_usd: float = Query(1000, ge=100),
+):
+    """Recent large swaps across PulseX."""
+    response.headers["Cache-Control"] = "public, max-age=60"
+    from smart_money import get_recent_large_swaps
+    swaps = get_recent_large_swaps(since_minutes=minutes, min_usd=min_usd)
+    return {"data": swaps, "count": len(swaps)}
+
+
+@app.get("/api/v1/wallet/{address}/swaps")
+def wallet_swaps(address: str, request: Request, response: Response):
+    """Recent swap history for a wallet."""
+    addr = _validate_address(address)
+    response.headers["Cache-Control"] = "public, max-age=120"
+    from smart_money import get_wallet_swap_history
+    swaps = get_wallet_swap_history(addr)
+    return {"data": swaps, "wallet": addr, "count": len(swaps)}
+
+
+@app.get("/api/v1/wallet/{address}/balances")
+def wallet_balances(address: str, request: Request, response: Response):
+    """Current token balances for a wallet."""
+    addr = _validate_address(address)
+    response.headers["Cache-Control"] = "public, max-age=120"
+    from smart_money import get_wallet_token_balances
+    balances = get_wallet_token_balances(addr)
+    return {"data": balances, "wallet": addr, "count": len(balances)}
+
+
 # ── Cron endpoints (called by Railway cron or external scheduler) ──
 
 CRON_SECRET = os.environ.get("CRON_SECRET", "")
