@@ -15,6 +15,12 @@ supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 def save_score(analysis: dict) -> bool:
     """Save or update a token safety score in Supabase."""
     try:
+        # Clamp numeric values to avoid overflow (NUMERIC(8,2) max = 999999.99)
+        def clamp(val, max_val=999999.99):
+            if val is None:
+                return None
+            return min(float(val), max_val)
+
         row = {
             "token_address": analysis["address"],
             "score": analysis["score"],
@@ -22,8 +28,8 @@ def save_score(analysis: dict) -> bool:
             "risks": analysis["risks"],
             "honeypot_score": analysis["honeypot"]["score"],
             "is_honeypot": analysis["honeypot"]["is_honeypot"],
-            "buy_tax_pct": analysis["honeypot"]["buy_tax_pct"],
-            "sell_tax_pct": analysis["honeypot"]["sell_tax_pct"],
+            "buy_tax_pct": clamp(analysis["honeypot"]["buy_tax_pct"]),
+            "sell_tax_pct": clamp(analysis["honeypot"]["sell_tax_pct"]),
             "contract_score": analysis["contract"]["score"],
             "is_verified": analysis["contract"]["is_verified"],
             "is_proxy": analysis["contract"]["is_proxy"],
@@ -33,15 +39,15 @@ def save_score(analysis: dict) -> bool:
             "contract_dangers": analysis["contract"]["dangers"],
             "lp_score": analysis["lp"]["score"],
             "has_lp": analysis["lp"]["has_lp"],
-            "total_liquidity_usd": analysis["lp"]["total_liquidity_usd"],
+            "total_liquidity_usd": clamp(analysis["lp"]["total_liquidity_usd"], 9999999999999999.99),
             "pair_count": analysis["lp"]["pair_count"],
             "recent_burns_24h": analysis["lp"]["recent_burns_24h"],
             "holders_score": analysis["holders"]["score"],
             "holder_count": analysis["holders"]["holder_count"],
-            "top10_pct": analysis["holders"]["top10_pct"],
-            "top1_pct": analysis["holders"]["top1_pct"],
+            "top10_pct": clamp(analysis["holders"]["top10_pct"]),
+            "top1_pct": clamp(analysis["holders"]["top1_pct"]),
             "age_score": analysis["age"].get("score", 0),
-            "age_days": analysis["age"].get("age_days", 0),
+            "age_days": clamp(analysis["age"].get("age_days", 0), 9999999.9),
             "analysis_details": json.dumps({
                 "honeypot": analysis["honeypot"],
                 "contract": analysis["contract"],
