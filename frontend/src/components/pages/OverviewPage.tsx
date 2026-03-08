@@ -112,10 +112,12 @@ export function OverviewPage() {
           Open-source, sovereign data for PulseChain. 2500+ tokens, bridge flows, DEX volume — powered by PulseX Subgraph.
         </p>
         <div className="flex flex-wrap justify-center gap-3 mt-4">
-          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-[#00D4FF]">Free API</span>
-          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-[#00D4FF]">100% On-chain</span>
-          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-[#00D4FF]">Open Source</span>
-          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-[#00D4FF]">No Auth Required</span>
+          <span className="rounded-full bg-white/5 border border-emerald-500/30 px-3 py-1 text-xs text-emerald-400">Token Safety</span>
+          <span className="rounded-full bg-white/5 border border-blue-500/30 px-3 py-1 text-xs text-blue-400">Smart Money</span>
+          <span className="rounded-full bg-white/5 border border-red-500/30 px-3 py-1 text-xs text-red-400">Scam Radar</span>
+          <span className="rounded-full bg-white/5 border border-gray-400/30 px-3 py-1 text-xs text-gray-300">Free API</span>
+          <span className="rounded-full bg-white/5 border border-amber-500/30 px-3 py-1 text-xs text-amber-400">2500+ Tokens</span>
+          <span className="rounded-full bg-white/5 border border-gray-400/30 px-3 py-1 text-xs text-gray-300">Open Source</span>
         </div>
       </div>
 
