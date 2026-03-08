@@ -18,8 +18,9 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env.local"), override=True)
 
 # Force unbuffered output for Railway logs
-_print = __builtins__.__dict__['print'] if isinstance(__builtins__, dict) else __builtins__.print
-print = lambda *a, **kw: _print(*a, **{**kw, 'flush': True})
+import builtins
+_orig_print = builtins.print
+print = lambda *a, **kw: _orig_print(*a, **{**kw, 'flush': True})
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
