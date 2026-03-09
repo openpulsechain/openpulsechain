@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "OpenPulsechain",
+  "description": "Token safety scores, scam detection & portfolio tracker for PulseChain. Protect your wallet before you sign.",
+  "version": "1.0.0",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png"
+    },
+    "default_title": "OpenPulsechain"
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/tx-guard-inject.ts"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/tx-guard.ts"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.pulsex.com/*", "*://app.pulsex.com/*"],
+      "js": ["src/content/pulsex-enrichment.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://safety.openpulsechain.com/*",
+    "https://api.openpulsechain.com/*",
+    "https://xojdwzmcoiaeydewijrhe.supabase.co/*",
+    "https://tokens.app.pulsex.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
