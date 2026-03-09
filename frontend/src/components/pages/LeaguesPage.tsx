@@ -18,6 +18,12 @@ const TOKEN_COLORS: Record<string, string> = {
   pHEX: '#FF6B35',
   INC: '#10b981',
 }
+const TOKEN_LOGOS: Record<string, string> = {
+  PLS: '/tokens/pls.png',
+  PLSX: '/tokens/plsx.png',
+  pHEX: '/tokens/phex.png',
+  INC: '/tokens/inc.png',
+}
 const TOKEN_DESCRIPTIONS: Record<string, string> = {
   PLS: 'Combined PLS + WPLS Holders',
   PLSX: 'PulseX Token Holders',
@@ -49,9 +55,14 @@ function TokenCard({ league }: { league: HolderLeagueCurrent }) {
       {/* Header */}
       <div className="px-6 py-4 border-b border-white/5" style={{ background: `linear-gradient(135deg, ${color}10, transparent)` }}>
         <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-white">{league.token_symbol} Holders</h3>
-            <p className="text-sm text-gray-400">{TOKEN_DESCRIPTIONS[league.token_symbol] || 'Token Holders'}</p>
+          <div className="flex items-center gap-3">
+            {TOKEN_LOGOS[league.token_symbol] && (
+              <img src={TOKEN_LOGOS[league.token_symbol]} alt={league.token_symbol} className="h-10 w-10 rounded-full" />
+            )}
+            <div>
+              <h3 className="text-lg font-bold text-white">{league.token_symbol} Holders</h3>
+              <p className="text-sm text-gray-400">{TOKEN_DESCRIPTIONS[league.token_symbol] || 'Token Holders'}</p>
+            </div>
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-white">{league.total_holders.toLocaleString()}</div>

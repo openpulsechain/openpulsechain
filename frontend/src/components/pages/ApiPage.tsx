@@ -222,6 +222,43 @@ const ENDPOINTS: Record<string, Endpoint[]> = {
       ],
     },
   ],
+  'Holder Leagues': [
+    {
+      table: 'holder_league_current',
+      description: 'Current holder league counts for PLS, PLSX, pHEX, INC (updated every 6h)',
+      columns: [
+        { name: 'token_symbol', type: 'text (PLS | PLSX | pHEX | INC)' },
+        { name: 'token_address', type: 'text' },
+        { name: 'total_holders', type: 'integer' },
+        { name: 'total_supply_human', type: 'numeric' },
+        { name: 'poseidon_count', type: 'integer (>= 10% supply)' },
+        { name: 'whale_count', type: 'integer (>= 1%)' },
+        { name: 'shark_count', type: 'integer (>= 0.1%)' },
+        { name: 'dolphin_count', type: 'integer (>= 0.01%)' },
+        { name: 'squid_count', type: 'integer (>= 0.001%)' },
+        { name: 'turtle_count', type: 'integer (>= 0.0001%)' },
+        { name: 'updated_at', type: 'timestamptz' },
+      ],
+    },
+    {
+      table: 'holder_league_snapshots',
+      description: 'Historical holder league snapshots for trend tracking',
+      columns: [
+        { name: 'id', type: 'bigint' },
+        { name: 'token_symbol', type: 'text' },
+        { name: 'token_address', type: 'text' },
+        { name: 'total_holders', type: 'integer' },
+        { name: 'total_supply_human', type: 'numeric' },
+        { name: 'poseidon_count', type: 'integer' },
+        { name: 'whale_count', type: 'integer' },
+        { name: 'shark_count', type: 'integer' },
+        { name: 'dolphin_count', type: 'integer' },
+        { name: 'squid_count', type: 'integer' },
+        { name: 'turtle_count', type: 'integer' },
+        { name: 'scraped_at', type: 'timestamptz' },
+      ],
+    },
+  ],
   'Network': [
     {
       table: 'network_tvl_history',
@@ -489,7 +526,7 @@ export function ApiPage() {
         <div className="flex items-center gap-2">
           <Database className="h-5 w-5 text-[#00D4FF]" />
           <h2 className="text-xl font-semibold">Endpoints</h2>
-          <span className="text-gray-500 text-sm">14 tables</span>
+          <span className="text-gray-500 text-sm">16 tables</span>
         </div>
 
         {Object.entries(ENDPOINTS).map(([category, endpoints]) => (
@@ -659,6 +696,24 @@ export function ApiPage() {
                 <td className="py-2 pr-4 text-gray-400 font-sans">Wallet token balances</td>
                 <td className="py-2 text-gray-500 font-sans">-</td>
               </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">/api/v1/leagues</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Holder leagues for all tokens (PLS, PLSX, pHEX, INC)</td>
+                <td className="py-2 text-gray-500 font-sans">-</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/leagues/{symbol}'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Holder league for a specific token</td>
+                <td className="py-2 text-gray-500 font-sans">-</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-4 text-emerald-400">GET</td>
+                <td className="py-2 pr-4 text-[#00D4FF]">{'/api/v1/leagues/{symbol}/history'}</td>
+                <td className="py-2 pr-4 text-gray-400 font-sans">Historical league snapshots</td>
+                <td className="py-2 text-gray-500 font-sans">days=30</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -682,6 +737,14 @@ export function ApiPage() {
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-300">Example: Scam radar alerts</h4>
           <CodeBlock code={`curl 'https://safety.openpulsechain.com/api/v1/alerts/recent?limit=10'`} />
+        </div>
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-300">Example: Holder leagues (all tokens)</h4>
+          <CodeBlock code={`curl 'https://safety.openpulsechain.com/api/v1/leagues'`} />
+        </div>
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-300">Example: PLS holder league history</h4>
+          <CodeBlock code={`curl 'https://safety.openpulsechain.com/api/v1/leagues/PLS/history?days=30'`} />
         </div>
       </section>
 
