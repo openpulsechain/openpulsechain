@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type Section = 'safety' | 'portfolio' | 'explorer' | 'smartmoney' | 'alerts' | 'settings'
+export type Section = 'safety' | 'portfolio' | 'bridge' | 'explorer' | 'smartmoney' | 'alerts' | 'settings'
 
 interface WalletEntry {
   address: string

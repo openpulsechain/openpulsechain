@@ -324,6 +324,23 @@ def wallet_balances(address: str, request: Request, response: Response):
     return {"data": balances, "wallet": addr, "count": len(balances)}
 
 
+# ── Bridge stats ──
+
+@app.get("/api/v1/bridge/stats")
+def bridge_stats(response: Response):
+    """Bridge daily stats for the last 7 days."""
+    response.headers["Cache-Control"] = "public, max-age=300"
+    from db import supabase
+    from datetime import timedelta
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    result = supabase.table("bridge_daily_stats") \
+        .select("date,deposit_count,withdrawal_count,deposit_volume_usd,withdrawal_volume_usd,net_flow_usd") \
+        .gte("date", since) \
+        .order("date", desc=True) \
+        .execute()
+    return {"data": result.data or [], "count": len(result.data or [])}
+
+
 # ── Cron endpoints (called by Railway cron or external scheduler) ──
 
 CRON_SECRET = os.environ.get("CRON_SECRET", "")

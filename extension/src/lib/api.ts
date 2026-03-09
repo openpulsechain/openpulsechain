@@ -113,7 +113,7 @@ interface TokenApiResponse {
   }
 }
 
-// WPLS address — used to get PLS native token price
+// WPLS address — PLS native uses WPLS price
 const WPLS_ADDRESS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27'
 const PLS_NATIVE = '0x0000000000000000000000000000000000000000'
 
@@ -123,58 +123,57 @@ async function getTokenPrices(addresses: string[]): Promise<Map<string, number>>
   const priceMap = new Map<string, number>()
   if (addresses.length === 0) return priceMap
 
-  // Map PLS native to WPLS for price lookup
-  const hasPlsNative = addresses.some(a => a.toLowerCase() === PLS_NATIVE)
-  const lookupAddresses = addresses.map(a =>
-    a.toLowerCase() === PLS_NATIVE ? WPLS_ADDRESS : a
-  )
+  // Replace PLS native with WPLS for price lookup, deduplicate
+  const lookupSet = new Set<string>()
+  for (const addr of addresses) {
+    const lower = addr.toLowerCase()
+    lookupSet.add(lower === PLS_NATIVE ? WPLS_ADDRESS : lower)
+  }
+  const lookupAddresses = [...lookupSet]
 
   // Check cache first, collect uncached
   const uncached: string[] = []
   for (const addr of lookupAddresses) {
-    const key = `price:${addr.toLowerCase()}`
+    const key = `price:${addr}`
     const cached = cache.get(key)
     if (cached && cached.expires > Date.now()) {
       const price = cached.data as number | null
-      if (price != null) priceMap.set(addr.toLowerCase(), price)
+      if (price != null) priceMap.set(addr, price)
     } else {
       uncached.push(addr)
     }
   }
 
-  if (uncached.length === 0) return priceMap
-
-  // Fetch in batches of 5 concurrent requests
-  const BATCH_SIZE = 5
-  for (let i = 0; i < uncached.length; i += BATCH_SIZE) {
-    const batch = uncached.slice(i, i + BATCH_SIZE)
-    const results = await Promise.allSettled(
-      batch.map(async (addr) => {
-        const url = `${REST_API}/api/v1/tokens/${addr.toLowerCase()}`
-        const res = await fetch(url)
-        if (!res.ok) return { addr, price: null }
-        const json: TokenApiResponse = await res.json()
-        return { addr, price: json.data?.price_usd ?? null }
-      })
-    )
-    for (const result of results) {
-      if (result.status === 'fulfilled' && result.value) {
-        const { addr, price } = result.value
-        // Cache for 5 min (even null prices to avoid re-fetching)
-        cache.set(`price:${addr.toLowerCase()}`, { data: price, expires: Date.now() + 5 * 60 * 1000 })
-        if (price != null) {
-          priceMap.set(addr.toLowerCase(), price)
+  if (uncached.length > 0) {
+    // Fetch in batches of 5 concurrent requests
+    const BATCH_SIZE = 5
+    for (let i = 0; i < uncached.length; i += BATCH_SIZE) {
+      const batch = uncached.slice(i, i + BATCH_SIZE)
+      const results = await Promise.allSettled(
+        batch.map(async (addr) => {
+          const url = `${REST_API}/api/v1/tokens/${addr}`
+          const res = await fetch(url)
+          if (!res.ok) return { addr, price: null }
+          const json: TokenApiResponse = await res.json()
+          return { addr, price: json.data?.price_usd ?? null }
+        })
+      )
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value) {
+          const { addr, price } = result.value
+          cache.set(`price:${addr}`, { data: price, expires: Date.now() + 5 * 60 * 1000 })
+          if (price != null) {
+            priceMap.set(addr, price)
+          }
         }
       }
     }
   }
 
-  // Copy WPLS price to PLS native address
-  if (hasPlsNative) {
-    const wplsPrice = priceMap.get(WPLS_ADDRESS)
-    if (wplsPrice != null) {
-      priceMap.set(PLS_NATIVE, wplsPrice)
-    }
+  // Always copy WPLS price to PLS native address
+  const wplsPrice = priceMap.get(WPLS_ADDRESS)
+  if (wplsPrice != null) {
+    priceMap.set(PLS_NATIVE, wplsPrice)
   }
 
   return priceMap
@@ -227,6 +226,51 @@ export async function getSmartMoneySwaps(minUsd = 5000): Promise<SmartMoneySwap[
     `${SAFETY_API}/api/v1/smart-money/swaps?min_usd=${minUsd}&minutes=60`, 60 * 1000
   )
   return result.data || []
+}
+
+// Bridge Monitor
+export interface BridgeSnapshot {
+  deposit_volume_24h: number
+  withdrawal_volume_24h: number
+  deposit_count_24h: number
+  withdrawal_count_24h: number
+  net_flow_24h: number
+  tx_count_24h: number
+  deposit_volume_7d: number
+  withdrawal_volume_7d: number
+  net_flow_7d: number
+}
+
+export async function getBridgeStats(): Promise<BridgeSnapshot> {
+  const cached = cache.get('bridge_stats')
+  if (cached && cached.expires > Date.now()) {
+    return cached.data as BridgeSnapshot
+  }
+
+  const res = await fetch(`${SAFETY_API}/api/v1/bridge/stats`)
+  if (!res.ok) throw new Error(`Bridge API error: ${res.status}`)
+  const json = await res.json()
+  const rows: { date: string; deposit_count: number; withdrawal_count: number; deposit_volume_usd: number; withdrawal_volume_usd: number; net_flow_usd: number }[] = json.data || []
+
+  // Today = first row (most recent), 7d = all rows
+  const today = rows[0] || { deposit_count: 0, withdrawal_count: 0, deposit_volume_usd: 0, withdrawal_volume_usd: 0, net_flow_usd: 0 }
+  const dep7d = rows.reduce((s, r) => s + (r.deposit_volume_usd || 0), 0)
+  const wd7d = rows.reduce((s, r) => s + (r.withdrawal_volume_usd || 0), 0)
+
+  const snapshot: BridgeSnapshot = {
+    deposit_volume_24h: today.deposit_volume_usd || 0,
+    withdrawal_volume_24h: today.withdrawal_volume_usd || 0,
+    deposit_count_24h: today.deposit_count || 0,
+    withdrawal_count_24h: today.withdrawal_count || 0,
+    net_flow_24h: today.net_flow_usd || 0,
+    tx_count_24h: (today.deposit_count || 0) + (today.withdrawal_count || 0),
+    deposit_volume_7d: dep7d,
+    withdrawal_volume_7d: wd7d,
+    net_flow_7d: dep7d - wd7d,
+  }
+
+  cache.set('bridge_stats', { data: snapshot, expires: Date.now() + 5 * 60 * 1000 })
+  return snapshot
 }
 
 export function clearCache() {

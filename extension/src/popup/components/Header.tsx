@@ -1,9 +1,10 @@
-import { Shield, Wallet, Search, TrendingUp, AlertTriangle, Settings, Menu, X } from 'lucide-react'
+import { Shield, Wallet, Search, TrendingUp, AlertTriangle, Settings, Menu, X, ArrowLeftRight } from 'lucide-react'
 import { useStore, type Section } from '../../lib/store'
 
 const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'safety', label: 'Token Safety', icon: <Shield className="h-4 w-4" /> },
   { id: 'portfolio', label: 'Portfolio', icon: <Wallet className="h-4 w-4" /> },
+  { id: 'bridge', label: 'Bridge', icon: <ArrowLeftRight className="h-4 w-4" /> },
   { id: 'explorer', label: 'Explorer', icon: <Search className="h-4 w-4" /> },
   { id: 'smartmoney', label: 'Smart Money', icon: <TrendingUp className="h-4 w-4" /> },
   { id: 'alerts', label: 'Scam Radar', icon: <AlertTriangle className="h-4 w-4" /> },
