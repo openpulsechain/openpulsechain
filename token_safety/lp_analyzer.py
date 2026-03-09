@@ -107,7 +107,7 @@ def analyze_lp(token_address: str) -> dict:
     # Include reserve0/reserve1 + derivedUSD for cross-validation
     pairs_query = """
     query($token: String!) {
-        asToken0: pairs(where: {token0: $token}, orderBy: totalTransactions, orderDirection: desc, first: 20) {
+        asToken0: pairs(where: {token0: $token}, orderBy: totalTransactions, orderDirection: desc, first: 50) {
             id
             token0 { id symbol derivedUSD }
             token1 { id symbol derivedUSD }
@@ -117,7 +117,7 @@ def analyze_lp(token_address: str) -> dict:
             totalTransactions
             timestamp
         }
-        asToken1: pairs(where: {token1: $token}, orderBy: totalTransactions, orderDirection: desc, first: 20) {
+        asToken1: pairs(where: {token1: $token}, orderBy: totalTransactions, orderDirection: desc, first: 50) {
             id
             token0 { id symbol derivedUSD }
             token1 { id symbol derivedUSD }
