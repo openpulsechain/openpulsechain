@@ -20,6 +20,7 @@ import type {
   IntelConclusion,
   LlmAnalysis,
   ResearchTweet,
+  HolderLeagueCurrent,
 } from '../types'
 
 function useQuery<T>(table: string, options?: {
@@ -271,5 +272,13 @@ export function useResearchTweets() {
     orderBy: 'tweeted_at',
     ascending: false,
     select: 'id,text,author_username,author_name,tweet_url,like_count,retweet_count,tweeted_at',
+  })
+}
+
+export function useHolderLeagues() {
+  return useQuery<HolderLeagueCurrent>('holder_league_current', {
+    orderBy: 'token_symbol',
+    ascending: true,
+    limit: 10,
   })
 }

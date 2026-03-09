@@ -203,3 +203,18 @@ export interface ResearchTweet {
   retweet_count: number
   tweeted_at: string
 }
+
+export interface HolderLeagueCurrent {
+  token_symbol: string
+  token_address: string
+  total_holders: number
+  total_supply: string
+  total_supply_human: number
+  poseidon_count: number
+  whale_count: number
+  shark_count: number
+  dolphin_count: number
+  squid_count: number
+  turtle_count: number
+  updated_at: string
+}
