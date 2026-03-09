@@ -1,6 +1,10 @@
 """
 LP (Liquidity Pool) analysis via PulseX Subgraph.
 Checks: LP exists, reserve size, deployer LP holdings, pair age.
+
+IMPORTANT: PulseX subgraph reserveUSD is unreliable for spam/dust pairs.
+We sort by totalTransactions (not reserveUSD), filter low-txn pairs,
+and cross-validate using derivedUSD * reserves.
 """
 
 import logging
@@ -9,6 +13,11 @@ import requests
 from config import PULSEX_V1_SUBGRAPH, PULSEX_V2_SUBGRAPH
 
 logger = logging.getLogger(__name__)
+
+# Minimum transactions to consider a pair legitimate
+MIN_TXNS = 10
+# Maximum realistic liquidity per pair (safety cap)
+MAX_PAIR_USD = 100_000_000  # $100M
 
 
 def _query_subgraph(url: str, query: str, variables: dict = None) -> dict:
@@ -27,6 +36,37 @@ def _query_subgraph(url: str, query: str, variables: dict = None) -> dict:
     except Exception as e:
         logger.warning(f"Subgraph query error: {str(e)[:100]}")
         return {}
+
+
+def _calc_pair_liquidity(pair: dict) -> float:
+    """
+    Calculate pair liquidity using derivedUSD × reserves.
+    Filters out dust/spam pairs where one side has near-zero real value.
+    """
+    try:
+        r0 = float(pair.get("reserve0", 0) or 0)
+        r1 = float(pair.get("reserve1", 0) or 0)
+        d0 = float(pair.get("token0", {}).get("derivedUSD", 0) or 0)
+        d1 = float(pair.get("token1", {}).get("derivedUSD", 0) or 0)
+
+        side0_usd = r0 * d0
+        side1_usd = r1 * d1
+        calc_usd = side0_usd + side1_usd
+
+        # Both sides must have meaningful value (> $10).
+        # Spam pairs have trillions of worthless tokens on one side
+        # and near-zero real value on the other.
+        MIN_SIDE_USD = 10.0
+        if side0_usd < MIN_SIDE_USD or side1_usd < MIN_SIDE_USD:
+            return 0.0
+
+        # Reject if total is unreasonably high
+        if calc_usd > MAX_PAIR_USD:
+            return 0.0
+
+        return calc_usd
+    except (ValueError, TypeError):
+        return 0.0
 
 
 def analyze_lp(token_address: str) -> dict:
@@ -63,21 +103,26 @@ def analyze_lp(token_address: str) -> dict:
 
     all_pairs = []
 
-    # Query both V1 and V2
+    # Query both V1 and V2 — sorted by totalTransactions to get real pairs first
+    # Include reserve0/reserve1 + derivedUSD for cross-validation
     pairs_query = """
     query($token: String!) {
-        asToken0: pairs(where: {token0: $token}, orderBy: reserveUSD, orderDirection: desc, first: 10) {
+        asToken0: pairs(where: {token0: $token}, orderBy: totalTransactions, orderDirection: desc, first: 20) {
             id
-            token0 { id symbol }
-            token1 { id symbol }
+            token0 { id symbol derivedUSD }
+            token1 { id symbol derivedUSD }
+            reserve0
+            reserve1
             reserveUSD
             totalTransactions
             timestamp
         }
-        asToken1: pairs(where: {token1: $token}, orderBy: reserveUSD, orderDirection: desc, first: 10) {
+        asToken1: pairs(where: {token1: $token}, orderBy: totalTransactions, orderDirection: desc, first: 20) {
             id
-            token0 { id symbol }
-            token1 { id symbol }
+            token0 { id symbol derivedUSD }
+            token1 { id symbol derivedUSD }
+            reserve0
+            reserve1
             reserveUSD
             totalTransactions
             timestamp
@@ -94,32 +139,30 @@ def analyze_lp(token_address: str) -> dict:
     if not all_pairs:
         return result
 
-    # Deduplicate by pair address and filter absurd values
-    # PulseX subgraph inflates USD values (PLS-denominated, not real USD)
-    # Cap at $1B per pair as sanity check
-    MAX_SANE_USD = 1_000_000_000
+    # Deduplicate and filter spam pairs (< MIN_TXNS transactions)
     seen = set()
     unique_pairs = []
     for p in all_pairs:
         if p["id"] not in seen:
             seen.add(p["id"])
-            reserve = float(p.get("reserveUSD", 0) or 0)
-            if reserve > MAX_SANE_USD:
-                p["reserveUSD"] = "0"  # Mark inflated as unknown
-            unique_pairs.append(p)
+            txns = int(p.get("totalTransactions", 0) or 0)
+            if txns >= MIN_TXNS:
+                unique_pairs.append(p)
+
+    if not unique_pairs:
+        return result
 
     result["has_lp"] = True
     result["pair_count"] = len(unique_pairs)
 
-    # Calculate total liquidity
+    # Calculate total liquidity using derivedUSD cross-validation
     total_liq = 0.0
     best = None
     best_reserve = 0.0
-
     now = int(time.time())
 
     for p in unique_pairs:
-        reserve = float(p.get("reserveUSD", 0) or 0)
+        reserve = _calc_pair_liquidity(p)
         total_liq += reserve
         if reserve > best_reserve:
             best_reserve = reserve
