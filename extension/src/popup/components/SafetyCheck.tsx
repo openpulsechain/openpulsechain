@@ -1,7 +1,18 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Shield, Search, AlertTriangle, CheckCircle, XCircle, ExternalLink, Loader2 } from 'lucide-react'
 import { getTokenSafety, getDeployerReputation, gradeColor, type SafetyScore, type DeployerReputation } from '../../lib/api'
 import { formatUsd, shortenAddress } from '../../lib/format'
+
+const QUICK_TOKENS = [
+  { symbol: 'HEX', address: '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39' },
+  { symbol: 'PLSX', address: '0x95b303987a60c71504d99aa1b13b4da07b0790ab' },
+  { symbol: 'INC', address: '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d' },
+  { symbol: 'HDRN', address: '0x3819f64f282bf135d62168c1e513280daf905e06' },
+  { symbol: 'LOAN', address: '0x9159f1d2a9f51998fc9ab03fbd8f265ab14a1b3b' },
+  { symbol: 'DAI', address: '0xefd766ccb38eaf1dfd701853bfce31359239f305' },
+  { symbol: 'WETH', address: '0x02dcdd04e3f455d838cd1249292c58f3b79e3c3c' },
+  { symbol: 'USDC', address: '0x15d38573d2feeb82e7ad5187ab8c1d52810b1f07' },
+]
 
 export function SafetyCheck() {
   const [input, setInput] = useState('')
@@ -10,12 +21,12 @@ export function SafetyCheck() {
   const [safety, setSafety] = useState<SafetyScore | null>(null)
   const [deployer, setDeployer] = useState<DeployerReputation | null>(null)
 
-  const handleCheck = async () => {
-    const addr = input.trim()
+  const checkToken = useCallback(async (addr: string) => {
     if (!addr.match(/^0x[a-fA-F0-9]{40}$/)) {
       setError('Enter a valid PulseChain token address (0x...)')
       return
     }
+    setInput(addr)
     setLoading(true)
     setError(null)
     setSafety(null)
@@ -34,7 +45,9 @@ export function SafetyCheck() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  const handleCheck = () => checkToken(input.trim())
 
   return (
     <div className="space-y-3">
@@ -69,6 +82,24 @@ export function SafetyCheck() {
         <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 rounded-lg p-2">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           {error}
+        </div>
+      )}
+
+      {/* Quick tokens when no result */}
+      {!safety && !loading && (
+        <div className="space-y-2">
+          <div className="text-xs text-gray-500">Popular tokens — tap to check:</div>
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_TOKENS.map((t) => (
+              <button
+                key={t.symbol}
+                onClick={() => checkToken(t.address)}
+                className="px-2.5 py-1.5 rounded-lg bg-gray-800/50 border border-white/5 text-xs text-gray-300 hover:bg-gray-800/80 hover:text-white hover:border-pulse-cyan/30 transition-colors"
+              >
+                {t.symbol}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

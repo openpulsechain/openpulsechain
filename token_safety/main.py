@@ -33,6 +33,7 @@ logger = logging.getLogger("token_safety")
 
 RADAR_INTERVAL_MIN = int(os.environ.get("RADAR_INTERVAL_MIN", "30"))
 BATCH_INTERVAL_HOURS = int(os.environ.get("BATCH_INTERVAL_HOURS", "12"))
+LEAGUE_INTERVAL_HOURS = int(os.environ.get("LEAGUE_INTERVAL_HOURS", "6"))
 BATCH_LIMIT = int(os.environ.get("BATCH_LIMIT", "200"))
 ENABLE_SCHEDULER = os.environ.get("ENABLE_SCHEDULER", "true").lower() == "true"
 
@@ -40,12 +41,14 @@ ENABLE_SCHEDULER = os.environ.get("ENABLE_SCHEDULER", "true").lower() == "true"
 async def _scheduler_loop():
     """Background scheduler: runs radar every 30min, batch every 12h."""
     await asyncio.sleep(30)  # Wait 30s after startup before first run
-    logger.info(f"Scheduler started: radar every {RADAR_INTERVAL_MIN}min, batch every {BATCH_INTERVAL_HOURS}h")
+    logger.info(f"Scheduler started: radar every {RADAR_INTERVAL_MIN}min, batch every {BATCH_INTERVAL_HOURS}h, leagues every {LEAGUE_INTERVAL_HOURS}h")
 
     radar_interval = RADAR_INTERVAL_MIN * 60
     batch_interval = BATCH_INTERVAL_HOURS * 3600
+    league_interval = LEAGUE_INTERVAL_HOURS * 3600
     last_radar = 0
     last_batch = 0
+    last_league = 0
 
     while True:
         now = time.time()
@@ -64,6 +67,18 @@ async def _scheduler_loop():
             except Exception as e:
                 logger.error(f"[CRON] Radar error: {e}")
             last_radar = time.time()
+
+        # Holder Leagues
+        if now - last_league >= league_interval:
+            try:
+                logger.info("[CRON] Running Holder Leagues scrape...")
+                import threading
+                from holder_leagues import run_holder_leagues
+                t = threading.Thread(target=run_holder_leagues, daemon=True)
+                t.start()
+            except Exception as e:
+                logger.error(f"[CRON] Leagues error: {e}")
+            last_league = time.time()
 
         # Batch analysis
         if now - last_batch >= batch_interval:
@@ -341,6 +356,50 @@ def bridge_stats(response: Response):
     return {"data": result.data or [], "count": len(result.data or [])}
 
 
+# ── Holder Leagues ───────────────────────────────────────────────
+
+@app.get("/api/v1/leagues")
+def holder_leagues(response: Response):
+    """Current holder league counts for all tracked tokens."""
+    response.headers["Cache-Control"] = "public, max-age=600"
+    from db import supabase
+    result = supabase.table("holder_league_current").select("*").execute()
+    return {"data": result.data or [], "count": len(result.data or [])}
+
+
+@app.get("/api/v1/leagues/{symbol}")
+def holder_league_detail(symbol: str, response: Response):
+    """Current holder league for a specific token."""
+    sym = symbol.upper()
+    if sym not in ("PLS", "PLSX", "PHEX", "INC"):
+        raise HTTPException(status_code=400, detail="Invalid token symbol")
+    response.headers["Cache-Control"] = "public, max-age=600"
+    from db import supabase
+    result = supabase.table("holder_league_current").select("*").eq("token_symbol", sym).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="No data yet")
+    return {"data": result.data[0]}
+
+
+@app.get("/api/v1/leagues/{symbol}/history")
+def holder_league_history(symbol: str, response: Response, days: int = Query(30, ge=1, le=365)):
+    """Historical holder league data for trend charts."""
+    sym = symbol.upper()
+    if sym not in ("PLS", "PLSX", "PHEX", "INC"):
+        raise HTTPException(status_code=400, detail="Invalid token symbol")
+    response.headers["Cache-Control"] = "public, max-age=1800"
+    from db import supabase
+    from datetime import timedelta
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    result = supabase.table("holder_league_snapshots") \
+        .select("token_symbol,total_holders,poseidon_count,whale_count,shark_count,dolphin_count,squid_count,turtle_count,scraped_at") \
+        .eq("token_symbol", sym) \
+        .gte("scraped_at", since) \
+        .order("scraped_at", desc=False) \
+        .execute()
+    return {"data": result.data or [], "count": len(result.data or [])}
+
+
 # ── Cron endpoints (called by Railway cron or external scheduler) ──
 
 CRON_SECRET = os.environ.get("CRON_SECRET", "")
@@ -367,6 +426,17 @@ def cron_radar(request: Request, secret: str = Query("")):
     if alerts:
         saved = save_alerts(alerts, supabase)
     return {"alerts_found": len(alerts), "alerts_saved": saved}
+
+
+@app.get("/cron/leagues")
+def cron_leagues(request: Request, secret: str = Query("")):
+    """Run holder leagues scraper. Protected by CRON_SECRET."""
+    _check_cron_secret(secret)
+    import threading
+    from holder_leagues import run_holder_leagues
+    t = threading.Thread(target=run_holder_leagues, daemon=True)
+    t.start()
+    return {"status": "started"}
 
 
 @app.get("/cron/batch")

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type Section = 'safety' | 'portfolio' | 'bridge' | 'explorer' | 'smartmoney' | 'alerts' | 'settings'
+export type Section = 'dashboard' | 'safety' | 'portfolio' | 'bridge' | 'explorer' | 'smartmoney' | 'alerts' | 'leagues' | 'settings'
 
 interface WalletEntry {
   address: string
@@ -46,7 +46,7 @@ function getFromStorage(key: string): Promise<unknown> {
 }
 
 export const useStore = create<ExtensionState>((set, get) => ({
-  activeSection: 'safety',
+  activeSection: 'dashboard',
   setActiveSection: (s) => set({ activeSection: s, menuOpen: false }),
   menuOpen: false,
   setMenuOpen: (open) => set({ menuOpen: open }),

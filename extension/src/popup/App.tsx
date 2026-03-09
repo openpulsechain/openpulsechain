@@ -1,13 +1,16 @@
 import { useEffect } from 'react'
 import { useStore } from '../lib/store'
 import { Header } from './components/Header'
+import { Dashboard } from './components/Dashboard'
 import { SafetyCheck } from './components/SafetyCheck'
 import { Portfolio } from './components/Portfolio'
 import { Bridge } from './components/Bridge'
 import { Explorer } from './components/Explorer'
 import { SmartMoney } from './components/SmartMoney'
+import { Leagues } from './components/Leagues'
 import { Alerts } from './components/Alerts'
 import { Settings } from './components/Settings'
+import { BottomNav } from './components/BottomNav'
 
 export function App() {
   const activeSection = useStore((s) => s.activeSection)
@@ -53,21 +56,20 @@ export function App() {
       {/* Content — above aurora */}
       <div className="flex flex-col h-full relative z-10">
         <Header />
-        <main className="flex-1 overflow-y-auto p-3">
+        <main className="flex-1 overflow-y-auto p-3 pb-14">
+          {activeSection === 'dashboard' && <Dashboard />}
           {activeSection === 'safety' && <SafetyCheck />}
           {activeSection === 'portfolio' && <Portfolio />}
           {activeSection === 'bridge' && <Bridge />}
           {activeSection === 'explorer' && <Explorer />}
           {activeSection === 'smartmoney' && <SmartMoney />}
+          {activeSection === 'leagues' && <Leagues />}
           {activeSection === 'alerts' && <Alerts />}
           {activeSection === 'settings' && <Settings />}
         </main>
-        <footer className="px-3 py-1.5 text-center text-[10px] text-gray-600 border-t border-white/5">
-          <a href="https://www.openpulsechain.com" target="_blank" rel="noopener noreferrer" className="hover:text-pulse-cyan transition-colors">
-            openpulsechain.com
-          </a>
-          {' · Open Source · MIT'}
-        </footer>
+        <div className="fixed bottom-0 left-0 right-0 z-20">
+          <BottomNav />
+        </div>
       </div>
     </div>
   )

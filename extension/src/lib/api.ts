@@ -273,6 +273,28 @@ export async function getBridgeStats(): Promise<BridgeSnapshot> {
   return snapshot
 }
 
+// Holder Leagues
+export interface LeagueData {
+  token_symbol: string
+  token_address: string
+  total_holders: number
+  total_supply_human: number
+  poseidon_count: number
+  whale_count: number
+  shark_count: number
+  dolphin_count: number
+  squid_count: number
+  turtle_count: number
+  updated_at: string
+}
+
+export async function getHolderLeagues(): Promise<LeagueData[]> {
+  const result = await cachedFetch<{ data: LeagueData[] }>(
+    `${SAFETY_API}/api/v1/leagues`, 10 * 60 * 1000
+  )
+  return result.data || []
+}
+
 export function clearCache() {
   cache.clear()
 }
