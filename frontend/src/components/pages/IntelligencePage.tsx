@@ -122,7 +122,17 @@ function ConclusionCard({ conclusion, isExpanded, onToggle }: {
       {isExpanded && conclusion.evidence && (
         <div className="border-t border-white/5 px-4 py-3 bg-white/[0.01]">
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Evidence</h4>
-          <p className="text-xs text-gray-300 whitespace-pre-wrap">{conclusion.evidence}</p>
+          <div className="space-y-1">
+            {Array.isArray(conclusion.evidence)
+              ? conclusion.evidence.map((e: any, i: number) => (
+                  <div key={i} className="text-xs text-gray-300 flex items-start gap-2">
+                    <span className="rounded bg-white/5 px-1 py-0.5 text-[10px] text-gray-500 shrink-0">{e.source || '?'}</span>
+                    <span>{e.detail || JSON.stringify(e)}</span>
+                  </div>
+                ))
+              : <p className="text-xs text-gray-300 whitespace-pre-wrap">{String(conclusion.evidence)}</p>
+            }
+          </div>
           <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
             <span>First seen: {formatDate(conclusion.first_seen)}</span>
             <span>Last seen: {formatDate(conclusion.last_seen)}</span>
