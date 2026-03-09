@@ -371,7 +371,9 @@ def holder_leagues(response: Response):
 def holder_league_detail(symbol: str, response: Response):
     """Current holder league for a specific token."""
     sym = symbol.upper()
-    if sym not in ("PLS", "PLSX", "PHEX", "INC"):
+    if sym == "PHEX":
+        sym = "pHEX"
+    if sym not in ("PLS", "PLSX", "pHEX", "INC"):
         raise HTTPException(status_code=400, detail="Invalid token symbol")
     response.headers["Cache-Control"] = "public, max-age=600"
     from db import supabase
@@ -381,11 +383,68 @@ def holder_league_detail(symbol: str, response: Response):
     return {"data": result.data[0]}
 
 
+@app.get("/api/v1/leagues/{symbol}/holders")
+def league_holders(symbol: str, response: Response, tier: str = Query(None)):
+    """Individual holders for a token, optionally filtered by tier."""
+    sym = symbol.upper()
+    if sym == "PHEX":
+        sym = "pHEX"
+    if sym not in ("PLS", "PLSX", "pHEX", "INC"):
+        raise HTTPException(status_code=400, detail="Invalid token symbol")
+    response.headers["Cache-Control"] = "public, max-age=600"
+    from db import supabase
+    query = supabase.table("holder_league_addresses").select("*").eq("token_symbol", sym)
+    if tier:
+        valid_tiers = ("poseidon", "whale", "shark", "dolphin", "squid", "turtle")
+        if tier not in valid_tiers:
+            raise HTTPException(status_code=400, detail="Invalid tier")
+        query = query.eq("tier", tier)
+    result = query.order("balance_pct", desc=True).limit(500).execute()
+    return {"data": result.data or [], "count": len(result.data or [])}
+
+
+@app.get("/api/v1/leagues/{symbol}/families")
+def league_families(symbol: str, response: Response, tier: str = Query(None)):
+    """Family clusters for a token, optionally filtered by combined tier."""
+    sym = symbol.upper()
+    if sym == "PHEX":
+        sym = "pHEX"
+    if sym not in ("PLS", "PLSX", "pHEX", "INC"):
+        raise HTTPException(status_code=400, detail="Invalid token symbol")
+    response.headers["Cache-Control"] = "public, max-age=600"
+    from db import supabase
+    query = supabase.table("holder_league_families").select("*").eq("token_symbol", sym)
+    if tier:
+        query = query.eq("combined_tier", tier)
+    result = query.order("combined_balance_pct", desc=True).limit(100).execute()
+    return {"data": result.data or [], "count": len(result.data or [])}
+
+
+@app.get("/api/v1/leagues/{symbol}/families/{family_id}/members")
+def family_members(symbol: str, family_id: str, response: Response):
+    """All members of a specific family for a token."""
+    sym = symbol.upper()
+    if sym == "PHEX":
+        sym = "pHEX"
+    if sym not in ("PLS", "PLSX", "pHEX", "INC"):
+        raise HTTPException(status_code=400, detail="Invalid token symbol")
+    if not re.match(r"^0x[0-9a-fA-F]{40}$", family_id):
+        raise HTTPException(status_code=400, detail="Invalid address")
+    response.headers["Cache-Control"] = "public, max-age=600"
+    from db import supabase
+    result = supabase.table("holder_league_addresses").select("*") \
+        .eq("token_symbol", sym).eq("family_id", family_id.lower()) \
+        .order("balance_pct", desc=True).execute()
+    return {"data": result.data or [], "count": len(result.data or [])}
+
+
 @app.get("/api/v1/leagues/{symbol}/history")
 def holder_league_history(symbol: str, response: Response, days: int = Query(30, ge=1, le=365)):
     """Historical holder league data for trend charts."""
     sym = symbol.upper()
-    if sym not in ("PLS", "PLSX", "PHEX", "INC"):
+    if sym == "PHEX":
+        sym = "pHEX"
+    if sym not in ("PLS", "PLSX", "pHEX", "INC"):
         raise HTTPException(status_code=400, detail="Invalid token symbol")
     response.headers["Cache-Control"] = "public, max-age=1800"
     from db import supabase

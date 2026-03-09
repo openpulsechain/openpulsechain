@@ -218,3 +218,25 @@ export interface HolderLeagueCurrent {
   turtle_count: number
   updated_at: string
 }
+
+export interface HolderLeagueAddress {
+  token_symbol: string
+  holder_address: string
+  balance_raw: string
+  balance_pct: number
+  tier: string
+  family_id: string | null
+  scraped_at: string
+}
+
+export interface HolderLeagueFamily {
+  token_symbol: string
+  family_id: string
+  mother_address: string
+  daughter_count: number
+  combined_balance_pct: number
+  combined_tier: string
+  individual_tier: string
+  link_types: string[]
+  scraped_at: string
+}
