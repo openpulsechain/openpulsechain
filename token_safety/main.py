@@ -367,6 +367,39 @@ def holder_leagues(response: Response):
     return {"data": result.data or [], "count": len(result.data or [])}
 
 
+@app.get("/api/v1/leagues/rank/{address}")
+def holder_rank(address: str, response: Response):
+    """Get holder rank for a wallet address across all league tokens (PLS, PLSX, pHEX, INC)."""
+    if not re.match(r"^0x[0-9a-fA-F]{40}$", address):
+        raise HTTPException(status_code=400, detail="Invalid address")
+    response.headers["Cache-Control"] = "public, max-age=300"
+    from db import supabase
+    addr = address.lower()
+    ranks = {}
+    for sym in ("PLS", "PLSX", "pHEX", "INC"):
+        # Find the holder's entry
+        entry = supabase.table("holder_league_addresses").select("balance_pct,tier") \
+            .eq("token_symbol", sym).eq("holder_address", addr).execute()
+        if not entry.data:
+            continue
+        holder = entry.data[0]
+        # Count how many holders have a higher balance_pct = rank
+        count_above = supabase.table("holder_league_addresses").select("holder_address", count="exact") \
+            .eq("token_symbol", sym).gt("balance_pct", holder["balance_pct"]).execute()
+        # Get total holders from current table
+        total = supabase.table("holder_league_current").select("total_holders") \
+            .eq("token_symbol", sym).execute()
+        total_holders = total.data[0]["total_holders"] if total.data else 0
+        rank = (count_above.count or 0) + 1
+        ranks[sym] = {
+            "rank": rank,
+            "total_holders": total_holders,
+            "tier": holder["tier"],
+            "balance_pct": holder["balance_pct"],
+        }
+    return {"address": addr, "ranks": ranks}
+
+
 @app.get("/api/v1/leagues/{symbol}")
 def holder_league_detail(symbol: str, response: Response):
     """Current holder league for a specific token."""

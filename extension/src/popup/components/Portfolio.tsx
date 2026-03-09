@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Wallet, Plus, Trash2, RefreshCw, Loader2, ExternalLink } from 'lucide-react'
 import { useStore } from '../../lib/store'
-import { getWalletBalances, type WalletBalance } from '../../lib/api'
+import { getWalletBalances, getHolderRank, type WalletBalance, type HolderRankResult } from '../../lib/api'
 import { formatUsd, shortenAddress } from '../../lib/format'
 
 function formatBalance(val: number): string {
@@ -79,6 +79,32 @@ function TokenAvatar({ symbol, address }: { symbol: string; address: string }) {
   )
 }
 
+// Map extension token symbols to league symbols
+const LEAGUE_SYMBOL_MAP: Record<string, string> = {
+  'PLS': 'PLS',
+  'PLSX': 'PLSX',
+  'HEX': 'pHEX',
+  'INC': 'INC',
+}
+
+const TIER_EMOJI: Record<string, string> = {
+  poseidon: '\u{1F531}',  // trident
+  whale: '\u{1F40B}',
+  shark: '\u{1F988}',
+  dolphin: '\u{1F42C}',
+  squid: '\u{1F991}',
+  turtle: '\u{1F422}',
+}
+
+const TIER_COLOR: Record<string, string> = {
+  poseidon: '#fbbf24',
+  whale: '#3b82f6',
+  shark: '#8b5cf6',
+  dolphin: '#06b6d4',
+  squid: '#10b981',
+  turtle: '#6b7280',
+}
+
 export function Portfolio() {
   const wallets = useStore((s) => s.wallets)
   const addWallet = useStore((s) => s.addWallet)
@@ -90,6 +116,7 @@ export function Portfolio() {
   const [balances, setBalances] = useState<WalletBalance[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [ranks, setRanks] = useState<HolderRankResult | null>(null)
 
   useEffect(() => {
     if (wallets.length > 0 && !activeWallet) {
@@ -102,7 +129,10 @@ export function Portfolio() {
     setLoading(true)
     setError(null)
     try {
-      const result = await getWalletBalances(address)
+      const [result, rankResult] = await Promise.all([
+        getWalletBalances(address),
+        getHolderRank(address).catch(() => null),
+      ])
       const withValue = result
         .filter((b) => b.value_usd != null && b.value_usd > 0.01)
         .sort((a, b) => (b.value_usd || 0) - (a.value_usd || 0))
@@ -112,6 +142,7 @@ export function Portfolio() {
         .sort((a, b) => b.balance - a.balance)
         .slice(0, 20)
       setBalances([...withValue, ...withoutValue])
+      setRanks(rankResult)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
       setBalances([])
@@ -287,7 +318,25 @@ export function Portfolio() {
                           </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-gray-500 truncate">{b.name}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-gray-500 truncate">{b.name}</span>
+                        {(() => {
+                          const leagueSym = LEAGUE_SYMBOL_MAP[b.symbol.toUpperCase()]
+                          const r = leagueSym && ranks?.ranks?.[leagueSym]
+                          if (!r) return null
+                          const emoji = TIER_EMOJI[r.tier] || ''
+                          const color = TIER_COLOR[r.tier] || '#6b7280'
+                          return (
+                            <span
+                              className="text-[9px] font-medium px-1 py-0.5 rounded whitespace-nowrap"
+                              style={{ color, backgroundColor: `${color}20` }}
+                              title={`${r.tier} — ${r.balance_pct.toFixed(4)}% of supply`}
+                            >
+                              #{r.rank}/{r.total_holders} {emoji}
+                            </span>
+                          )
+                        })()}
+                      </div>
                     </div>
 
                     {/* Values */}

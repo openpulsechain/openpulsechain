@@ -288,6 +288,22 @@ export interface LeagueData {
   updated_at: string
 }
 
+export interface HolderRankEntry {
+  rank: number
+  total_holders: number
+  tier: string
+  balance_pct: number
+}
+
+export interface HolderRankResult {
+  address: string
+  ranks: Record<string, HolderRankEntry>
+}
+
+export async function getHolderRank(address: string): Promise<HolderRankResult> {
+  return cachedFetch(`${SAFETY_API}/api/v1/leagues/rank/${address}`, 10 * 60 * 1000)
+}
+
 export async function getHolderLeagues(): Promise<LeagueData[]> {
   const result = await cachedFetch<{ data: LeagueData[] }>(
     `${SAFETY_API}/api/v1/leagues`, 10 * 60 * 1000
