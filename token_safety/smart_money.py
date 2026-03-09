@@ -17,7 +17,7 @@ import logging
 import time
 import requests
 from datetime import datetime, timezone
-from config import SCAN_API_URL, PULSEX_V1_SUBGRAPH, PULSEX_V2_SUBGRAPH
+from config import SCAN_API_URL, PULSEX_V1_SUBGRAPH, PULSEX_V2_SUBGRAPH, RPC_URL
 
 logger = logging.getLogger(__name__)
 
@@ -166,19 +166,43 @@ def get_wallet_swap_history(wallet_address: str, limit: int = 50) -> list:
 
 def get_wallet_token_balances(wallet_address: str) -> list:
     """
-    Get current token balances for a wallet via Scan API.
+    Get current token balances for a wallet via Scan API + RPC for native PLS.
     """
     addr = wallet_address.lower()
+    balances = []
+
+    # 1. Fetch native PLS balance via RPC eth_getBalance
+    try:
+        rpc_resp = requests.post(
+            RPC_URL,
+            json={"jsonrpc": "2.0", "method": "eth_getBalance", "params": [addr, "latest"], "id": 1},
+            timeout=10
+        )
+        if rpc_resp.status_code == 200:
+            rpc_data = rpc_resp.json()
+            hex_balance = rpc_data.get("result", "0x0")
+            pls_balance = int(hex_balance, 16) / 1e18
+            if pls_balance > 0:
+                balances.append({
+                    "token_address": "0x0000000000000000000000000000000000000000",
+                    "symbol": "PLS",
+                    "name": "PulseChain",
+                    "balance": pls_balance,
+                    "token_type": "native",
+                })
+    except Exception as e:
+        logger.warning(f"PLS native balance error for {addr}: {str(e)[:100]}")
+
+    # 2. Fetch ERC-20 token balances via Scan API
     try:
         resp = requests.get(
             f"{SCAN_API_URL}/api/v2/addresses/{addr}/token-balances",
             timeout=15
         )
         if resp.status_code != 200:
-            return []
+            return balances
 
         data = resp.json()
-        balances = []
         for item in data:
             token = item.get("token", {})
             value_str = item.get("value", "0")
