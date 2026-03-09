@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Crown, Users, Loader2 } from 'lucide-react'
 import { useHolderLeagues } from '../../hooks/useSupabase'
 import type { HolderLeagueCurrent } from '../../types'
