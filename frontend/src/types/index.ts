@@ -170,7 +170,7 @@ export interface IntelConclusion {
   subject: string
   title: string
   summary: string
-  evidence: string | null
+  evidence: any[] | string | null
   addresses_involved: string[] | null
   tokens_involved: string[] | null
   risk_level: string
@@ -182,8 +182,24 @@ export interface IntelConclusion {
 
 export interface LlmAnalysis {
   id: number
+  tweet_id: string
   sentiment: string | null
   action_detected: string | null
   risk_level: string | null
   summary: string | null
+  addresses_mentioned: any[] | null
+  tokens_mentioned: string[] | null
+  amounts_mentioned: any[] | null
+  relationships: any[] | null
+}
+
+export interface ResearchTweet {
+  id: string
+  text: string
+  author_username: string
+  author_name: string
+  tweet_url: string
+  like_count: number
+  retweet_count: number
+  tweeted_at: string
 }

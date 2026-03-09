@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react'
-import { ExternalLink, ChevronDown, ChevronUp, AlertTriangle, Shield, Eye, Activity } from 'lucide-react'
+import { ExternalLink, ChevronDown, ChevronUp, AlertTriangle, Shield, Eye, Activity, Heart, Repeat2 } from 'lucide-react'
 import { Spinner } from '../ui/Spinner'
-import { useIntelConclusions, useLlmAnalyses } from '../../hooks/useSupabase'
+import { useIntelConclusions, useLlmAnalyses, useResearchTweets } from '../../hooks/useSupabase'
 import { shortenAddress, formatDate } from '../../lib/format'
-import type { IntelConclusion } from '../../types'
+import type { IntelConclusion, LlmAnalysis, ResearchTweet } from '../../types'
 
 const SCAN_URL = 'https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address'
 
@@ -63,11 +63,44 @@ function AddressLink({ address }: { address: string }) {
   )
 }
 
-function ConclusionCard({ conclusion, isExpanded, onToggle }: {
+function ConclusionCard({ conclusion, isExpanded, onToggle, tweets, llmAnalyses }: {
   conclusion: IntelConclusion
   isExpanded: boolean
   onToggle: () => void
+  tweets: Map<string, ResearchTweet>
+  llmAnalyses: Map<string, LlmAnalysis>
 }) {
+  // Get tweet IDs from evidence
+  const tweetIds = useMemo(() => {
+    if (!Array.isArray(conclusion.evidence)) return []
+    const ids = new Set<string>()
+    for (const e of conclusion.evidence) ids.add(e.tweet_id)
+    return [...ids]
+  }, [conclusion.evidence])
+
+  // Get matching LLM analyses
+  const relatedLlm = useMemo(() => {
+    return tweetIds.map(tid => llmAnalyses.get(tid)).filter(Boolean) as LlmAnalysis[]
+  }, [tweetIds, llmAnalyses])
+
+  // Collect all amounts from LLM
+  const allAmounts = useMemo(() => {
+    const amounts: any[] = []
+    for (const llm of relatedLlm) {
+      if (llm.amounts_mentioned) amounts.push(...llm.amounts_mentioned)
+    }
+    return amounts
+  }, [relatedLlm])
+
+  // Collect all relationships
+  const allRelationships = useMemo(() => {
+    const rels: any[] = []
+    for (const llm of relatedLlm) {
+      if (llm.relationships) rels.push(...llm.relationships)
+    }
+    return rels
+  }, [relatedLlm])
+
   return (
     <div className="rounded-xl border border-white/5 bg-white/[0.03] overflow-hidden">
       <div
@@ -119,21 +152,105 @@ function ConclusionCard({ conclusion, isExpanded, onToggle }: {
       </div>
 
       {/* Expanded details */}
-      {isExpanded && conclusion.evidence && (
-        <div className="border-t border-white/5 px-4 py-3 bg-white/[0.01]">
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Evidence</h4>
-          <div className="space-y-1">
-            {Array.isArray(conclusion.evidence)
-              ? conclusion.evidence.map((e: any, i: number) => (
-                  <div key={i} className="text-xs text-gray-300 flex items-start gap-2">
-                    <span className="rounded bg-white/5 px-1 py-0.5 text-[10px] text-gray-500 shrink-0">{e.source || '?'}</span>
-                    <span>{e.detail || JSON.stringify(e)}</span>
+      {isExpanded && (
+        <div className="border-t border-white/5 px-4 py-3 bg-white/[0.01] space-y-4">
+
+          {/* LLM Analysis Summary */}
+          {relatedLlm.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">AI Analysis</h4>
+              <div className="space-y-2">
+                {relatedLlm.map((llm, i) => (
+                  <div key={i} className="rounded-lg bg-white/[0.02] border border-white/5 p-3 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {llm.sentiment && (
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${SENTIMENT_COLORS[llm.sentiment] || 'bg-gray-500/20 text-gray-300'}`}>
+                          {llm.sentiment}
+                        </span>
+                      )}
+                      {llm.action_detected && llm.action_detected !== 'none' && (
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${ACTION_COLORS[llm.action_detected] || 'bg-gray-500/20 text-gray-300'}`}>
+                          {llm.action_detected}
+                        </span>
+                      )}
+                      {llm.risk_level && (
+                        <RiskBadge level={llm.risk_level} />
+                      )}
+                    </div>
+                    {llm.summary && <p className="text-xs text-gray-300">{llm.summary}</p>}
                   </div>
-                ))
-              : <p className="text-xs text-gray-300 whitespace-pre-wrap">{String(conclusion.evidence)}</p>
-            }
-          </div>
-          <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Amounts detected */}
+          {allAmounts.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Amounts Detected</h4>
+              <div className="flex flex-wrap gap-2">
+                {allAmounts.map((a, i) => (
+                  <span key={i} className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-xs text-amber-300">
+                    {a.value || a}{a.token ? ` ${a.token}` : ''}{a.context ? ` (${a.context})` : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Relationships */}
+          {allRelationships.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Address Relationships</h4>
+              <div className="space-y-1">
+                {allRelationships.map((r, i) => (
+                  <div key={i} className="text-xs flex items-center gap-2">
+                    {r.from && <span className="font-mono text-[#00D4FF]">{shortenAddress(r.from)}</span>}
+                    <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-400">{r.type?.replace(/_/g, ' ')}</span>
+                    {r.to && <span className="font-mono text-[#00D4FF]">{shortenAddress(r.to)}</span>}
+                    {r.detail && <span className="text-gray-500">— {r.detail}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Source tweets */}
+          {tweetIds.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Source Tweets</h4>
+              <div className="space-y-2">
+                {tweetIds.map(tid => {
+                  const tweet = tweets.get(tid)
+                  if (!tweet) return null
+                  return (
+                    <div key={tid} className="rounded-lg bg-white/[0.02] border border-white/5 p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-white">@{tweet.author_username}</span>
+                        <a
+                          href={tweet.tweet_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-[#00D4FF] hover:text-white transition-colors flex items-center gap-1"
+                        >
+                          View on X <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                      <p className="text-xs text-gray-300 whitespace-pre-wrap line-clamp-4">{tweet.text}</p>
+                      <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-500">
+                        <span className="flex items-center gap-1"><Heart className="h-3 w-3" /> {tweet.like_count}</span>
+                        <span className="flex items-center gap-1"><Repeat2 className="h-3 w-3" /> {tweet.retweet_count}</span>
+                        <span>{formatDate(tweet.tweeted_at)}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Metadata */}
+          <div className="flex items-center gap-4 text-xs text-gray-500 pt-2 border-t border-white/5">
             <span>First seen: {formatDate(conclusion.first_seen)}</span>
             <span>Last seen: {formatDate(conclusion.last_seen)}</span>
             <span className={conclusion.is_active ? 'text-green-400' : 'text-gray-500'}>
@@ -149,11 +266,25 @@ function ConclusionCard({ conclusion, isExpanded, onToggle }: {
 export function IntelligencePage() {
   const conclusions = useIntelConclusions()
   const llmAnalyses = useLlmAnalyses()
+  const researchTweets = useResearchTweets()
   const [expanded, setExpanded] = useState<number | null>(null)
   const [riskFilter, setRiskFilter] = useState<RiskFilter>('all')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
-  const loading = conclusions.loading || llmAnalyses.loading
+  const loading = conclusions.loading || llmAnalyses.loading || researchTweets.loading
+
+  // Build lookup maps for expanded cards
+  const tweetsMap = useMemo(() => {
+    const map = new Map<string, ResearchTweet>()
+    for (const t of researchTweets.data) map.set(t.id, t)
+    return map
+  }, [researchTweets.data])
+
+  const llmMap = useMemo(() => {
+    const map = new Map<string, LlmAnalysis>()
+    for (const l of llmAnalyses.data) map.set(l.tweet_id, l)
+    return map
+  }, [llmAnalyses.data])
 
   // KPIs
   const totalConclusions = conclusions.data.length
@@ -314,6 +445,8 @@ export function IntelligencePage() {
                 conclusion={c}
                 isExpanded={expanded === c.id}
                 onToggle={() => setExpanded(expanded === c.id ? null : c.id)}
+                tweets={tweetsMap}
+                llmAnalyses={llmMap}
               />
             ))
           )}

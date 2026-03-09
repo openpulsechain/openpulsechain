@@ -19,6 +19,7 @@ import type {
   WhaleLink,
   IntelConclusion,
   LlmAnalysis,
+  ResearchTweet,
 } from '../types'
 
 function useQuery<T>(table: string, options?: {
@@ -262,5 +263,13 @@ export function useLlmAnalyses() {
   return useQuery<LlmAnalysis>('research_llm_analysis', {
     orderBy: 'id',
     ascending: false,
+  })
+}
+
+export function useResearchTweets() {
+  return useQuery<ResearchTweet>('research_tweets', {
+    orderBy: 'tweeted_at',
+    ascending: false,
+    select: 'id,text,author_username,author_name,tweet_url,like_count,retweet_count,tweeted_at',
   })
 }
