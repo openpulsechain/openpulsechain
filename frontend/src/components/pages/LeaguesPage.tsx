@@ -102,13 +102,13 @@ function TierHoldersList({ tokenSymbol, tierKey }: { tokenSymbol: string; tierKe
     async function load() {
       setLoading(true)
       const [holdersRes, familiesRes] = await Promise.all([
-        supabase.table('holder_league_addresses')
+        supabase.from('holder_league_addresses')
           .select('*')
           .eq('token_symbol', tokenSymbol)
           .eq('tier', tierKey)
           .order('balance_pct', { ascending: false })
           .limit(200),
-        supabase.table('holder_league_families')
+        supabase.from('holder_league_families')
           .select('*')
           .eq('token_symbol', tokenSymbol)
           .eq('combined_tier', tierKey)
