@@ -336,20 +336,52 @@ export function LeaguesPage() {
     .map((sym) => leagues.find((l) => l.token_symbol === sym))
     .filter(Boolean) as HolderLeagueCurrent[]
 
+  // Aggregate KPIs from all tokens
+  const totalHolders = sorted.reduce((sum, l) => sum + l.total_holders, 0)
+  const totalWhales = sorted.reduce((sum, l) => sum + l.whale_count, 0)
+  const totalSharks = sorted.reduce((sum, l) => sum + l.shark_count, 0)
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <Crown className="h-6 w-6 text-amber-400" />
-          <h1 className="text-2xl font-bold text-white">Holder Leagues</h1>
+      {/* Hero header */}
+      <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-amber-500/5 via-purple-500/5 to-cyan-500/5 backdrop-blur-sm p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-amber-400/10 border border-amber-400/20">
+                <Crown className="h-6 w-6 text-amber-400" />
+              </div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-amber-300 to-purple-400 bg-clip-text text-transparent">
+                Holder Leagues
+              </h1>
+            </div>
+            <p className="text-gray-400 max-w-xl text-sm">
+              On-chain holder distribution for PLS, PLSX, pHEX, and INC.
+              Click any tier to reveal individual addresses and family clusters.
+            </p>
+          </div>
+          {sorted.length > 0 && (
+            <div className="flex gap-4">
+              <div className="text-center px-4 py-2 rounded-xl bg-white/[0.03] border border-white/5">
+                <div className="text-lg font-bold text-white">{totalHolders.toLocaleString()}</div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-wider">Total Holders</div>
+              </div>
+              <div className="text-center px-4 py-2 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                <div className="text-lg font-bold text-purple-400">{totalWhales}</div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-wider">Whales</div>
+              </div>
+              <div className="text-center px-4 py-2 rounded-xl bg-cyan-500/5 border border-cyan-500/10">
+                <div className="text-lg font-bold text-cyan-400">{totalSharks}</div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-wider">Sharks</div>
+              </div>
+            </div>
+          )}
         </div>
-        <p className="text-gray-400 max-w-2xl">
-          PulseChain token holder distribution ranked by ocean-themed tiers.
-          Track whale concentration and holder growth for PLS, PLSX, pHEX, and INC.
-          Click any tier to see individual addresses and family clusters.
-          Updated every 6 hours.
-        </p>
+        {sorted.length > 0 && sorted[0].updated_at && (
+          <div className="mt-3 text-[10px] text-gray-600">
+            Data sourced on-chain via PulseChain Scan API &middot; Updated every 6h &middot; Last: {new Date(sorted[0].updated_at).toLocaleString()}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -370,10 +402,13 @@ export function LeaguesPage() {
         </div>
       )}
 
-      {/* Last updated */}
-      {sorted.length > 0 && sorted[0].updated_at && (
-        <div className="text-center text-xs text-gray-600">
-          Last updated: {new Date(sorted[0].updated_at).toLocaleString()}
+      {/* Token logos row */}
+      {sorted.length > 0 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          {sorted.map(l => (
+            <img key={l.token_symbol} src={TOKEN_LOGOS[l.token_symbol]} alt={l.token_symbol} className="h-6 w-6 rounded-full opacity-40" />
+          ))}
+          <span className="text-[10px] text-gray-600 ml-2">100% on-chain data &middot; Open source</span>
         </div>
       )}
     </div>
