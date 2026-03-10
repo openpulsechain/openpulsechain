@@ -15,7 +15,9 @@ from config import PULSEX_V1_SUBGRAPH, PULSEX_V2_SUBGRAPH
 logger = logging.getLogger(__name__)
 
 # Minimum transactions to consider a pair legitimate
-MIN_TXNS = 10
+MIN_TXNS = 50
+# Minimum liquidity per side to count as real (not dust)
+MIN_SIDE_USD = 100.0
 # Maximum realistic liquidity per pair (safety cap)
 MAX_PAIR_USD = 100_000_000  # $100M
 
@@ -53,10 +55,9 @@ def _calc_pair_liquidity(pair: dict) -> float:
         side1_usd = r1 * d1
         calc_usd = side0_usd + side1_usd
 
-        # Both sides must have meaningful value (> $10).
+        # Both sides must have meaningful value (> $100).
         # Spam pairs have trillions of worthless tokens on one side
         # and near-zero real value on the other.
-        MIN_SIDE_USD = 10.0
         if side0_usd < MIN_SIDE_USD or side1_usd < MIN_SIDE_USD:
             return 0.0
 
@@ -153,17 +154,19 @@ def analyze_lp(token_address: str) -> dict:
         return result
 
     result["has_lp"] = True
-    result["pair_count"] = len(unique_pairs)
 
     # Calculate total liquidity using derivedUSD cross-validation
     total_liq = 0.0
+    real_pair_count = 0
     best = None
     best_reserve = 0.0
     now = int(time.time())
 
     for p in unique_pairs:
         reserve = _calc_pair_liquidity(p)
-        total_liq += reserve
+        if reserve > 0:
+            total_liq += reserve
+            real_pair_count += 1
         if reserve > best_reserve:
             best_reserve = reserve
             created_ts = int(p.get("timestamp", 0) or 0)
@@ -177,6 +180,8 @@ def analyze_lp(token_address: str) -> dict:
                 "total_txns": int(p.get("totalTransactions", 0) or 0),
             }
 
+    # Only count pairs with real liquidity (passed bilateral filter)
+    result["pair_count"] = real_pair_count
     result["total_liquidity_usd"] = round(total_liq, 2)
     result["best_pair"] = best
 

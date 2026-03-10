@@ -348,11 +348,11 @@ export function TokenSafetyPage() {
               <BoolBadge value={safety.has_lp} trueLabel="Yes" falseLabel="No LP" />
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Liquidity</span>
+              <span className="text-gray-400">Total Liquidity</span>
               <span>${(safety.total_liquidity_usd || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Pairs</span>
+              <span className="text-gray-400">Active Pairs</span>
               <span>{safety.pair_count || 0}</span>
             </div>
             <div className="flex justify-between">
@@ -360,6 +360,9 @@ export function TokenSafetyPage() {
               <span className={safety.recent_burns_24h > 0 ? 'text-orange-400' : ''}>{safety.recent_burns_24h || 0}</span>
             </div>
           </div>
+          <p className="text-[10px] text-gray-600 leading-relaxed">
+            Sum of verified liquidity across all active PulseX V1+V2 pairs. Each pair is cross-validated using derivedUSD &times; reserves (bilateral filter). Dust and spam pairs are excluded.
+          </p>
         </div>
 
         {/* Holders */}
