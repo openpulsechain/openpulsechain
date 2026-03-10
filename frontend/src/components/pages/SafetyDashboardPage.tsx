@@ -50,7 +50,7 @@ export function SafetyDashboardPage() {
     const { data } = await supabase
       .from('token_safety_scores')
       .select('token_address, score, grade, risks, is_honeypot, is_verified, total_liquidity_usd, holder_count, top10_pct, buy_tax_pct, sell_tax_pct, analyzed_at')
-      .order('analyzed_at', { ascending: false })
+      .order('total_liquidity_usd', { ascending: false })
       .limit(200)
 
     const entries = data || []
