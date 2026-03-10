@@ -725,6 +725,16 @@ def cron_batch(request: Request, secret: str = Query(""), limit: int = Query(100
     return {"status": "started", "max_tokens": limit}
 
 
+@app.get("/cron/lp-monitor")
+def cron_lp_monitor(request: Request, secret: str = Query(""), limit: int = Query(200, ge=1, le=500)):
+    """Force LP liquidity re-check for top tokens. Fixes inflated values."""
+    _check_cron_secret(secret)
+    import threading
+    t = threading.Thread(target=_run_lp_monitor, args=(limit,), daemon=True)
+    t.start()
+    return {"status": "started", "limit": limit}
+
+
 # ── LP Liquidity Monitor ─────────────────────────────────────────
 
 def _run_lp_monitor(limit: int = 50):
