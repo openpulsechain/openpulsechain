@@ -51,6 +51,7 @@ interface LiquidityPair {
   created_at: number
   age_days: number
   total_txns: number
+  is_anchored?: boolean
 }
 
 // Known token logos (checksum addresses for PulseX CDN)
@@ -471,6 +472,12 @@ export function TokenSafetyPage() {
                           <span className="text-[9px] px-1 py-0.5 rounded bg-white/5 text-gray-500">
                             {p.dex.replace('_', ' ')}
                           </span>
+                          {p.is_anchored === true && (
+                            <span className="text-[8px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400" title="Paired with a reference token (WPLS, HEX, DAI, etc.)">anchored</span>
+                          )}
+                          {p.is_anchored === false && (
+                            <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400" title="Neither token is a known reference — liquidity capped at $50K">capped</span>
+                          )}
                         </div>
                         <div className="text-[10px] text-gray-500 font-mono truncate">
                           {p.address.slice(0, 10)}...{p.address.slice(-6)}
@@ -492,20 +499,62 @@ export function TokenSafetyPage() {
             </div>
           )}
 
-          {/* Methodology note */}
-          <div className="rounded-lg bg-blue-500/5 border border-blue-500/10 px-3 py-2.5 space-y-1.5">
-            <p className="text-[11px] text-blue-300 font-medium">How is liquidity calculated?</p>
-            <p className="text-[11px] text-gray-400 leading-relaxed">
-              Total liquidity = sum across all active PulseX V1 + V2 pairs.
-              Each pair is <strong className="text-gray-300">cross-validated</strong>: derivedUSD &times; reserves for both sides.
-              Only pairs where <strong className="text-gray-300">both sides &gt; $100</strong> and <strong className="text-gray-300">50+ transactions</strong> are counted.
-              Monitored every 2 hours.
-            </p>
-            <p className="text-[11px] text-gray-500 leading-relaxed">
-              PulseX subgraph <code className="text-[10px] bg-white/5 px-1 rounded">reserveUSD</code> is unreliable (spam inflation).
-              We recalculate from on-chain reserves &times; token prices. Values may differ from aggregators using raw subgraph data.
-            </p>
-          </div>
+          {/* Per-token methodology note */}
+          {(() => {
+            const anchoredCount = pairs.filter(p => p.is_anchored).length
+            const unanchoredCount = pairs.filter(p => p.is_anchored === false).length
+            const anchoredLiq = pairs.filter(p => p.is_anchored).reduce((s, p) => s + p.reserve_usd, 0)
+            const totalPairLiq = pairs.reduce((s, p) => s + p.reserve_usd, 0)
+            const symbol = tokenInfo?.symbol || 'this token'
+
+            return (
+              <div className="rounded-lg bg-blue-500/5 border border-blue-500/10 px-3 py-2.5 space-y-2">
+                <p className="text-[11px] text-blue-300 font-medium">Liquidity Report — {symbol}</p>
+
+                {/* Token-specific summary */}
+                <p className="text-[11px] text-gray-300 leading-relaxed">
+                  {pairs.length > 0 ? (
+                    <>
+                      We found <strong className="text-white">{pairs.length} verified pair{pairs.length > 1 ? 's' : ''}</strong> with
+                      {' '}<strong className="text-white">${totalPairLiq.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong> total liquidity.
+                      {anchoredCount > 0 && (
+                        <> {anchoredCount} pair{anchoredCount > 1 ? 's' : ''} ({Math.round(anchoredLiq / Math.max(totalPairLiq, 1) * 100)}%) are
+                        {' '}<strong className="text-emerald-400">anchored</strong> to reference tokens (WPLS, HEX, PLSX, DAI, USDC, etc.).</>
+                      )}
+                      {unanchoredCount > 0 && (
+                        <> {unanchoredCount} pair{unanchoredCount > 1 ? 's' : ''} are
+                        {' '}<strong className="text-amber-400">unanchored</strong> (capped at $50K each — see below).</>
+                      )}
+                    </>
+                  ) : (
+                    <>No verified liquidity pairs found for {symbol} after spam filtering.</>
+                  )}
+                </p>
+
+                {/* How it works */}
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  <strong className="text-gray-300">How we verify liquidity:</strong>{' '}
+                  Each PulseX V1 + V2 pair must have 50+ transactions and both sides &gt; $100 in real value.
+                  We recalculate from on-chain reserves × token prices (not subgraph reserveUSD which is unreliable).
+                </p>
+
+                {/* Anchor system explanation */}
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  <strong className="text-gray-300">Anchor system:</strong>{' '}
+                  Pairs containing a reference token (WPLS, HEX, PLSX, INC, DAI, USDC, USDT, WETH, WBTC) are
+                  {' '}<span className="text-emerald-400">trusted</span>.
+                  Pairs where both tokens are unknown are <span className="text-amber-400">capped at $50K</span> to
+                  prevent inflation from tokens that only trade against other worthless tokens.
+                </p>
+
+                {/* Transparency note */}
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  Monitored every 2h. Values may differ from DexScreener or other aggregators that use raw subgraph data.
+                  Click on any pair above to verify on DexScreener.
+                </p>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Holders */}

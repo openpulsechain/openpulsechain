@@ -20,6 +20,23 @@ MIN_TXNS = 50
 MIN_SIDE_USD = 100.0
 # Maximum realistic liquidity per pair (safety cap)
 MAX_PAIR_USD = 100_000_000  # $100M
+# Max liquidity for pairs NOT containing a reference token
+MAX_UNANCHORED_PAIR_USD = 50_000  # $50K cap for unanchored pairs
+
+# Reference tokens with verified real-world value.
+# Pairs containing at least one of these are "anchored" and trusted.
+# Pairs with NO reference token are "unanchored" and capped at $50K.
+REFERENCE_TOKENS = {
+    "0xa1077a294dde1b09bb078844df40758a5d0f9a27",  # WPLS
+    "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",  # HEX
+    "0x95b303987a60c71504d99aa1b13b4da07b0790ab",  # PLSX
+    "0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d",  # INC
+    "0xefd766ccb38eaf1dfd701853bfce31359239f305",  # DAI
+    "0x15d38573d2feeb82e7ad5187ab8c1d52810b1f07",  # USDC
+    "0x0cb6f5a34ad42ec934882a05265a7d5f59b51a2f",  # USDT
+    "0x02dcdd04e3f455d838cd1249292c58f3b79e3c3c",  # WETH
+    "0xb17d901469b9208b17d916112988a3fed19b5ca1",  # WBTC
+}
 
 
 def _query_subgraph(url: str, query: str, variables: dict = None) -> dict:
@@ -44,6 +61,11 @@ def _calc_pair_liquidity(pair: dict) -> float:
     """
     Calculate pair liquidity using derivedUSD × reserves.
     Filters out dust/spam pairs where one side has near-zero real value.
+
+    Applies "anchor check": if neither token in the pair is a reference token
+    (WPLS, HEX, PLSX, DAI, USDC, etc.), the pair's liquidity is capped at
+    MAX_UNANCHORED_PAIR_USD ($50K). This prevents inflated derivedUSD from
+    tokens that only trade against other worthless tokens.
     """
     try:
         r0 = float(pair.get("reserve0", 0) or 0)
@@ -56,14 +78,25 @@ def _calc_pair_liquidity(pair: dict) -> float:
         calc_usd = side0_usd + side1_usd
 
         # Both sides must have meaningful value (> $100).
-        # Spam pairs have trillions of worthless tokens on one side
-        # and near-zero real value on the other.
         if side0_usd < MIN_SIDE_USD or side1_usd < MIN_SIDE_USD:
             return 0.0
 
         # Reject if total is unreasonably high
         if calc_usd > MAX_PAIR_USD:
             return 0.0
+
+        # Anchor check: is at least one token a reference token?
+        t0_addr = pair.get("token0", {}).get("id", "").lower()
+        t1_addr = pair.get("token1", {}).get("id", "").lower()
+        is_anchored = t0_addr in REFERENCE_TOKENS or t1_addr in REFERENCE_TOKENS
+
+        if not is_anchored and calc_usd > MAX_UNANCHORED_PAIR_USD:
+            logger.debug(
+                f"Unanchored pair {pair.get('id','?')[:10]} "
+                f"({pair.get('token0',{}).get('symbol','?')}/{pair.get('token1',{}).get('symbol','?')}) "
+                f"capped: ${calc_usd:,.0f} → ${MAX_UNANCHORED_PAIR_USD:,.0f}"
+            )
+            return MAX_UNANCHORED_PAIR_USD
 
         return calc_usd
     except (ValueError, TypeError):
@@ -170,6 +203,9 @@ def analyze_lp(token_address: str) -> dict:
             t1 = p.get("token1", {})
             created_ts = int(p.get("timestamp", 0) or 0)
             age_days = (now - created_ts) / 86400 if created_ts > 0 else 0
+            t0_addr = t0.get("id", "").lower()
+            t1_addr = t1.get("id", "").lower()
+            anchored = t0_addr in REFERENCE_TOKENS or t1_addr in REFERENCE_TOKENS
             pair_info = {
                 "address": p["id"],
                 "dex": p["_dex"],
@@ -181,6 +217,7 @@ def analyze_lp(token_address: str) -> dict:
                 "created_at": created_ts,
                 "age_days": round(age_days, 1),
                 "total_txns": int(p.get("totalTransactions", 0) or 0),
+                "is_anchored": anchored,
             }
             all_valid_pairs.append(pair_info)
             if reserve > best_reserve:
