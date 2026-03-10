@@ -2,6 +2,11 @@ import { useState } from 'react'
 import { Database, Code, Zap, Copy, Check } from 'lucide-react'
 import { Tabs } from '../ui/Tabs'
 
+const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL
+  ? `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`
+  : '${SUPABASE_BASE}'
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_ANON_KEY'
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   return (
@@ -298,18 +303,18 @@ const CODE_TABS = [
 const CODE_EXAMPLES: Record<string, { title: string; curl: string; javascript: string; python: string }> = {
   whale: {
     title: 'Whale alerts — transfers > $50K',
-    curl: `curl 'https://your-project.supabase.co/rest/v1/bridge_transfers?amount_usd=gte.50000&order=block_timestamp.desc&limit=20' \\
-  -H "apikey: YOUR_ANON_KEY"`,
+    curl: `curl '${SUPABASE_BASE}bridge_transfers?amount_usd=gte.50000&order=block_timestamp.desc&limit=20' \\
+  -H "apikey: ${SUPABASE_KEY}"`,
     javascript: `const res = await fetch(
-  'https://your-project.supabase.co/rest/v1/bridge_transfers?amount_usd=gte.50000&order=block_timestamp.desc&limit=20',
-  { headers: { apikey: 'YOUR_ANON_KEY' } }
+  '${SUPABASE_BASE}bridge_transfers?amount_usd=gte.50000&order=block_timestamp.desc&limit=20',
+  { headers: { apikey: '${SUPABASE_KEY}' } }
 )
 const whales = await res.json()
 console.log(whales)`,
     python: `import requests
 
-url = "https://your-project.supabase.co/rest/v1/bridge_transfers"
-headers = {"apikey": "YOUR_ANON_KEY"}
+url = "${SUPABASE_BASE}bridge_transfers"
+headers = {"apikey": "${SUPABASE_KEY}"}
 params = {"amount_usd": "gte.50000", "order": "block_timestamp.desc", "limit": 20}
 
 whales = requests.get(url, headers=headers, params=params).json()
@@ -317,18 +322,18 @@ print(whales)`,
   },
   volume: {
     title: 'Daily bridge volume — last 30 days',
-    curl: `curl 'https://your-project.supabase.co/rest/v1/bridge_daily_stats?order=date.desc&limit=30' \\
-  -H "apikey: YOUR_ANON_KEY"`,
+    curl: `curl '${SUPABASE_BASE}bridge_daily_stats?order=date.desc&limit=30' \\
+  -H "apikey: ${SUPABASE_KEY}"`,
     javascript: `const res = await fetch(
-  'https://your-project.supabase.co/rest/v1/bridge_daily_stats?order=date.desc&limit=30',
-  { headers: { apikey: 'YOUR_ANON_KEY' } }
+  '${SUPABASE_BASE}bridge_daily_stats?order=date.desc&limit=30',
+  { headers: { apikey: '${SUPABASE_KEY}' } }
 )
 const stats = await res.json()
 console.log(stats)`,
     python: `import requests
 
-url = "https://your-project.supabase.co/rest/v1/bridge_daily_stats"
-headers = {"apikey": "YOUR_ANON_KEY"}
+url = "${SUPABASE_BASE}bridge_daily_stats"
+headers = {"apikey": "${SUPABASE_KEY}"}
 params = {"order": "date.desc", "limit": 30}
 
 stats = requests.get(url, headers=headers, params=params).json()
@@ -336,18 +341,18 @@ print(stats)`,
   },
   prices: {
     title: 'Current token prices',
-    curl: `curl 'https://your-project.supabase.co/rest/v1/token_prices?select=symbol,price_usd,price_change_24h_pct' \\
-  -H "apikey: YOUR_ANON_KEY"`,
+    curl: `curl '${SUPABASE_BASE}token_prices?select=symbol,price_usd,price_change_24h_pct' \\
+  -H "apikey: ${SUPABASE_KEY}"`,
     javascript: `const res = await fetch(
-  'https://your-project.supabase.co/rest/v1/token_prices?select=symbol,price_usd,price_change_24h_pct',
-  { headers: { apikey: 'YOUR_ANON_KEY' } }
+  '${SUPABASE_BASE}token_prices?select=symbol,price_usd,price_change_24h_pct',
+  { headers: { apikey: '${SUPABASE_KEY}' } }
 )
 const prices = await res.json()
 console.log(prices)`,
     python: `import requests
 
-url = "https://your-project.supabase.co/rest/v1/token_prices"
-headers = {"apikey": "YOUR_ANON_KEY"}
+url = "${SUPABASE_BASE}token_prices"
+headers = {"apikey": "${SUPABASE_KEY}"}
 params = {"select": "symbol,price_usd,price_change_24h_pct"}
 
 prices = requests.get(url, headers=headers, params=params).json()
@@ -355,18 +360,18 @@ print(prices)`,
   },
   tokenHistory: {
     title: 'Token price history (sovereign) — HEX last 30 days',
-    curl: `curl 'https://your-project.supabase.co/rest/v1/token_price_history?address=eq.0x2b591e99afe9f32eaa6214f7b7629768c40eeb39&order=date.desc&limit=30&select=date,price_usd,daily_volume_usd' \\
-  -H "apikey: YOUR_ANON_KEY"`,
+    curl: `curl '${SUPABASE_BASE}token_price_history?address=eq.0x2b591e99afe9f32eaa6214f7b7629768c40eeb39&order=date.desc&limit=30&select=date,price_usd,daily_volume_usd' \\
+  -H "apikey: ${SUPABASE_KEY}"`,
     javascript: `const res = await fetch(
-  'https://your-project.supabase.co/rest/v1/token_price_history?address=eq.0x2b591e99afe9f32eaa6214f7b7629768c40eeb39&order=date.desc&limit=30&select=date,price_usd,daily_volume_usd',
-  { headers: { apikey: 'YOUR_ANON_KEY' } }
+  '${SUPABASE_BASE}token_price_history?address=eq.0x2b591e99afe9f32eaa6214f7b7629768c40eeb39&order=date.desc&limit=30&select=date,price_usd,daily_volume_usd',
+  { headers: { apikey: '${SUPABASE_KEY}' } }
 )
 const history = await res.json()
 console.log(history)`,
     python: `import requests
 
-url = "https://your-project.supabase.co/rest/v1/token_price_history"
-headers = {"apikey": "YOUR_ANON_KEY"}
+url = "${SUPABASE_BASE}token_price_history"
+headers = {"apikey": "${SUPABASE_KEY}"}
 params = {
     "address": "eq.0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
     "order": "date.desc", "limit": 30,
@@ -378,18 +383,18 @@ print(history)  # HEX daily prices from PulseX Subgraph`,
   },
   tokenDiscovery: {
     title: 'Top tokens by volume (sovereign)',
-    curl: `curl 'https://your-project.supabase.co/rest/v1/pulsechain_tokens?is_active=eq.true&order=total_volume_usd.desc&limit=20&select=address,symbol,name,total_volume_usd' \\
-  -H "apikey: YOUR_ANON_KEY"`,
+    curl: `curl '${SUPABASE_BASE}pulsechain_tokens?is_active=eq.true&order=total_volume_usd.desc&limit=20&select=address,symbol,name,total_volume_usd' \\
+  -H "apikey: ${SUPABASE_KEY}"`,
     javascript: `const res = await fetch(
-  'https://your-project.supabase.co/rest/v1/pulsechain_tokens?is_active=eq.true&order=total_volume_usd.desc&limit=20&select=address,symbol,name,total_volume_usd',
-  { headers: { apikey: 'YOUR_ANON_KEY' } }
+  '${SUPABASE_BASE}pulsechain_tokens?is_active=eq.true&order=total_volume_usd.desc&limit=20&select=address,symbol,name,total_volume_usd',
+  { headers: { apikey: '${SUPABASE_KEY}' } }
 )
 const tokens = await res.json()
 console.log(tokens)`,
     python: `import requests
 
-url = "https://your-project.supabase.co/rest/v1/pulsechain_tokens"
-headers = {"apikey": "YOUR_ANON_KEY"}
+url = "${SUPABASE_BASE}pulsechain_tokens"
+headers = {"apikey": "${SUPABASE_KEY}"}
 params = {
     "is_active": "eq.true",
     "order": "total_volume_usd.desc",
@@ -402,18 +407,18 @@ print(tokens)  # 2500+ tokens from PulseX Subgraph`,
   },
   hyperlane: {
     title: 'Hyperlane chain breakdown',
-    curl: `curl 'https://your-project.supabase.co/rest/v1/hyperlane_chain_stats?order=total_inbound_volume_usd.desc' \\
-  -H "apikey: YOUR_ANON_KEY"`,
+    curl: `curl '${SUPABASE_BASE}hyperlane_chain_stats?order=total_inbound_volume_usd.desc' \\
+  -H "apikey: ${SUPABASE_KEY}"`,
     javascript: `const res = await fetch(
-  'https://your-project.supabase.co/rest/v1/hyperlane_chain_stats?order=total_inbound_volume_usd.desc',
-  { headers: { apikey: 'YOUR_ANON_KEY' } }
+  '${SUPABASE_BASE}hyperlane_chain_stats?order=total_inbound_volume_usd.desc',
+  { headers: { apikey: '${SUPABASE_KEY}' } }
 )
 const chains = await res.json()
 console.log(chains)`,
     python: `import requests
 
-url = "https://your-project.supabase.co/rest/v1/hyperlane_chain_stats"
-headers = {"apikey": "YOUR_ANON_KEY"}
+url = "${SUPABASE_BASE}hyperlane_chain_stats"
+headers = {"apikey": "${SUPABASE_KEY}"}
 params = {"order": "total_inbound_volume_usd.desc"}
 
 chains = requests.get(url, headers=headers, params=params).json()
@@ -423,8 +428,8 @@ print(chains)`,
 
 function EndpointCard({ endpoint }: { endpoint: Endpoint }) {
   const [open, setOpen] = useState(false)
-  const curlExample = `curl 'https://your-project.supabase.co/rest/v1/${endpoint.table}?limit=5' \\
-  -H "apikey: YOUR_ANON_KEY"`
+  const curlExample = `curl '${SUPABASE_BASE}${endpoint.table}?limit=5' \\
+  -H "apikey: ${SUPABASE_KEY}"`
 
   return (
     <div className="border border-white/10 rounded-lg overflow-hidden">
@@ -495,11 +500,11 @@ export function ApiPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <label className="text-xs text-gray-500 uppercase tracking-wider">Base URL</label>
-            <CodeBlock code="https://your-project.supabase.co/rest/v1/" />
+            <CodeBlock code={SUPABASE_BASE} />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-gray-500 uppercase tracking-wider">Header</label>
-            <CodeBlock code="apikey: YOUR_ANON_KEY" />
+            <CodeBlock code={`apikey: ${SUPABASE_KEY}`} />
           </div>
         </div>
         <div className="bg-gray-900/50 border border-white/5 rounded-lg p-4 text-sm text-gray-400">

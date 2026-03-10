@@ -6,6 +6,16 @@ import { Spinner } from '../ui/Spinner'
 import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { formatUsd } from '../../lib/format'
 
+// Ethereum fork copies on PulseChain — these have same symbol as native bridged versions
+// but trade at massive discounts. Show a visual indicator to avoid confusion.
+const ETH_FORK_ADDRESSES = new Set([
+  '0x6b175474e89094c44da98b954eedeac495271d0f', // DAI (Ethereum fork)
+  '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', // USDC (Ethereum fork)
+  '0xdac17f958d2ee523a2206206994597c13d831ec7', // USDT (Ethereum fork)
+  '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', // WBTC (Ethereum fork, low price)
+  '0x5b218ed1428cfc1e488b777bdd473cf2647d30e3', // PLSX v2 (spam/old)
+])
+
 interface Token {
   address: string
   symbol: string
@@ -214,6 +224,9 @@ export function TokensPage() {
                       <td className="py-2.5 pr-4 text-gray-500">{page * PAGE_SIZE + i + 1}</td>
                       <td className="py-2.5 pr-4">
                         <span className="font-medium text-white">{token.symbol}</span>
+                        {ETH_FORK_ADDRESSES.has(token.address.toLowerCase()) && (
+                          <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20" title="Ethereum fork copy — not the native bridged version">ETH fork</span>
+                        )}
                         <span className="ml-2 text-gray-500 text-xs">{token.name}</span>
                       </td>
                       <td className="py-2.5 pr-4 text-right text-white">

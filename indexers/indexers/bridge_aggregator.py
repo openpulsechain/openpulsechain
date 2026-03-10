@@ -23,15 +23,19 @@ def _aggregate_daily():
     if hasattr(result, "data") and result.data:
         rows = result.data
         now = datetime.now(timezone.utc).isoformat()
+        # Cap: individual daily volume above $10M is likely inflated subgraph data
+        MAX_DAILY_VOLUME_USD = 10_000_000
         upsert_rows = []
         for row in rows:
+            dep_vol = min(row["deposit_volume_usd"] or 0, MAX_DAILY_VOLUME_USD)
+            wdr_vol = min(row["withdrawal_volume_usd"] or 0, MAX_DAILY_VOLUME_USD)
             upsert_rows.append({
                 "date": row["date"],
                 "deposit_count": row["deposit_count"],
                 "withdrawal_count": row["withdrawal_count"],
-                "deposit_volume_usd": row["deposit_volume_usd"] or 0,
-                "withdrawal_volume_usd": row["withdrawal_volume_usd"] or 0,
-                "net_flow_usd": (row["deposit_volume_usd"] or 0) - (row["withdrawal_volume_usd"] or 0),
+                "deposit_volume_usd": dep_vol,
+                "withdrawal_volume_usd": wdr_vol,
+                "net_flow_usd": dep_vol - wdr_vol,
                 "unique_users": row["unique_users"],
                 "updated_at": now,
             })

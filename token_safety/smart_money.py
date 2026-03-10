@@ -118,9 +118,20 @@ def get_recent_large_swaps(since_minutes: int = 60, min_usd: float = 1000) -> li
                 "tx_id": swap.get("id", ""),
             })
 
-    # Sort by amount descending
-    swaps.sort(key=lambda x: x["amount_usd"], reverse=True)
-    return swaps
+    # Deduplicate multi-hop swaps: keep only the highest-value leg per transaction
+    # Multi-hop swaps (e.g. WPLS→DAI→WETH) produce multiple entries with same base tx_id
+    # but different suffixes (-0, -1, -2). Without dedup, volume is inflated 40-60%.
+    seen_tx: dict = {}  # base_tx_id -> best swap entry
+    for swap in swaps:
+        tx_id = swap["tx_id"]
+        # Strip the subgraph swap index suffix (e.g., "0xabc...-0" → "0xabc...")
+        base_tx = tx_id.rsplit("-", 1)[0] if "-" in tx_id else tx_id
+        if base_tx not in seen_tx or swap["amount_usd"] > seen_tx[base_tx]["amount_usd"]:
+            seen_tx[base_tx] = swap
+
+    deduped = list(seen_tx.values())
+    deduped.sort(key=lambda x: x["amount_usd"], reverse=True)
+    return deduped
 
 
 def get_wallet_swap_history(wallet_address: str, limit: int = 50) -> list:

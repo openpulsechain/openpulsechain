@@ -347,8 +347,10 @@ def scrape_token_holders(token: dict) -> dict:
         PLS_TOTAL_SUPPLY = 138_890_000_000_000  # 138.89 trillion PLS
         total_supply_raw = int(PLS_TOTAL_SUPPLY * (10 ** 18))
 
-        stats = _get_chain_stats()
-        total_holders = int(stats.get("total_addresses", "0"))
+        # For PLS native, get holder count from WPLS token (same address)
+        # NOT from chain stats total_addresses (which is 430M+ = all addresses ever)
+        wpls_info = _get_token_info(address)
+        total_holders = int(wpls_info.get("holders", "0") or "0")
 
         turtle_threshold_raw = int(total_supply_raw * TIERS[-1][1] / 100)
         holders = _paginate_native_holders(turtle_threshold_raw)

@@ -288,6 +288,30 @@ def run():
         if all_rows:
             supabase.table("token_prices").upsert(all_rows, on_conflict="id").execute()
 
+            # Also snapshot PulseChain prices into token_price_history
+            # so tomorrow's run has a "yesterday price" for 24h change calculation
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            history_rows = []
+            for row in pls_rows:
+                addr = row.get("address")
+                if addr and row.get("price_usd") and row["price_usd"] > 0:
+                    history_rows.append({
+                        "address": addr.lower(),
+                        "date": today,
+                        "price_usd": row["price_usd"],
+                        "daily_volume_usd": row.get("volume_24h_usd"),
+                        "total_liquidity_usd": None,
+                        "source": "pulsex_subgraph",
+                    })
+            if history_rows:
+                try:
+                    supabase.table("token_price_history").upsert(
+                        history_rows, on_conflict="address,date"
+                    ).execute()
+                    logger.info(f"Saved {len(history_rows)} price snapshots to token_price_history")
+                except Exception as e:
+                    logger.warning(f"Failed to save price history: {e}")
+
         supabase.table("sync_status").update({
             "status": "idle",
             "last_synced_at": datetime.now(timezone.utc).isoformat(),
