@@ -52,7 +52,7 @@ export function SafetyDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [searchAddress, setSearchAddress] = useState('')
   const [filter, setFilter] = useState<string>('all')
-  const [stats, setStats] = useState({ total: 0, honeypots: 0, safe: 0, risky: 0 })
+  const [stats, setStats] = useState({ total: 0, honeypots: 0, safe: 0, moderate: 0, risky: 0 })
 
   useEffect(() => {
     loadScores()
@@ -72,8 +72,9 @@ export function SafetyDashboardPage() {
     // Calculate stats
     const honeypots = entries.filter(e => e.is_honeypot === true).length
     const safe = entries.filter(e => e.score >= 60).length
+    const moderate = entries.filter(e => e.score >= 40 && e.score < 60).length
     const risky = entries.filter(e => e.score < 40).length
-    setStats({ total: entries.length, honeypots, safe, risky })
+    setStats({ total: entries.length, honeypots, safe, moderate, risky })
 
     // Fetch token names
     const addresses = entries.map(e => e.token_address)
@@ -104,6 +105,7 @@ export function SafetyDashboardPage() {
   const filteredScores = scores.filter(s => {
     if (filter === 'honeypot') return s.is_honeypot === true
     if (filter === 'safe') return s.score >= 60
+    if (filter === 'moderate') return s.score >= 40 && s.score < 60
     if (filter === 'risky') return s.score < 40
     return true
   })
@@ -142,7 +144,7 @@ export function SafetyDashboardPage() {
       </form>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="rounded-xl border border-white/5 bg-gray-900/50 p-4 text-center">
           <p className="text-2xl font-bold">{stats.total}</p>
           <p className="text-xs text-gray-400 mt-1">Tokens Analyzed</p>
@@ -150,6 +152,10 @@ export function SafetyDashboardPage() {
         <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/5 p-4 text-center">
           <p className="text-2xl font-bold text-emerald-400">{stats.safe}</p>
           <p className="text-xs text-gray-400 mt-1">Safe (60+)</p>
+        </div>
+        <div className="rounded-xl border border-yellow-500/10 bg-yellow-500/5 p-4 text-center">
+          <p className="text-2xl font-bold text-yellow-400">{stats.moderate}</p>
+          <p className="text-xs text-gray-400 mt-1">Moderate (40-59)</p>
         </div>
         <div className="rounded-xl border border-orange-500/10 bg-orange-500/5 p-4 text-center">
           <p className="text-2xl font-bold text-orange-400">{stats.risky}</p>
@@ -166,6 +172,7 @@ export function SafetyDashboardPage() {
         {[
           { id: 'all', label: 'All' },
           { id: 'safe', label: 'Safe' },
+          { id: 'moderate', label: 'Moderate' },
           { id: 'risky', label: 'Risky' },
           { id: 'honeypot', label: 'Honeypots' },
         ].map(f => (

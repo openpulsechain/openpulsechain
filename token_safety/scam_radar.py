@@ -95,10 +95,10 @@ def check_lp_removals(since_timestamp: int) -> list[dict]:
     return alerts
 
 
-def check_large_transfers(token_address: str, total_supply: float, since_block: int = 0) -> list[dict]:
+def check_large_transfers(token_address: str, total_supply: float, since_block: int = 0, token_price: float = 0) -> list[dict]:
     """
     Check for large transfers (whale dumps) via Scan API.
-    Returns list of alerts.
+    Returns list of alerts with USD values when price is available.
     """
     alerts = []
     addr = token_address.lower()
@@ -123,6 +123,7 @@ def check_large_transfers(token_address: str, total_supply: float, since_block: 
             if total_supply > 0:
                 pct_of_supply = (value / total_supply) * 100
                 if pct_of_supply >= WHALE_DUMP_SUPPLY_PCT:
+                    amount_usd = round(value * token_price, 2) if token_price > 0 else None
                     alerts.append({
                         "type": "whale_dump",
                         "severity": "high" if pct_of_supply > 10 else "medium",
@@ -130,6 +131,7 @@ def check_large_transfers(token_address: str, total_supply: float, since_block: 
                         "from": tx.get("from", {}).get("hash", ""),
                         "to": tx.get("to", {}).get("hash", ""),
                         "value": value,
+                        "amount_usd": amount_usd,
                         "pct_of_supply": round(pct_of_supply, 2),
                         "timestamp": tx.get("timestamp", ""),
                         "tx_hash": tx.get("tx_hash", ""),
@@ -163,6 +165,16 @@ def run_scan(since_minutes: int = 30) -> list[dict]:
             if addr and addr not in token_addresses_seen:
                 token_addresses_seen.add(addr)
 
+    # Fetch token prices for USD conversion
+    token_prices = {}
+    try:
+        from db import supabase
+        price_rows = supabase.table("token_prices").select("id, price_usd").execute()
+        for p in (price_rows.data or []):
+            token_prices[p["id"].lower()] = float(p.get("price_usd", 0) or 0)
+    except Exception:
+        pass
+
     for addr in list(token_addresses_seen)[:20]:
         try:
             # Get total supply from Scan API
@@ -173,10 +185,11 @@ def run_scan(since_minutes: int = 30) -> list[dict]:
             total_supply_str = token_data.get("total_supply", "0")
             decimals = int(token_data.get("decimals", "18") or "18")
             total_supply = int(total_supply_str) / (10 ** decimals) if total_supply_str else 0
+            token_price = token_prices.get(addr.lower(), 0)
 
             if total_supply > 0:
                 logger.info(f"  Checking whale dumps for {addr[:10]}...")
-                dump_alerts = check_large_transfers(addr, total_supply)
+                dump_alerts = check_large_transfers(addr, total_supply, token_price=token_price)
                 all_alerts.extend(dump_alerts)
                 if dump_alerts:
                     logger.info(f"    Found {len(dump_alerts)} whale dump alerts")

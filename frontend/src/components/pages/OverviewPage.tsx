@@ -216,7 +216,7 @@ export function OverviewPage() {
                   <span className="sm:hidden">MCap</span>
                   <span className="text-xs text-gray-500 ml-1" title="Fully Diluted Valuation for PulseChain tokens, Circulating for CoinGecko tokens">*</span>
                 </th>
-                <th className="py-3 text-right">Volume</th>
+                <th className="py-3 text-right" title="All-time cumulative trading volume from PulseX">Volume (All-time)</th>
               </tr>
             </thead>
             <tbody>

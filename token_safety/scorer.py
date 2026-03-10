@@ -142,13 +142,17 @@ def calculate_score(
         risks.append("No liquidity pool found")
     else:
         liq = lp.get("total_liquidity_usd", 0)
-        if liq >= 100000:
-            lp_score = WEIGHT_LP
-        elif liq >= 50000:
+        if liq >= 1_000_000:
+            lp_score = WEIGHT_LP  # $1M+ = full score
+        elif liq >= 500_000:
+            lp_score = WEIGHT_LP - 1
+        elif liq >= 100_000:
+            lp_score = WEIGHT_LP - 2
+        elif liq >= 50_000:
             lp_score = WEIGHT_LP * 4 // 5
-        elif liq >= 10000:
+        elif liq >= 10_000:
             lp_score = WEIGHT_LP * 3 // 5
-        elif liq >= 1000:
+        elif liq >= 1_000:
             lp_score = WEIGHT_LP * 2 // 5
             risks.append(f"Low liquidity: ${liq:,.0f}")
         else:
@@ -156,13 +160,15 @@ def calculate_score(
             risks.append(f"Very low liquidity: ${liq:,.0f}")
 
         # Recent burns (LP removals) = danger signal
+        # Only penalize if liquidity is < $1M (for large tokens, LP moves are normal)
         burns = lp.get("recent_burns", [])
-        if len(burns) >= 3:
-            lp_score = max(0, lp_score - 8)
-            risks.append(f"{len(burns)} LP removals in last 24h")
-        elif len(burns) >= 1:
-            lp_score = max(0, lp_score - 3)
-            risks.append(f"{len(burns)} LP removal in last 24h")
+        if burns and liq < 1_000_000:
+            if len(burns) >= 3:
+                lp_score = max(0, lp_score - 8)
+                risks.append(f"{len(burns)} LP removals in last 24h")
+            elif len(burns) >= 1:
+                lp_score = max(0, lp_score - 3)
+                risks.append(f"{len(burns)} LP removal in last 24h")
 
     details["lp"] = {
         "score": lp_score,

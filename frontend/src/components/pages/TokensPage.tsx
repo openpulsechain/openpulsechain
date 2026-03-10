@@ -230,7 +230,9 @@ export function TokensPage() {
                           ? `${token.price_change_24h_pct >= 0 ? '+' : ''}${token.price_change_24h_pct.toFixed(2)}%`
                           : '--'}
                       </td>
-                      <td className="py-2.5 pr-4 text-right text-gray-300">{token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : formatUsd(token.total_volume_usd)}</td>
+                      <td className="py-2.5 pr-4 text-right text-gray-300" title={token.volume_24h_usd == null ? 'All-time cumulative volume (24h not available)' : '24h trading volume'}>
+                        {token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : <span className="text-gray-500">{formatUsd(token.total_volume_usd)}</span>}
+                      </td>
                       <td className="py-2.5 text-right text-gray-300">{formatUsd(token.total_liquidity)}</td>
                     </tr>
                   ))}

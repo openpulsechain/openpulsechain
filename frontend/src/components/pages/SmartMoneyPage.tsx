@@ -139,7 +139,7 @@ export function SmartMoneyPage() {
             tab === 'swaps' ? 'bg-[#8000E0]/20 text-[#00D4FF] border border-[#8000E0]/30' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
           }`}
         >
-          Recent Swaps
+          Recent Swaps (6h)
         </button>
         <button
           onClick={() => setTab('wallets')}

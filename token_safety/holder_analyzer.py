@@ -9,6 +9,18 @@ from config import SCAN_API_URL
 
 logger = logging.getLogger(__name__)
 
+# Addresses to exclude from holder concentration analysis:
+# bridge contracts, routers, burn addresses, known infrastructure
+EXCLUDED_HOLDERS = {
+    "0x0000000000000000000000000000000000000000",  # zero address
+    "0x000000000000000000000000000000000000dead",  # dead/burn
+    "0x98bf93ebf5c380c0e6ae8e192a7e2ae08edacc02",  # PulseX V1 Router
+    "0x165c3410fc91ef562c50559f7d2289febed552d9",  # PulseX V2 Router
+    "0x1715a3e4a142d8b698131108995174f37aeba10d",  # OmniBridge (ETH)
+    "0xbeb6a26ffa386bfc03368e8243193c56db062577",  # OmniBridge (PLS)
+    "0x8bca0149752de7271360b69789e6be8c47f86b8c",  # Burn address HEX
+}
+
 
 def analyze_holders(token_address: str) -> dict:
     """
@@ -73,23 +85,38 @@ def analyze_holders(token_address: str) -> dict:
 
         top10_total = 0.0
         top_holders = []
+        counted = 0
 
-        for i, holder in enumerate(items[:50]):
+        for holder in items[:50]:
+            holder_addr = holder.get("address", {}).get("hash", "").lower()
+
+            # Skip known infrastructure/burn addresses
+            if holder_addr in EXCLUDED_HOLDERS:
+                continue
+
+            # Also skip if the address is a known contract detected by Scan API
+            is_contract = holder.get("address", {}).get("is_contract", False)
+
             value_str = holder.get("value", "0")
             value = int(value_str) / (10 ** decimals) if value_str else 0
             pct = (value / total_supply) * 100 if total_supply > 0 else 0
 
             holder_info = {
-                "address": holder.get("address", {}).get("hash", "").lower(),
+                "address": holder_addr,
                 "pct": round(pct, 2),
+                "is_contract": is_contract,
             }
 
-            if i < 10:
+            if counted < 10:
                 top10_total += pct
                 top_holders.append(holder_info)
 
-            if i == 0:
+            if counted == 0:
                 result["top1_pct"] = round(pct, 2)
+
+            counted += 1
+            if counted >= 10:
+                break
 
         result["top10_pct"] = round(top10_total, 2)
         result["top_holders"] = top_holders
