@@ -100,6 +100,8 @@ def analyze_holders(token_address: str) -> dict:
             value_str = holder.get("value", "0")
             value = int(value_str) / (10 ** decimals) if value_str else 0
             pct = (value / total_supply) * 100 if total_supply > 0 else 0
+            # Cap at 100% — prevents overflow from bad decimals/supply data
+            pct = min(pct, 100.0)
 
             holder_info = {
                 "address": holder_addr,
