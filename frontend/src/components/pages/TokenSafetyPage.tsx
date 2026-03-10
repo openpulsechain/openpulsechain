@@ -360,9 +360,18 @@ export function TokenSafetyPage() {
               <span className={safety.recent_burns_24h > 0 ? 'text-orange-400' : ''}>{safety.recent_burns_24h || 0}</span>
             </div>
           </div>
-          <p className="text-[10px] text-gray-600 leading-relaxed">
-            Sum of verified liquidity across all active PulseX V1+V2 pairs. Each pair is cross-validated using derivedUSD &times; reserves (bilateral filter). Dust and spam pairs are excluded.
-          </p>
+          <div className="rounded-lg bg-blue-500/5 border border-blue-500/10 px-3 py-2.5 space-y-1.5">
+            <p className="text-[11px] text-blue-300 font-medium">How is liquidity calculated?</p>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Total liquidity is the sum across all active PulseX V1 + V2 pairs where this token appears.
+              Each pair is <strong className="text-gray-300">cross-validated</strong>: we compute derivedUSD &times; reserves for both sides independently.
+              Only pairs where <strong className="text-gray-300">both sides exceed $100</strong> and have <strong className="text-gray-300">50+ transactions</strong> are counted.
+            </p>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Note: The PulseX subgraph <code className="text-[10px] bg-white/5 px-1 rounded">reserveUSD</code> field is unreliable for many pairs (spam tokens inflate values).
+              We no longer use it. Instead, our bilateral filter recalculates real value from on-chain reserves &times; token prices, which may differ from other aggregators that use raw subgraph data.
+            </p>
+          </div>
         </div>
 
         {/* Holders */}
