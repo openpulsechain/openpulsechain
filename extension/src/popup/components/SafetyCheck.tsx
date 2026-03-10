@@ -3,6 +3,32 @@ import { Shield, Search, AlertTriangle, CheckCircle, XCircle, ExternalLink, Load
 import { getTokenSafety, getDeployerReputation, gradeColor, type SafetyScore, type DeployerReputation } from '../../lib/api'
 import { formatUsd, shortenAddress } from '../../lib/format'
 
+// Known token logos (checksum addresses for PulseX CDN)
+const KNOWN_LOGOS: Record<string, string> = {
+  '0xa1077a294dde1b09bb078844df40758a5d0f9a27': 'https://tokens.app.pulsex.com/images/tokens/0xA1077a294dDE1B09bB078844df40758a5D0f9a27.png',
+  '0x95b303987a60c71504d99aa1b13b4da07b0790ab': 'https://tokens.app.pulsex.com/images/tokens/0x95B303987A60C71504D99Aa1b13B4DA07b0790ab.png',
+  '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39': 'https://tokens.app.pulsex.com/images/tokens/0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39.png',
+  '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d': 'https://tokens.app.pulsex.com/images/tokens/0x2fa878Ab3F87CC1C9737Fc071108F904c0B0C95d.png',
+  '0xefd766ccb38eaf1dfd701853bfce31359239f305': 'https://tokens.app.pulsex.com/images/tokens/0xefD766cCb38EaF1dfd701853BFCe31359239F305.png',
+  '0x02dcdd04e3f455d838cd1249292c58f3b79e3c3c': 'https://tokens.app.pulsex.com/images/tokens/0x02DcdD04e3F455D838cd1249292C58f3B79e3C3C.png',
+}
+
+function SafetyTokenLogo({ address }: { address: string }) {
+  const [error, setError] = useState(false)
+  const addr = address?.toLowerCase() || ''
+  const knownUrl = KNOWN_LOGOS[addr]
+  const imgUrl = knownUrl || `https://tokens.app.pulsex.com/images/tokens/${address}.png`
+  if (error) return null
+  return (
+    <img
+      src={imgUrl}
+      alt=""
+      className="h-6 w-6 rounded-full bg-gray-800 border border-white/10 shrink-0"
+      onError={() => setError(true)}
+    />
+  )
+}
+
 const QUICK_TOKENS = [
   { symbol: 'HEX', address: '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39' },
   { symbol: 'PLSX', address: '0x95b303987a60c71504d99aa1b13b4da07b0790ab' },
@@ -108,14 +134,17 @@ export function SafetyCheck() {
         <div className="space-y-2.5">
           {/* Score header */}
           <div className="flex items-center justify-between bg-gray-800/40 rounded-xl p-3 border border-white/5">
-            <div>
-              <div className="text-xs text-gray-400">
-                {safety.token_symbol || shortenAddress(safety.token_address)}
-                {safety.token_name && <span className="ml-1 text-gray-500">{safety.token_name}</span>}
-              </div>
+            <div className="flex items-center gap-2">
+              <SafetyTokenLogo address={safety.token_address} />
+              <div>
+                <div className="text-xs text-gray-400">
+                  {safety.token_symbol || shortenAddress(safety.token_address)}
+                  {safety.token_name && <span className="ml-1 text-gray-500">{safety.token_name}</span>}
+                </div>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-2xl font-bold text-white">{safety.score}</span>
                 <span className="text-xs text-gray-500">/ 100</span>
+              </div>
               </div>
             </div>
             <div

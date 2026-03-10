@@ -53,6 +53,35 @@ interface LiquidityPair {
   total_txns: number
 }
 
+// Known token logos (checksum addresses for PulseX CDN)
+const KNOWN_LOGOS: Record<string, string> = {
+  '0xa1077a294dde1b09bb078844df40758a5d0f9a27': 'https://tokens.app.pulsex.com/images/tokens/0xA1077a294dDE1B09bB078844df40758a5D0f9a27.png',
+  '0x95b303987a60c71504d99aa1b13b4da07b0790ab': 'https://tokens.app.pulsex.com/images/tokens/0x95B303987A60C71504D99Aa1b13B4DA07b0790ab.png',
+  '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39': 'https://tokens.app.pulsex.com/images/tokens/0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39.png',
+  '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d': 'https://tokens.app.pulsex.com/images/tokens/0x2fa878Ab3F87CC1C9737Fc071108F904c0B0C95d.png',
+  '0xefd766ccb38eaf1dfd701853bfce31359239f305': 'https://tokens.app.pulsex.com/images/tokens/0xefD766cCb38EaF1dfd701853BFCe31359239F305.png',
+  '0x02dcdd04e3f455d838cd1249292c58f3b79e3c3c': 'https://tokens.app.pulsex.com/images/tokens/0x02DcdD04e3F455D838cd1249292C58f3B79e3C3C.png',
+}
+
+function TokenLogo({ address }: { address: string }) {
+  const [error, setError] = useState(false)
+  const addr = address?.toLowerCase() || ''
+  const knownUrl = KNOWN_LOGOS[addr]
+  // Try known logo first, then PulseX CDN with original address
+  const imgUrl = knownUrl || `https://tokens.app.pulsex.com/images/tokens/${address}.png`
+
+  if (error) return null
+
+  return (
+    <img
+      src={imgUrl}
+      alt=""
+      className="h-8 w-8 rounded-full bg-gray-800 border border-white/10 shrink-0"
+      onError={() => setError(true)}
+    />
+  )
+}
+
 const GRADE_COLORS: Record<string, string> = {
   A: 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10',
   B: 'text-green-400 border-green-400/30 bg-green-400/10',
@@ -281,6 +310,7 @@ export function TokenSafetyPage() {
 
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
+            {address && <TokenLogo address={address} />}
             <h1 className="text-2xl font-bold">
               {tokenInfo ? `${tokenInfo.name} (${tokenInfo.symbol})` : `Token ${address?.slice(0, 10)}...`}
             </h1>
