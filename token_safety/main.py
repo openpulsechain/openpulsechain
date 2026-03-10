@@ -777,14 +777,62 @@ def _run_lp_monitor(limit: int = 50):
     logger.info(f"[LP Monitor] Done: {updated}/{len(rows.data or [])} tokens updated")
 
 
+# ── Batch progress tracking ───────────────────────────────────────
+
+_batch_progress = {
+    "running": False,
+    "total": 0,
+    "analyzed": 0,
+    "errors": 0,
+    "started_at": None,
+    "finished_at": None,
+}
+
+
+@app.get("/cron/batch/status")
+def batch_status():
+    """Return current batch progress."""
+    p = _batch_progress
+    pct = round(p["analyzed"] / max(p["total"], 1) * 100, 1)
+    elapsed = 0
+    eta_s = None
+    if p["started_at"]:
+        elapsed = round(time.time() - p["started_at"], 1)
+        if p["analyzed"] > 0 and p["running"]:
+            per_token = elapsed / p["analyzed"]
+            remaining = p["total"] - p["analyzed"] - p["errors"]
+            eta_s = round(per_token * remaining)
+    return {
+        "running": p["running"],
+        "total": p["total"],
+        "analyzed": p["analyzed"],
+        "errors": p["errors"],
+        "percent": pct,
+        "elapsed_s": elapsed,
+        "eta_s": eta_s,
+        "started_at": datetime.fromtimestamp(p["started_at"], tz=timezone.utc).isoformat() if p["started_at"] else None,
+        "finished_at": datetime.fromtimestamp(p["finished_at"], tz=timezone.utc).isoformat() if p["finished_at"] else None,
+    }
+
+
 # ── Batch mode ────────────────────────────────────────────────────
 
 def run_batch(max_tokens: int = 1000):
     """Analyze all active tokens (for cron job)."""
+    global _batch_progress
     logger.info("Starting batch token safety analysis...")
     tokens = get_all_tokens_to_analyze()
     tokens = tokens[:max_tokens]
     logger.info(f"Found {len(tokens)} tokens to analyze (limit={max_tokens})")
+
+    _batch_progress = {
+        "running": True,
+        "total": len(tokens),
+        "analyzed": 0,
+        "errors": 0,
+        "started_at": time.time(),
+        "finished_at": None,
+    }
 
     analyzed = 0
     errors = 0
@@ -794,6 +842,7 @@ def run_batch(max_tokens: int = 1000):
             analysis = analyze_token(addr)
             save_score(analysis)
             analyzed += 1
+            _batch_progress["analyzed"] = analyzed
 
             # Rate limit: 1 token per 2 seconds to avoid hammering APIs
             time.sleep(2)
@@ -801,10 +850,13 @@ def run_batch(max_tokens: int = 1000):
         except Exception as e:
             logger.error(f"Failed to analyze {addr}: {e}")
             errors += 1
+            _batch_progress["errors"] = errors
 
         if analyzed % 50 == 0:
             logger.info(f"Progress: {analyzed}/{len(tokens)} analyzed, {errors} errors")
 
+    _batch_progress["running"] = False
+    _batch_progress["finished_at"] = time.time()
     logger.info(f"Batch complete: {analyzed} analyzed, {errors} errors out of {len(tokens)} tokens")
 
 
