@@ -4,6 +4,16 @@ import { useStore } from '../../lib/store'
 import { getBridgeStats, getRecentAlerts, getTokenSafety, getWalletBalances, gradeColor, type BridgeSnapshot, type ScamAlert, type SafetyScore } from '../../lib/api'
 import { formatUsd, shortenAddress, timeAgo } from '../../lib/format'
 
+// PulseX CDN logos (checksum addresses)
+const TOKEN_LOGOS: Record<string, string> = {
+  HEX: 'https://tokens.app.pulsex.com/images/tokens/0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39.png',
+  PLSX: 'https://tokens.app.pulsex.com/images/tokens/0x95B303987A60C71504D99Aa1b13B4DA07b0790ab.png',
+  INC: 'https://tokens.app.pulsex.com/images/tokens/0x2fa878Ab3F87CC1C9737Fc071108F904c0B0C95d.png',
+  HDRN: 'https://tokens.app.pulsex.com/images/tokens/0x3819f64f282bf135d62168C1e513280dAF905e06.png',
+  LOAN: 'https://tokens.app.pulsex.com/images/tokens/0x9159f1D2a9f51998Fc9Ab03fbd8f265ab14A1b3B.png',
+  DAI: 'https://tokens.app.pulsex.com/images/tokens/0xefD766cCb38EaF1dfd701853BFCe31359239F305.png',
+}
+
 const POPULAR_TOKENS = [
   { symbol: 'HEX', address: '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39', fallbackGrade: 'A' },
   { symbol: 'PLSX', address: '0x95b303987a60c71504d99aa1b13b4da07b0790ab', fallbackGrade: 'A' },
@@ -274,7 +284,12 @@ export function Dashboard() {
                   onClick={() => setActiveSection('safety')}
                   className="bg-gray-800/30 rounded-lg p-2.5 border border-white/5 flex items-center justify-between hover:bg-gray-800/50 transition-colors cursor-pointer"
                 >
-                  <span className="text-xs font-medium text-white">{token.symbol}</span>
+                  <div className="flex items-center gap-1.5">
+                    {TOKEN_LOGOS[token.symbol] && (
+                      <img src={TOKEN_LOGOS[token.symbol]} alt="" className="h-4 w-4 rounded-full shrink-0" />
+                    )}
+                    <span className="text-xs font-medium text-white">{token.symbol}</span>
+                  </div>
                   <span
                     className="text-sm font-bold"
                     style={{ color }}

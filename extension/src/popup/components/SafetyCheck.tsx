@@ -120,8 +120,11 @@ export function SafetyCheck() {
               <button
                 key={t.symbol}
                 onClick={() => checkToken(t.address)}
-                className="px-2.5 py-1.5 rounded-lg bg-gray-800/50 border border-white/5 text-xs text-gray-300 hover:bg-gray-800/80 hover:text-white hover:border-pulse-cyan/30 transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-800/50 border border-white/5 text-xs text-gray-300 hover:bg-gray-800/80 hover:text-white hover:border-pulse-cyan/30 transition-colors"
               >
+                {KNOWN_LOGOS[t.address] && (
+                  <img src={KNOWN_LOGOS[t.address]} alt="" className="h-4 w-4 rounded-full" />
+                )}
                 {t.symbol}
               </button>
             ))}

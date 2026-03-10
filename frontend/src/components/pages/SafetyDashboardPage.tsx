@@ -3,6 +3,19 @@ import { useNavigate } from 'react-router-dom'
 import { Shield, Search, AlertTriangle, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
+function TokenLogo({ address }: { address: string }) {
+  const [error, setError] = useState(false)
+  if (error) return null
+  return (
+    <img
+      src={`https://tokens.app.pulsex.com/images/tokens/${address}.png`}
+      alt=""
+      className="h-6 w-6 rounded-full bg-gray-800 border border-white/10 shrink-0"
+      onError={() => setError(true)}
+    />
+  )
+}
+
 interface SafetyEntry {
   token_address: string
   score: number
@@ -206,8 +219,13 @@ export function SafetyDashboardPage() {
                     onClick={() => navigate(`/token/${entry.token_address}`)}
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium">{token?.symbol || entry.token_address.slice(0, 10) + '...'}</div>
-                      {token && <div className="text-xs text-gray-500">{token.name}</div>}
+                      <div className="flex items-center gap-2.5">
+                        <TokenLogo address={entry.token_address} />
+                        <div>
+                          <div className="font-medium">{token?.symbol || entry.token_address.slice(0, 10) + '...'}</div>
+                          {token && <div className="text-xs text-gray-500">{token.name}</div>}
+                        </div>
+                      </div>
                     </td>
                     <td className="text-center px-4 py-3 font-bold">{entry.score}</td>
                     <td className="text-center px-4 py-3">
