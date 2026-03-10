@@ -328,7 +328,7 @@ export function Portfolio() {
                           const color = TIER_COLOR[r.tier] || '#6b7280'
                           return (
                             <span
-                              className="text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                              className="text-[11px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                               style={{ color, backgroundColor: `${color}25` }}
                               title={`${r.tier} — ${r.balance_pct.toFixed(4)}% of supply`}
                             >

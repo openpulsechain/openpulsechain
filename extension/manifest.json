@@ -22,13 +22,27 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*.pulsex.com/*",
+        "*://*.pulsechain.com/*",
+        "*://*.9mm.pro/*",
+        "*://*.piteas.io/*",
+        "*://*.dexscreener.com/*",
+        "http://localhost:*/*"
+      ],
       "js": ["src/content/tx-guard-inject.ts"],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*.pulsex.com/*",
+        "*://*.pulsechain.com/*",
+        "*://*.9mm.pro/*",
+        "*://*.piteas.io/*",
+        "*://*.dexscreener.com/*",
+        "http://localhost:*/*"
+      ],
       "js": ["src/content/tx-guard.ts"],
       "run_at": "document_start"
     },

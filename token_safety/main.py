@@ -11,6 +11,7 @@ import json
 import logging
 import time
 import asyncio
+import secrets
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
@@ -133,7 +134,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://openpulsechain.com",
+        "https://www.openpulsechain.com",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ],
     allow_credentials=False,
     allow_methods=["GET"],
     allow_headers=["*"],
@@ -200,7 +206,7 @@ def token_safety(address: str, request: Request, response: Response, fresh: bool
         analysis = analyze_token(addr)
     except Exception as e:
         logger.error(f"Analysis failed for {addr}: {e}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)[:200]}")
+        raise HTTPException(status_code=500, detail="Internal error")
 
     # Save to DB
     save_score(analysis)
@@ -282,7 +288,8 @@ def batch_safety(request: Request, limit: int = Query(20, ge=1, le=100)):
             "count": len(result.data or []),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)[:200])
+        logger.error(f"Batch safety query failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal error")
 
 
 # ── Scam Radar ────────────────────────────────────────────────────
@@ -298,7 +305,8 @@ def recent_alerts(request: Request, limit: int = Query(50, ge=1, le=200), alert_
         result = query.order("created_at", desc=True).limit(limit).execute()
         return {"data": result.data or [], "count": len(result.data or [])}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)[:200])
+        logger.error(f"Recent alerts query failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal error")
 
 
 # ── Deployer Reputation ──────────────────────────────────────────
@@ -566,18 +574,24 @@ def holder_league_history(symbol: str, response: Response, days: int = Query(30,
 CRON_SECRET = os.environ.get("CRON_SECRET", "")
 
 
-def _check_cron_secret(secret: str):
-    """Validate cron secret. Blocks access if CRON_SECRET is not configured."""
+def _check_cron_secret(secret: str = "", request: Request = None):
+    """Validate cron secret. Timing-safe comparison."""
     if not CRON_SECRET:
         raise HTTPException(status_code=403, detail="CRON_SECRET not configured")
-    if secret != CRON_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid secret")
+    # Support both query param and Authorization header
+    token = secret
+    if not token and request:
+        auth = request.headers.get("authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+    if not secrets.compare_digest(token, CRON_SECRET):
+        raise HTTPException(status_code=403, detail="Unauthorized")
 
 
 @app.get("/cron/radar")
 def cron_radar(request: Request, secret: str = Query("")):
     """Run scam radar scan. Protected by CRON_SECRET."""
-    _check_cron_secret(secret)
+    _check_cron_secret(secret, request)
 
     from scam_radar import run_scan, save_alerts
     from db import supabase
@@ -701,7 +715,7 @@ def address_funding_tree(address: str, response: Response):
 @app.get("/cron/leagues")
 def cron_leagues(request: Request, secret: str = Query("")):
     """Run holder leagues scraper. Protected by CRON_SECRET."""
-    _check_cron_secret(secret)
+    _check_cron_secret(secret, request)
     import threading
     from holder_leagues import run_holder_leagues
     t = threading.Thread(target=run_holder_leagues, daemon=True)
@@ -712,7 +726,7 @@ def cron_leagues(request: Request, secret: str = Query("")):
 @app.get("/cron/batch")
 def cron_batch(request: Request, secret: str = Query(""), limit: int = Query(100, ge=1, le=1000)):
     """Run batch token safety analysis. Protected by CRON_SECRET."""
-    _check_cron_secret(secret)
+    _check_cron_secret(secret, request)
 
     import threading
 
@@ -728,7 +742,7 @@ def cron_batch(request: Request, secret: str = Query(""), limit: int = Query(100
 @app.get("/cron/lp-monitor")
 def cron_lp_monitor(request: Request, secret: str = Query(""), limit: int = Query(200, ge=1, le=500)):
     """Force LP liquidity re-check for top tokens. Fixes inflated values."""
-    _check_cron_secret(secret)
+    _check_cron_secret(secret, request)
     import threading
     t = threading.Thread(target=_run_lp_monitor, args=(limit,), daemon=True)
     t.start()
