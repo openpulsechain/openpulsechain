@@ -281,7 +281,7 @@ def batch_safety(request: Request, limit: int = Query(20, ge=1, le=100)):
         result = supabase.table("token_safety_scores").select(
             "token_address, score, grade, risks, is_honeypot, is_verified, "
             "total_liquidity_usd, holder_count, top10_pct, analyzed_at"
-        ).order("analyzed_at", desc=True).limit(limit).execute()
+        ).order("total_liquidity_usd", desc=True).limit(limit).execute()
 
         return {
             "data": result.data or [],

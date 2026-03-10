@@ -17,9 +17,22 @@ import logging
 import time
 import requests
 from datetime import datetime, timezone
-from config import SCAN_API_URL, PULSEX_V1_SUBGRAPH, PULSEX_V2_SUBGRAPH, RPC_URL
+from config import (
+    SCAN_API_URL, PULSEX_V1_SUBGRAPH, PULSEX_V2_SUBGRAPH, RPC_URL,
+    PULSEX_V1_ROUTER, PULSEX_V2_ROUTER,
+)
 
 logger = logging.getLogger(__name__)
+
+# Contracts that appear as "wallets" in swap events but are infrastructure
+EXCLUDED_WALLETS = {
+    PULSEX_V1_ROUTER.lower(),
+    PULSEX_V2_ROUTER.lower(),
+    "0x0000000000000000000000000000000000000000",
+    "0x000000000000000000000000000000000000dead",
+    "0x1715a3e4a142d8b698131108995174f37aeba10d",  # OmniBridge ETH
+    "0xbeb6a26ffa386bfc03368e8243193c56db062577",  # OmniBridge PLS
+}
 
 
 def _query_subgraph(url: str, query: str, variables: dict = None) -> dict:
@@ -87,6 +100,11 @@ def get_recent_large_swaps(since_minutes: int = 60, min_usd: float = 1000) -> li
                 bought_token = token0
                 sold_token = token1
 
+            wallet = swap.get("sender", "") or swap.get("to", "")
+            # Skip router/bridge contracts masquerading as wallets
+            if wallet.lower() in EXCLUDED_WALLETS:
+                continue
+
             swaps.append({
                 "dex": f"PulseX_{dex_name}",
                 "pair_address": pair.get("id", ""),
@@ -95,7 +113,7 @@ def get_recent_large_swaps(since_minutes: int = 60, min_usd: float = 1000) -> li
                 "sold_symbol": sold_token.get("symbol", "?"),
                 "sold_address": sold_token.get("id", ""),
                 "amount_usd": round(amount_usd, 2),
-                "wallet": swap.get("sender", "") or swap.get("to", ""),
+                "wallet": wallet,
                 "timestamp": int(swap.get("timestamp", 0)),
                 "tx_id": swap.get("id", ""),
             })
@@ -240,6 +258,9 @@ def build_smart_money_feed(since_hours: int = 24, min_usd: float = 5000) -> dict
     for swap in swaps:
         wallet = swap["wallet"]
         if not wallet:
+            continue
+        # Skip known contracts (routers, bridges, burn addresses)
+        if wallet.lower() in EXCLUDED_WALLETS:
             continue
         if wallet not in wallet_activity:
             wallet_activity[wallet] = {
