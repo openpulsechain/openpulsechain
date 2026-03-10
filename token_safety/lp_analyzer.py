@@ -157,7 +157,7 @@ def analyze_lp(token_address: str) -> dict:
 
     # Calculate total liquidity using derivedUSD cross-validation
     total_liq = 0.0
-    real_pair_count = 0
+    all_valid_pairs = []
     best = None
     best_reserve = 0.0
     now = int(time.time())
@@ -166,24 +166,35 @@ def analyze_lp(token_address: str) -> dict:
         reserve = _calc_pair_liquidity(p)
         if reserve > 0:
             total_liq += reserve
-            real_pair_count += 1
-        if reserve > best_reserve:
-            best_reserve = reserve
+            t0 = p.get("token0", {})
+            t1 = p.get("token1", {})
             created_ts = int(p.get("timestamp", 0) or 0)
             age_days = (now - created_ts) / 86400 if created_ts > 0 else 0
-            best = {
+            pair_info = {
                 "address": p["id"],
                 "dex": p["_dex"],
                 "reserve_usd": round(reserve, 2),
+                "token0_symbol": t0.get("symbol", "?"),
+                "token1_symbol": t1.get("symbol", "?"),
+                "token0_address": t0.get("id", ""),
+                "token1_address": t1.get("id", ""),
                 "created_at": created_ts,
                 "age_days": round(age_days, 1),
                 "total_txns": int(p.get("totalTransactions", 0) or 0),
             }
+            all_valid_pairs.append(pair_info)
+            if reserve > best_reserve:
+                best_reserve = reserve
+                best = pair_info
+
+    # Sort by liquidity descending
+    all_valid_pairs.sort(key=lambda x: x["reserve_usd"], reverse=True)
 
     # Only count pairs with real liquidity (passed bilateral filter)
-    result["pair_count"] = real_pair_count
+    result["pair_count"] = len(all_valid_pairs)
     result["total_liquidity_usd"] = round(total_liq, 2)
     result["best_pair"] = best
+    result["all_pairs"] = all_valid_pairs
 
     # Check recent burns (LP removals) in last 24h
     if best:

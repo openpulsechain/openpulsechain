@@ -74,6 +74,7 @@ def analyze_token(token_address: str) -> dict:
             "total_liquidity_usd": lp.get("total_liquidity_usd"),
             "pair_count": lp.get("pair_count"),
             "best_pair": lp.get("best_pair"),
+            "all_pairs": lp.get("all_pairs", []),
             "recent_burns_24h": len(lp.get("recent_burns", [])),
             "recent_mints_24h": len(lp.get("recent_mints", [])),
         },

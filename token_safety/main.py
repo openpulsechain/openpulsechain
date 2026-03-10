@@ -34,6 +34,8 @@ logger = logging.getLogger("token_safety")
 RADAR_INTERVAL_MIN = int(os.environ.get("RADAR_INTERVAL_MIN", "30"))
 BATCH_INTERVAL_HOURS = int(os.environ.get("BATCH_INTERVAL_HOURS", "12"))
 LEAGUE_INTERVAL_HOURS = int(os.environ.get("LEAGUE_INTERVAL_HOURS", "6"))
+LP_MONITOR_INTERVAL_HOURS = int(os.environ.get("LP_MONITOR_INTERVAL_HOURS", "2"))
+LP_MONITOR_LIMIT = int(os.environ.get("LP_MONITOR_LIMIT", "50"))
 BATCH_LIMIT = int(os.environ.get("BATCH_LIMIT", "200"))
 ENABLE_SCHEDULER = os.environ.get("ENABLE_SCHEDULER", "true").lower() == "true"
 
@@ -41,14 +43,16 @@ ENABLE_SCHEDULER = os.environ.get("ENABLE_SCHEDULER", "true").lower() == "true"
 async def _scheduler_loop():
     """Background scheduler: runs radar every 30min, batch every 12h."""
     await asyncio.sleep(30)  # Wait 30s after startup before first run
-    logger.info(f"Scheduler started: radar every {RADAR_INTERVAL_MIN}min, batch every {BATCH_INTERVAL_HOURS}h, leagues every {LEAGUE_INTERVAL_HOURS}h")
+    logger.info(f"Scheduler started: radar every {RADAR_INTERVAL_MIN}min, batch every {BATCH_INTERVAL_HOURS}h, leagues every {LEAGUE_INTERVAL_HOURS}h, LP monitor every {LP_MONITOR_INTERVAL_HOURS}h")
 
     radar_interval = RADAR_INTERVAL_MIN * 60
     batch_interval = BATCH_INTERVAL_HOURS * 3600
     league_interval = LEAGUE_INTERVAL_HOURS * 3600
+    lp_monitor_interval = LP_MONITOR_INTERVAL_HOURS * 3600
     last_radar = 0
     last_batch = 0
     last_league = 0
+    last_lp_monitor = 0
 
     while True:
         now = time.time()
@@ -79,6 +83,17 @@ async def _scheduler_loop():
             except Exception as e:
                 logger.error(f"[CRON] Leagues error: {e}")
             last_league = time.time()
+
+        # LP Liquidity Monitor — re-check top tokens' liquidity
+        if now - last_lp_monitor >= lp_monitor_interval:
+            try:
+                logger.info(f"[CRON] Running LP liquidity monitor (top {LP_MONITOR_LIMIT} tokens)...")
+                import threading
+                t = threading.Thread(target=_run_lp_monitor, args=(LP_MONITOR_LIMIT,), daemon=True)
+                t.start()
+            except Exception as e:
+                logger.error(f"[CRON] LP monitor error: {e}")
+            last_lp_monitor = time.time()
 
         # Batch analysis
         if now - last_batch >= batch_interval:
@@ -195,6 +210,53 @@ def token_safety(address: str, request: Request, response: Response, fresh: bool
     return {
         "data": analysis,
         "cached": False,
+    }
+
+
+@app.get("/api/v1/token/{address}/liquidity")
+def token_liquidity(address: str, response: Response, fresh: bool = Query(False)):
+    """Get detailed liquidity breakdown for a token — all pairs with links."""
+    addr = _validate_address(address)
+    response.headers["Cache-Control"] = "public, max-age=300"
+
+    from db import supabase
+
+    # Try to get from analysis_details JSONB
+    row = supabase.table("token_safety_scores").select(
+        "analysis_details, total_liquidity_usd, pair_count, token_symbol, token_name"
+    ).eq("token_address", addr).execute()
+
+    if not row.data:
+        raise HTTPException(status_code=404, detail="Token not analyzed yet")
+
+    record = row.data[0]
+    details = record.get("analysis_details") or {}
+    lp_data = details.get("lp", {})
+    all_pairs = lp_data.get("all_pairs", [])
+
+    # If no pairs stored yet or fresh requested, re-analyze
+    if not all_pairs or fresh:
+        from lp_analyzer import analyze_lp
+        lp_result = analyze_lp(addr)
+        all_pairs = lp_result.get("all_pairs", [])
+        # Update analysis_details with fresh pair data
+        lp_data["all_pairs"] = all_pairs
+        lp_data["total_liquidity_usd"] = lp_result.get("total_liquidity_usd", 0)
+        lp_data["pair_count"] = lp_result.get("pair_count", 0)
+        lp_data["best_pair"] = lp_result.get("best_pair")
+        details["lp"] = lp_data
+        supabase.table("token_safety_scores").update({
+            "analysis_details": details,
+            "total_liquidity_usd": lp_result.get("total_liquidity_usd", 0),
+            "pair_count": lp_result.get("pair_count", 0),
+        }).eq("token_address", addr).execute()
+
+    return {
+        "token_address": addr,
+        "token_symbol": record.get("token_symbol"),
+        "total_liquidity_usd": lp_data.get("total_liquidity_usd", record.get("total_liquidity_usd", 0)),
+        "pair_count": lp_data.get("pair_count", record.get("pair_count", 0)),
+        "pairs": all_pairs,
     }
 
 
@@ -654,6 +716,51 @@ def cron_batch(request: Request, secret: str = Query(""), limit: int = Query(100
     t = threading.Thread(target=_run, daemon=True)
     t.start()
     return {"status": "started", "max_tokens": limit}
+
+
+# ── LP Liquidity Monitor ─────────────────────────────────────────
+
+def _run_lp_monitor(limit: int = 50):
+    """Re-check liquidity for top tokens by total_liquidity_usd.
+    Updates all_pairs, pair_count, total_liquidity_usd in Supabase."""
+    from lp_analyzer import analyze_lp
+    from db import supabase
+
+    logger.info(f"[LP Monitor] Starting liquidity check for top {limit} tokens...")
+
+    # Get top tokens by liquidity
+    rows = supabase.table("token_safety_scores").select(
+        "token_address, token_symbol, total_liquidity_usd, analysis_details"
+    ).order("total_liquidity_usd", desc=True).limit(limit).execute()
+
+    updated = 0
+    for row in (rows.data or []):
+        addr = row["token_address"]
+        try:
+            lp = analyze_lp(addr)
+            details = row.get("analysis_details") or {}
+            lp_section = details.get("lp", {})
+            lp_section["all_pairs"] = lp.get("all_pairs", [])
+            lp_section["total_liquidity_usd"] = lp.get("total_liquidity_usd", 0)
+            lp_section["pair_count"] = lp.get("pair_count", 0)
+            lp_section["best_pair"] = lp.get("best_pair")
+            lp_section["recent_burns_24h"] = len(lp.get("recent_burns", []))
+            lp_section["recent_mints_24h"] = len(lp.get("recent_mints", []))
+            details["lp"] = lp_section
+
+            supabase.table("token_safety_scores").update({
+                "total_liquidity_usd": lp.get("total_liquidity_usd", 0),
+                "pair_count": lp.get("pair_count", 0),
+                "analysis_details": details,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("token_address", addr).execute()
+            updated += 1
+
+            time.sleep(2)  # Rate limit
+        except Exception as e:
+            logger.warning(f"[LP Monitor] Error for {addr}: {e}")
+
+    logger.info(f"[LP Monitor] Done: {updated}/{len(rows.data or [])} tokens updated")
 
 
 # ── Batch mode ────────────────────────────────────────────────────

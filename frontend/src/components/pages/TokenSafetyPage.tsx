@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2 } from 'lucide-react'
+import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import { ShareButton } from '../ui/ShareButton'
 import { supabase } from '../../lib/supabase'
 
@@ -38,6 +38,19 @@ interface TokenInfo {
   address: string
   symbol: string
   name: string
+}
+
+interface LiquidityPair {
+  address: string
+  dex: string
+  reserve_usd: number
+  token0_symbol: string
+  token1_symbol: string
+  token0_address: string
+  token1_address: string
+  created_at: number
+  age_days: number
+  total_txns: number
 }
 
 const GRADE_COLORS: Record<string, string> = {
@@ -130,6 +143,26 @@ export function TokenSafetyPage() {
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pairs, setPairs] = useState<LiquidityPair[]>([])
+  const [pairsExpanded, setPairsExpanded] = useState(false)
+  const [pairsLoading, setPairsLoading] = useState(false)
+
+  const loadPairs = () => {
+    if (pairs.length > 0 || !address) {
+      setPairsExpanded(!pairsExpanded)
+      return
+    }
+    setPairsExpanded(true)
+    setPairsLoading(true)
+    const addr = address.toLowerCase()
+    fetch(`${SAFETY_API}/api/v1/token/${addr}/liquidity`)
+      .then(r => r.json())
+      .then(json => {
+        setPairs(json.pairs || [])
+        setPairsLoading(false)
+      })
+      .catch(() => setPairsLoading(false))
+  }
 
   useEffect(() => {
     if (!address) return
@@ -360,16 +393,78 @@ export function TokenSafetyPage() {
               <span className={safety.recent_burns_24h > 0 ? 'text-orange-400' : ''}>{safety.recent_burns_24h || 0}</span>
             </div>
           </div>
+          {/* Expandable pair list */}
+          {safety.has_lp && (
+            <button
+              onClick={loadPairs}
+              className="w-full flex items-center gap-2 text-xs text-[#00D4FF] hover:text-white transition-colors py-1.5"
+            >
+              {pairsExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              <span className="font-medium">View all {safety.pair_count} active pairs</span>
+            </button>
+          )}
+
+          {pairsExpanded && (
+            <div className="space-y-1.5 max-h-72 overflow-y-auto">
+              {pairsLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                </div>
+              ) : pairs.length > 0 ? (
+                pairs.map((p, i) => {
+                  const pctOfTotal = safety.total_liquidity_usd > 0
+                    ? ((p.reserve_usd / safety.total_liquidity_usd) * 100).toFixed(1)
+                    : '0'
+                  return (
+                    <a
+                      key={p.address}
+                      href={`https://dexscreener.com/pulsechain/${p.address}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 transition-colors group"
+                    >
+                      <span className="text-[10px] text-gray-600 w-5 shrink-0">#{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-medium text-white">
+                            {p.token0_symbol}/{p.token1_symbol}
+                          </span>
+                          <span className="text-[9px] px-1 py-0.5 rounded bg-white/5 text-gray-500">
+                            {p.dex.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-gray-500 font-mono truncate">
+                          {p.address.slice(0, 10)}...{p.address.slice(-6)}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs font-semibold text-white">
+                          ${p.reserve_usd >= 1000 ? `${(p.reserve_usd / 1000).toFixed(1)}K` : p.reserve_usd.toFixed(0)}
+                        </div>
+                        <div className="text-[9px] text-gray-500">{pctOfTotal}% &middot; {p.total_txns.toLocaleString()} tx</div>
+                      </div>
+                      <ExternalLink className="h-3 w-3 text-gray-600 group-hover:text-[#00D4FF] shrink-0 transition-colors" />
+                    </a>
+                  )
+                })
+              ) : (
+                <p className="text-xs text-gray-500 text-center py-2">No pair data available</p>
+              )}
+            </div>
+          )}
+
+          {/* Methodology note */}
           <div className="rounded-lg bg-blue-500/5 border border-blue-500/10 px-3 py-2.5 space-y-1.5">
             <p className="text-[11px] text-blue-300 font-medium">How is liquidity calculated?</p>
             <p className="text-[11px] text-gray-400 leading-relaxed">
-              Total liquidity is the sum across all active PulseX V1 + V2 pairs where this token appears.
-              Each pair is <strong className="text-gray-300">cross-validated</strong>: we compute derivedUSD &times; reserves for both sides independently.
-              Only pairs where <strong className="text-gray-300">both sides exceed $100</strong> and have <strong className="text-gray-300">50+ transactions</strong> are counted.
+              Total liquidity = sum across all active PulseX V1 + V2 pairs.
+              Each pair is <strong className="text-gray-300">cross-validated</strong>: derivedUSD &times; reserves for both sides.
+              Only pairs where <strong className="text-gray-300">both sides &gt; $100</strong> and <strong className="text-gray-300">50+ transactions</strong> are counted.
+              Monitored every 2 hours.
             </p>
             <p className="text-[11px] text-gray-500 leading-relaxed">
-              Note: The PulseX subgraph <code className="text-[10px] bg-white/5 px-1 rounded">reserveUSD</code> field is unreliable for many pairs (spam tokens inflate values).
-              We no longer use it. Instead, our bilateral filter recalculates real value from on-chain reserves &times; token prices, which may differ from other aggregators that use raw subgraph data.
+              PulseX subgraph <code className="text-[10px] bg-white/5 px-1 rounded">reserveUSD</code> is unreliable (spam inflation).
+              We recalculate from on-chain reserves &times; token prices. Values may differ from aggregators using raw subgraph data.
             </p>
           </div>
         </div>
