@@ -61,6 +61,18 @@ def check_honeypot(token_address: str) -> dict:
             "router": str
         }
     """
+    # WPLS cannot be honeypot-checked (swap WPLS→WPLS = IDENTICAL_ADDRESSES)
+    if token_address.lower() == WPLS_ADDRESS.lower():
+        return {
+            "is_honeypot": False,
+            "buy_tax_pct": 0.0,
+            "sell_tax_pct": 0.0,
+            "buy_success": True,
+            "sell_success": True,
+            "error": None,
+            "router": "native",
+        }
+
     token_addr = Web3.to_checksum_address(token_address)
 
     # Try V2 router first, then V1
