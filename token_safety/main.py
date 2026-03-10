@@ -223,14 +223,22 @@ def token_liquidity(address: str, response: Response, fresh: bool = Query(False)
 
     # Try to get from analysis_details JSONB
     row = supabase.table("token_safety_scores").select(
-        "analysis_details, total_liquidity_usd, pair_count, token_symbol, token_name"
+        "analysis_details, total_liquidity_usd, pair_count"
     ).eq("token_address", addr).execute()
 
     if not row.data:
         raise HTTPException(status_code=404, detail="Token not analyzed yet")
 
     record = row.data[0]
-    details = record.get("analysis_details") or {}
+    raw_details = record.get("analysis_details") or {}
+    # analysis_details may be stored as JSON string
+    if isinstance(raw_details, str):
+        import json as _json
+        try:
+            raw_details = _json.loads(raw_details)
+        except Exception:
+            raw_details = {}
+    details = raw_details
     lp_data = details.get("lp", {})
     all_pairs = lp_data.get("all_pairs", [])
 
@@ -246,14 +254,13 @@ def token_liquidity(address: str, response: Response, fresh: bool = Query(False)
         lp_data["best_pair"] = lp_result.get("best_pair")
         details["lp"] = lp_data
         supabase.table("token_safety_scores").update({
-            "analysis_details": details,
+            "analysis_details": json.dumps(details),
             "total_liquidity_usd": lp_result.get("total_liquidity_usd", 0),
             "pair_count": lp_result.get("pair_count", 0),
         }).eq("token_address", addr).execute()
 
     return {
         "token_address": addr,
-        "token_symbol": record.get("token_symbol"),
         "total_liquidity_usd": lp_data.get("total_liquidity_usd", record.get("total_liquidity_usd", 0)),
         "pair_count": lp_data.get("pair_count", record.get("pair_count", 0)),
         "pairs": all_pairs,
@@ -738,7 +745,14 @@ def _run_lp_monitor(limit: int = 50):
         addr = row["token_address"]
         try:
             lp = analyze_lp(addr)
-            details = row.get("analysis_details") or {}
+            raw = row.get("analysis_details") or {}
+            if isinstance(raw, str):
+                import json as _json
+                try:
+                    raw = _json.loads(raw)
+                except Exception:
+                    raw = {}
+            details = raw
             lp_section = details.get("lp", {})
             lp_section["all_pairs"] = lp.get("all_pairs", [])
             lp_section["total_liquidity_usd"] = lp.get("total_liquidity_usd", 0)
@@ -751,7 +765,7 @@ def _run_lp_monitor(limit: int = 50):
             supabase.table("token_safety_scores").update({
                 "total_liquidity_usd": lp.get("total_liquidity_usd", 0),
                 "pair_count": lp.get("pair_count", 0),
-                "analysis_details": details,
+                "analysis_details": json.dumps(details),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }).eq("token_address", addr).execute()
             updated += 1

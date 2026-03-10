@@ -148,20 +148,28 @@ export function TokenSafetyPage() {
   const [pairsLoading, setPairsLoading] = useState(false)
 
   const loadPairs = () => {
-    if (pairs.length > 0 || !address) {
+    if (pairs.length > 0) {
       setPairsExpanded(!pairsExpanded)
       return
     }
+    if (!address) return
     setPairsExpanded(true)
     setPairsLoading(true)
     const addr = address.toLowerCase()
-    fetch(`${SAFETY_API}/api/v1/token/${addr}/liquidity`)
-      .then(r => r.json())
+    // Always use fresh=true on first load to ensure pairs are populated
+    fetch(`${SAFETY_API}/api/v1/token/${addr}/liquidity?fresh=true`)
+      .then(r => {
+        if (!r.ok) throw new Error(`API error: ${r.status}`)
+        return r.json()
+      })
       .then(json => {
         setPairs(json.pairs || [])
         setPairsLoading(false)
       })
-      .catch(() => setPairsLoading(false))
+      .catch((err) => {
+        console.error('Liquidity fetch failed:', err)
+        setPairsLoading(false)
+      })
   }
 
   useEffect(() => {
@@ -397,10 +405,11 @@ export function TokenSafetyPage() {
           {safety.has_lp && (
             <button
               onClick={loadPairs}
-              className="w-full flex items-center gap-2 text-xs text-[#00D4FF] hover:text-white transition-colors py-1.5"
+              className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2.5 transition-colors"
             >
-              {pairsExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              <span className="font-medium">View all {safety.pair_count} active pairs</span>
+              {pairsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {pairsExpanded ? 'Hide pair details' : `View all ${safety.pair_count} active pairs`}
+              <ExternalLink className="h-3.5 w-3.5 ml-1 opacity-50" />
             </button>
           )}
 
