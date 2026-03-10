@@ -747,7 +747,7 @@ def _run_lp_monitor(limit: int = 50):
 
     # Get top tokens by liquidity
     rows = supabase.table("token_safety_scores").select(
-        "token_address, token_symbol, total_liquidity_usd, analysis_details"
+        "token_address, total_liquidity_usd, analysis_details"
     ).order("total_liquidity_usd", desc=True).limit(limit).execute()
 
     updated = 0
