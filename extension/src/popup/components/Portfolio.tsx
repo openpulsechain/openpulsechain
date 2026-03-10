@@ -313,13 +313,13 @@ export function Portfolio() {
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-semibold text-white">{b.symbol}</span>
                         {b.price_usd != null && (
-                          <span className="text-[9px] text-gray-500">
+                          <span className="text-[9px] text-gray-400">
                             ${b.price_usd < 0.01 ? b.price_usd.toFixed(6) : b.price_usd.toFixed(4)}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-gray-500 truncate">{b.name}</span>
+                        <span className="text-[10px] text-gray-400 truncate">{b.name}</span>
                         {(() => {
                           const leagueSym = LEAGUE_SYMBOL_MAP[b.symbol.toUpperCase()]
                           const r = leagueSym && ranks?.ranks?.[leagueSym]
@@ -328,8 +328,8 @@ export function Portfolio() {
                           const color = TIER_COLOR[r.tier] || '#6b7280'
                           return (
                             <span
-                              className="text-[9px] font-medium px-1 py-0.5 rounded whitespace-nowrap"
-                              style={{ color, backgroundColor: `${color}20` }}
+                              className="text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                              style={{ color, backgroundColor: `${color}25` }}
                               title={`${r.tier} — ${r.balance_pct.toFixed(4)}% of supply`}
                             >
                               #{r.rank}/{r.total_holders} {emoji}
@@ -344,7 +344,7 @@ export function Portfolio() {
                       {hasPriceData ? (
                         <>
                           <div className="text-xs font-medium text-white">{formatUsd(b.value_usd)}</div>
-                          <div className="text-[10px] text-gray-500">{formatBalance(b.balance)}</div>
+                          <div className="text-[10px] text-gray-400">{formatBalance(b.balance)}</div>
                         </>
                       ) : (
                         <>
