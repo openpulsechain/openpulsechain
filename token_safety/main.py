@@ -520,6 +520,115 @@ def cron_radar(request: Request, secret: str = Query("")):
     return {"alerts_found": len(alerts), "alerts_saved": saved}
 
 
+# ── Funding tree ─────────────────────────────────────────
+
+import requests as http_req
+
+SCAN_API_V2 = "https://api.scan.pulsechain.com/api/v2"
+
+# Known bridge / system contracts on PulseChain
+KNOWN_LABELS: dict[str, str] = {
+    "0x1715a3e4a142d8b698131108995174f37aeba10d": "PulseChain Bridge",
+    "0x0000000000000000000000000000000000000000": "Null (Mint)",
+}
+
+
+def _fetch_incoming_txs(addr: str, limit: int = 50) -> list[dict]:
+    """Fetch incoming transactions for an address from PulseChain Scan API v2."""
+    try:
+        resp = http_req.get(
+            f"{SCAN_API_V2}/addresses/{addr}/transactions",
+            params={"filter": "to"},
+            timeout=12,
+        )
+        if resp.status_code != 200:
+            return []
+        items = resp.json().get("items", [])[:limit]
+        return items
+    except Exception:
+        return []
+
+
+def _fetch_address_info(addr: str) -> dict:
+    """Fetch address metadata (name, is_contract) from Scan API."""
+    try:
+        resp = http_req.get(f"{SCAN_API_V2}/addresses/{addr}", timeout=8)
+        if resp.status_code != 200:
+            return {}
+        return resp.json()
+    except Exception:
+        return {}
+
+
+def _build_funders(addr: str, max_funders: int = 10) -> list[dict]:
+    """Group incoming transactions by sender, return top funders."""
+    items = _fetch_incoming_txs(addr)
+    senders: dict[str, dict] = {}
+
+    for tx in items:
+        from_info = tx.get("from") or {}
+        sender = (from_info.get("hash") or "").lower()
+        if not sender or sender == addr:
+            continue
+
+        value_wei = int(tx.get("value") or "0")
+        value_pls = value_wei / 1e18
+
+        if sender not in senders:
+            senders[sender] = {
+                "address": sender,
+                "total_pls": 0,
+                "tx_count": 0,
+                "is_contract": from_info.get("is_contract", False),
+                "label": KNOWN_LABELS.get(sender) or from_info.get("name"),
+                "first_tx": tx.get("timestamp"),
+            }
+        senders[sender]["total_pls"] += value_pls
+        senders[sender]["tx_count"] += 1
+
+    result = sorted(senders.values(), key=lambda x: x["total_pls"], reverse=True)
+    return result[:max_funders]
+
+
+@app.get("/api/v1/address/{address}/funding-tree")
+def address_funding_tree(address: str, response: Response):
+    """Trace funding sources of an address (2 levels deep).
+    Returns: target info + funders (each with optional sub-funders)."""
+    if not ADDRESS_RE.match(address):
+        raise HTTPException(status_code=400, detail="Invalid address")
+
+    addr = address.lower()
+    response.headers["Cache-Control"] = "public, max-age=3600"
+
+    # Get target address info
+    target_info = _fetch_address_info(addr)
+
+    # Level 1: direct funders
+    funders = _build_funders(addr, max_funders=10)
+
+    # Level 2: for the top 5 non-contract funders, trace their funders
+    for f in funders[:5]:
+        if not f["is_contract"] and f["total_pls"] > 0:
+            f["funders"] = _build_funders(f["address"], max_funders=5)
+        else:
+            f["funders"] = []
+
+    # Also check whale_links for known relationships
+    from db import supabase
+    links_out = supabase.table("whale_links").select("*") \
+        .eq("address_from", addr).limit(20).execute()
+    links_in = supabase.table("whale_links").select("*") \
+        .eq("address_to", addr).limit(20).execute()
+
+    return {
+        "target": addr,
+        "target_name": target_info.get("name"),
+        "target_is_contract": target_info.get("is_contract", False),
+        "funders": funders,
+        "whale_links": (links_out.data or []) + (links_in.data or []),
+    }
+
+
 @app.get("/cron/leagues")
 def cron_leagues(request: Request, secret: str = Query("")):
     """Run holder leagues scraper. Protected by CRON_SECRET."""

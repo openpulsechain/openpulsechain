@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Crown, Users, Loader2, ChevronDown, ChevronRight, Link2, ExternalLink, Copy, Check } from 'lucide-react'
+import { Crown, Users, Loader2, ChevronDown, ChevronRight, Link2, ExternalLink, Copy, Check, GitBranch } from 'lucide-react'
 import { useHolderLeagues } from '../../hooks/useSupabase'
 import { supabase } from '../../lib/supabase'
+import { FundingTreeModal } from '../FundingTreeModal'
 import type { HolderLeagueCurrent, HolderLeagueAddress, HolderLeagueFamily } from '../../types'
 
 const SCAN_URL = 'https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#'
@@ -73,26 +74,38 @@ function CopyAddr({ address }: { address: string }) {
   )
 }
 
-function AddressLink({ address }: { address: string }) {
+function AddressLink({ address, onClickAddress }: { address: string; onClickAddress?: (addr: string) => void }) {
   return (
     <span className="inline-flex items-center gap-1.5 font-mono text-xs">
+      <button
+        className="text-[#00D4FF] hover:underline cursor-pointer flex items-center gap-1"
+        onClick={(e) => {
+          e.stopPropagation()
+          if (onClickAddress) onClickAddress(address)
+        }}
+        title="View funding genealogy"
+      >
+        <GitBranch className="h-3 w-3" />
+        {shortAddr(address)}
+      </button>
+      <CopyAddr address={address} />
       <a
         href={`${SCAN_URL}/address/${address}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[#00D4FF] hover:underline"
+        className="text-gray-600 hover:text-[#00D4FF] transition-colors"
         onClick={e => e.stopPropagation()}
+        title="View on PulseChain Scan"
       >
-        {shortAddr(address)}
+        <ExternalLink className="h-3 w-3" />
       </a>
-      <CopyAddr address={address} />
     </span>
   )
 }
 
 // ── Expandable tier row with holders ────────────────────────
 
-function TierHoldersList({ tokenSymbol, tierKey }: { tokenSymbol: string; tierKey: string }) {
+function TierHoldersList({ tokenSymbol, tierKey, onClickAddress }: { tokenSymbol: string; tierKey: string; onClickAddress: (addr: string) => void }) {
   const [holders, setHolders] = useState<HolderLeagueAddress[]>([])
   const [families, setFamilies] = useState<HolderLeagueFamily[]>([])
   const [loading, setLoading] = useState(true)
@@ -199,7 +212,7 @@ function TierHoldersList({ tokenSymbol, tierKey }: { tokenSymbol: string; tierKe
                 {mother && (
                   <div className="flex items-center gap-2 text-xs">
                     <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-bold">MOTHER</span>
-                    <AddressLink address={mother.holder_address} />
+                    <AddressLink address={mother.holder_address} onClickAddress={onClickAddress} />
                     <span className="text-gray-400 ml-auto font-mono">{mother.balance_pct.toFixed(4)}%</span>
                   </div>
                 )}
@@ -207,7 +220,7 @@ function TierHoldersList({ tokenSymbol, tierKey }: { tokenSymbol: string; tierKe
                 {daughters.map(d => (
                   <div key={d.holder_address} className="flex items-center gap-2 text-xs pl-6">
                     <span className="px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 text-[10px]">CHILD</span>
-                    <AddressLink address={d.holder_address} />
+                    <AddressLink address={d.holder_address} onClickAddress={onClickAddress} />
                     <span className="text-gray-500 ml-auto font-mono">{d.balance_pct.toFixed(4)}%</span>
                   </div>
                 ))}
@@ -230,17 +243,8 @@ function TierHoldersList({ tokenSymbol, tierKey }: { tokenSymbol: string; tierKe
       {/* Solo holders */}
       {soloHolders.map(h => (
         <div key={h.holder_address} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/[0.02] transition-colors">
-          <AddressLink address={h.holder_address} />
+          <AddressLink address={h.holder_address} onClickAddress={onClickAddress} />
           <span className="text-xs text-gray-500 ml-auto font-mono">{h.balance_pct.toFixed(4)}%</span>
-          <a
-            href={`${SCAN_URL}/address/${h.holder_address}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-gray-600 hover:text-[#00D4FF] transition-colors"
-            onClick={e => e.stopPropagation()}
-          >
-            <ExternalLink className="h-3 w-3" />
-          </a>
         </div>
       ))}
 
@@ -253,7 +257,7 @@ function TierHoldersList({ tokenSymbol, tierKey }: { tokenSymbol: string; tierKe
 
 // ── Token card ──────────────────────────────────────────────
 
-function TokenCard({ league }: { league: HolderLeagueCurrent }) {
+function TokenCard({ league, onClickAddress }: { league: HolderLeagueCurrent; onClickAddress: (addr: string) => void }) {
   const color = TOKEN_COLORS[league.token_symbol] || '#00D4FF'
   const [expandedTier, setExpandedTier] = useState<string | null>(null)
 
@@ -318,7 +322,7 @@ function TokenCard({ league }: { league: HolderLeagueCurrent }) {
               </div>
               {isExpanded && (
                 <div className="bg-white/[0.01] border-t border-white/[0.03]">
-                  <TierHoldersList tokenSymbol={league.token_symbol} tierKey={tier.key} />
+                  <TierHoldersList tokenSymbol={league.token_symbol} tierKey={tier.key} onClickAddress={onClickAddress} />
                 </div>
               )}
             </div>
@@ -331,6 +335,7 @@ function TokenCard({ league }: { league: HolderLeagueCurrent }) {
 
 export function LeaguesPage() {
   const { data: leagues, loading } = useHolderLeagues()
+  const [modalAddress, setModalAddress] = useState<string | null>(null)
 
   const sorted = TOKEN_ORDER
     .map((sym) => leagues.find((l) => l.token_symbol === sym))
@@ -397,7 +402,7 @@ export function LeaguesPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {sorted.map((league) => (
-            <TokenCard key={league.token_symbol} league={league} />
+            <TokenCard key={league.token_symbol} league={league} onClickAddress={setModalAddress} />
           ))}
         </div>
       )}
@@ -410,6 +415,14 @@ export function LeaguesPage() {
           ))}
           <span className="text-[10px] text-gray-600 ml-2">100% on-chain data &middot; Open source</span>
         </div>
+      )}
+
+      {/* Funding tree modal */}
+      {modalAddress && (
+        <FundingTreeModal
+          address={modalAddress}
+          onClose={() => setModalAddress(null)}
+        />
       )}
     </div>
   )
