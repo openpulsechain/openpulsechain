@@ -751,10 +751,22 @@ def _run_lp_monitor(limit: int = 50):
     ).order("total_liquidity_usd", desc=True).limit(limit).execute()
 
     updated = 0
+    skipped = 0
     for row in (rows.data or []):
         addr = row["token_address"]
         try:
             lp = analyze_lp(addr)
+            new_liq = lp.get("total_liquidity_usd", 0)
+            old_liq = float(row.get("total_liquidity_usd", 0) or 0)
+
+            # Safety: if subgraph returned 0 but old value was reasonable (<$50M),
+            # it's likely a transient error — skip to avoid erasing valid data.
+            # Only overwrite with 0 if old value was clearly inflated (>$50M).
+            if new_liq == 0 and 0 < old_liq <= 50_000_000:
+                logger.info(f"[LP Monitor] Skipping {addr[:12]}... — subgraph returned $0 but old=${old_liq:,.0f} looks valid")
+                skipped += 1
+                continue
+
             raw = row.get("analysis_details") or {}
             if isinstance(raw, str):
                 import json as _json
@@ -765,7 +777,7 @@ def _run_lp_monitor(limit: int = 50):
             details = raw
             lp_section = details.get("lp", {})
             lp_section["all_pairs"] = lp.get("all_pairs", [])
-            lp_section["total_liquidity_usd"] = lp.get("total_liquidity_usd", 0)
+            lp_section["total_liquidity_usd"] = new_liq
             lp_section["pair_count"] = lp.get("pair_count", 0)
             lp_section["best_pair"] = lp.get("best_pair")
             lp_section["recent_burns_24h"] = len(lp.get("recent_burns", []))
@@ -773,7 +785,7 @@ def _run_lp_monitor(limit: int = 50):
             details["lp"] = lp_section
 
             supabase.table("token_safety_scores").update({
-                "total_liquidity_usd": lp.get("total_liquidity_usd", 0),
+                "total_liquidity_usd": new_liq,
                 "pair_count": lp.get("pair_count", 0),
                 "analysis_details": json.dumps(details),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -784,7 +796,7 @@ def _run_lp_monitor(limit: int = 50):
         except Exception as e:
             logger.warning(f"[LP Monitor] Error for {addr}: {e}")
 
-    logger.info(f"[LP Monitor] Done: {updated}/{len(rows.data or [])} tokens updated")
+    logger.info(f"[LP Monitor] Done: {updated} updated, {skipped} skipped (transient $0) out of {len(rows.data or [])}")
 
 
 # ── Batch progress tracking ───────────────────────────────────────
