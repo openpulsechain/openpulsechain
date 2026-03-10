@@ -103,18 +103,18 @@ export function Header({ activePage }: HeaderProps) {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden md:flex items-center gap-0.5">
           {PAGES.map((page) => (
             <Link
               key={page.id}
               to={page.path}
-              className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors whitespace-nowrap ${
                 activePage === page.id
                   ? 'bg-[#8000E0]/20 text-[#00D4FF] border border-[#8000E0]/30'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               } ${page.id === 'safety' ? 'text-emerald-400' : ''}`}
             >
-              {page.icon && <page.icon className="h-4 w-4" />}
+              {page.icon && <page.icon className="h-3.5 w-3.5" />}
               {page.label}
             </Link>
           ))}
