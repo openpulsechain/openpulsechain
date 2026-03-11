@@ -250,12 +250,19 @@ export function OverviewPage() {
           <div className="flex items-center gap-2 mb-4">
             <Fuel className="h-5 w-5 text-[#00D4FF]" />
             <h2 className="text-lg font-semibold text-white">Gas Estimates</h2>
+            <LiveIndicator />
             <span className="text-xs text-gray-500">@ {formatGwei(liveGasPriceGwei!)} Gwei</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {gasEstimates.map((e) => (
               <div key={e.label} className="rounded-lg bg-white/5 p-3">
-                <div className="text-xs text-gray-400 mb-1">{e.label}</div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-xs text-gray-400">{e.label}</span>
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                  </span>
+                </div>
                 <div className="text-sm font-medium text-white">
                   {e.costPls < 1
                     ? e.costPls.toFixed(4)
