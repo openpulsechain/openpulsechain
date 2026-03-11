@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 
 const PULSEX_V2_SUBGRAPH = 'https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2'
 const WPLS_ADDRESS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27'
-const REFRESH_INTERVAL = 30_000 // 30 seconds
+const REFRESH_INTERVAL = 5_000 // 5 seconds
 
 const QUERY = `{
   token(id: "${WPLS_ADDRESS}") {
