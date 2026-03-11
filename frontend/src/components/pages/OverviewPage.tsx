@@ -6,6 +6,7 @@ import { Spinner } from '../ui/Spinner'
 import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { useNetworkTvl, useNetworkDexVolume, useTokenPrices, useNetworkSnapshot } from '../../hooks/useSupabase'
 import { useLivePlsPrice } from '../../hooks/useLivePlsPrice'
+import { useLiveChainStats } from '../../hooks/useLiveChainStats'
 import { formatUsd, formatNumber, formatGwei } from '../../lib/format'
 
 // Standard gas limits for common operations on PulseChain
@@ -36,6 +37,7 @@ export function OverviewPage() {
   const prices = useTokenPrices()
   const snapshot = useNetworkSnapshot()
   const livePls = useLivePlsPrice()
+  const liveChain = useLiveChainStats()
 
   const latestTvl = tvl.data.length > 0 ? tvl.data[tvl.data.length - 1] : null
   const latestSnapshot = snapshot.data.length > 0 ? snapshot.data[0] : null
@@ -44,16 +46,20 @@ export function OverviewPage() {
   // Use live subgraph price (max precision), fallback to Supabase cached
   const plsPriceUsd = livePls.price ?? plsPrice?.price_usd ?? null
 
+  // Live chain stats with fallback to Supabase snapshot
+  const liveGasPriceGwei = liveChain.stats?.gasPriceGwei ?? latestSnapshot?.gas_price_gwei ?? null
+  const liveBaseFeeGwei = liveChain.stats?.baseFeeGwei ?? latestSnapshot?.base_fee_gwei ?? null
+  const liveBlockNumber = liveChain.stats?.blockNumber ?? latestSnapshot?.block_number ?? null
+
   // Gas estimates computed from gas price + PLS price (live)
   const gasEstimates = useMemo(() => {
-    if (!latestSnapshot || !plsPriceUsd) return null
-    const gasPriceGwei = latestSnapshot.gas_price_gwei
+    if (!liveGasPriceGwei || !plsPriceUsd) return null
     return GAS_ESTIMATES.map((e) => {
-      const costPls = (gasPriceGwei * e.gasLimit) / 1e9
+      const costPls = (liveGasPriceGwei * e.gasLimit) / 1e9
       const costUsd = costPls * plsPriceUsd
       return { ...e, costPls, costUsd }
     })
-  }, [latestSnapshot, plsPriceUsd])
+  }, [liveGasPriceGwei, plsPriceUsd])
 
   const [tvlRange, setTvlRange] = useState<number | null>(null)
   const [dexRange, setDexRange] = useState<number | null>(null)
@@ -156,13 +162,15 @@ export function OverviewPage() {
         />
         <KpiCard
           title="Gas Price"
-          value={latestSnapshot ? `${formatGwei(latestSnapshot.gas_price_gwei)} Gwei` : '--'}
-          subtitle={latestSnapshot ? `Base: ${formatGwei(latestSnapshot.base_fee_gwei)}` : ''}
+          titleSuffix={<LiveIndicator />}
+          value={liveGasPriceGwei ? `${formatGwei(liveGasPriceGwei)} Gwei` : '--'}
+          subtitle={liveBaseFeeGwei ? `Base: ${formatGwei(liveBaseFeeGwei)}` : ''}
           icon={<Fuel className="h-5 w-5" />}
         />
         <KpiCard
           title="Latest Block"
-          value={latestSnapshot ? formatNumber(latestSnapshot.block_number) : '--'}
+          titleSuffix={<LiveIndicator />}
+          value={liveBlockNumber ? formatNumber(liveBlockNumber) : '--'}
           icon={<Box className="h-5 w-5" />}
         />
       </div>
@@ -199,7 +207,7 @@ export function OverviewPage() {
           <div className="flex items-center gap-2 mb-4">
             <Fuel className="h-5 w-5 text-[#00D4FF]" />
             <h2 className="text-lg font-semibold text-white">Gas Estimates</h2>
-            <span className="text-xs text-gray-500">@ {formatGwei(latestSnapshot!.gas_price_gwei)} Gwei</span>
+            <span className="text-xs text-gray-500">@ {formatGwei(liveGasPriceGwei!)} Gwei</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {gasEstimates.map((e) => (
