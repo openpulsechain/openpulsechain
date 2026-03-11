@@ -75,9 +75,9 @@ const COLORS: Record<Status, string> = {
 }
 
 const LABELS: Record<Status, string> = {
-  operational: 'All Systems Operational',
-  degraded: 'Partial Degradation',
-  down: 'Service Disruption',
+  operational: 'Statuts',
+  degraded: 'Statuts',
+  down: 'Statuts',
 }
 
 function Dot({ status }: { status: Status }) {

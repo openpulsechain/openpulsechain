@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom'
 import { useRpcHealth, type ServiceStatus } from '../../hooks/useRpcHealth'
 
 const STATUS_CONFIG: Record<ServiceStatus, { color: string; ping: string; label: string }> = {
-  operational: { color: 'bg-emerald-400', ping: 'bg-emerald-400', label: 'All Systems Operational' },
-  degraded: { color: 'bg-amber-400', ping: 'bg-amber-400', label: 'Partial Degradation' },
-  down: { color: 'bg-red-500', ping: 'bg-red-500', label: 'Service Disruption' },
+  operational: { color: 'bg-emerald-400', ping: 'bg-emerald-400', label: 'Statuts' },
+  degraded: { color: 'bg-amber-400', ping: 'bg-amber-400', label: 'Statuts' },
+  down: { color: 'bg-red-500', ping: 'bg-red-500', label: 'Statuts' },
 }
 
 function StatusDot({ status }: { status: ServiceStatus }) {
