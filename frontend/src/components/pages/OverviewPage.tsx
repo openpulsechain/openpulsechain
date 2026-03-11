@@ -306,9 +306,17 @@ export function OverviewPage() {
     })
   }, [prices.data])
 
-  // Deduplicate by symbol: prefer CoinGecko source, then highest market cap
+  // Deduplicate by symbol: prefer CoinGecko price/market cap but keep PulseChain address
   const deduped = useMemo(() => {
     const map = new Map<string, typeof prices.data[0]>()
+    // Track PulseChain addresses by symbol (from PulseX subgraph)
+    const addressMap = new Map<string, string>()
+    for (const token of cleanPrices) {
+      if (token.address && token.source === 'pulsex_subgraph') {
+        addressMap.set(token.symbol.toUpperCase(), token.address)
+      }
+    }
+
     for (const token of cleanPrices) {
       const key = token.symbol.toUpperCase()
       const existing = map.get(key)
@@ -319,7 +327,9 @@ export function OverviewPage() {
         const existingIsCG = existing.source === 'coingecko'
         const newIsCG = token.source === 'coingecko'
         if (newIsCG && !existingIsCG) {
-          map.set(key, token)
+          // Keep CoinGecko data but preserve PulseChain address
+          const pcAddress = addressMap.get(key)
+          map.set(key, pcAddress ? { ...token, address: pcAddress } : token)
         } else if (!newIsCG && existingIsCG) {
           // keep existing
         } else if ((token.market_cap_usd ?? 0) > (existing.market_cap_usd ?? 0)) {
@@ -330,8 +340,8 @@ export function OverviewPage() {
     return Array.from(map.values())
   }, [cleanPrices])
 
-  // Filter out tokens with negligible price or zero market cap
-  const filtered = deduped.filter((t) => (t.price_usd ?? 0) >= 0.0000001 && (t.market_cap_usd ?? 0) > 0)
+  // Only show tokens with a PulseChain address (this is a PulseChain analytics site)
+  const filtered = deduped.filter((t) => t.address && (t.price_usd ?? 0) >= 0.0000001 && (t.market_cap_usd ?? 0) > 0)
 
   // Sort tokens by market cap
   const sortedPrices = [...filtered].sort((a, b) => {
