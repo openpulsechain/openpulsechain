@@ -774,7 +774,7 @@ export function TokensPage() {
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li><span className="text-orange-400">ETH fork tokens</span> — Ethereum fork copies (DAI, USDC, USDT, WBTC) trade at large discounts vs native bridged versions. Marked with <span className="text-orange-400">Fork</span> badge.</li>
                 <li><span className="text-gray-300">Market cap</span> — Uses total supply (not circulating). May be inflated for tokens with locked/burned supply.</li>
-                <li><span className="text-gray-300">V1 only</span> — Only PulseX V1 pools are indexed. V2 liquidity/volume is not included yet.</li>
+                <li><span className="text-gray-300">V1 + V2</span> — Both PulseX V1 and V2 pools are indexed. Volume and liquidity are combined from both subgraphs.</li>
                 <li><span className="text-gray-300">Categories</span> — Auto-detection is approximate. Some tokens may be miscategorized.</li>
                 <li><span className="text-gray-300">Holders</span> — Updated daily for top 50 tokens only. Other tokens show no holder count.</li>
               </ul>

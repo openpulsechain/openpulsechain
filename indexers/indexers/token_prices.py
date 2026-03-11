@@ -11,12 +11,12 @@ from datetime import datetime, timezone, timedelta
 import requests
 
 from db import supabase
-from config import COINGECKO_BASE, COINGECKO_API_KEY
+from config import COINGECKO_BASE, COINGECKO_API_KEY, PULSEX_SUBGRAPH_V1
 from utils.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
-PULSEX_SUBGRAPH = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex"
+PULSEX_SUBGRAPH = PULSEX_SUBGRAPH_V1
 
 # Major tokens from CoinGecko (reliable for these — not PulseChain native)
 COINGECKO_TOKENS = {

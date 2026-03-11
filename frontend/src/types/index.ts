@@ -92,6 +92,7 @@ export interface PulsexTopPair {
   volume_usd: number
   reserve_usd: number
   total_transactions: number
+  daily_volume_usd?: number
 }
 
 export interface HyperlaneTransfer {

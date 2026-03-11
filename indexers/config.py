@@ -26,6 +26,10 @@ COINGECKO_API_KEY = os.environ.get("COINGECKO_API_KEY", "")
 # PulseChain tokens: PulseX subgraph (sovereign, no GeckoTerminal)
 # Major tokens (BTC, ETH, stables): CoinGecko
 
+# PulseX subgraphs
+PULSEX_SUBGRAPH_V1 = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex"
+PULSEX_SUBGRAPH_V2 = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2"
+
 # Subgraph page size
 SUBGRAPH_PAGE_SIZE = 1000
 

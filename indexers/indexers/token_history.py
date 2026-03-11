@@ -15,7 +15,8 @@ from db import supabase
 
 logger = logging.getLogger(__name__)
 
-PULSEX_SUBGRAPH = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex"
+PULSEX_SUBGRAPH_V1 = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex"
+PULSEX_SUBGRAPH_V2 = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2"
 
 # Max pages per token per run (avoid Railway timeout)
 MAX_PAGES_PER_TOKEN = 5
@@ -28,10 +29,10 @@ MAX_RUNTIME_SECONDS = 5 * 60
 MAX_TOKENS_PER_RUN = 50
 
 
-def _query_subgraph(query: str) -> dict:
-    """Execute a GraphQL query against PulseX subgraph."""
+def _query_subgraph(query: str, endpoint: str = None) -> dict:
+    """Execute a GraphQL query against a PulseX subgraph."""
     resp = requests.post(
-        PULSEX_SUBGRAPH,
+        endpoint or PULSEX_SUBGRAPH_V1,
         json={"query": query},
         timeout=30,
     )
@@ -62,39 +63,64 @@ def _timestamp_from_date(date_str: str) -> int:
 
 
 def _fetch_token_day_datas(address: str, since_timestamp: int) -> list[dict]:
-    """Fetch all tokenDayDatas for a token since a given timestamp."""
-    all_data = []
-    last_date = since_timestamp
+    """Fetch tokenDayDatas from V1 + V2 subgraphs, combined by date.
 
-    for _ in range(MAX_PAGES_PER_TOKEN):
-        query = f"""{{
-            tokenDayDatas(
-                first: {PAGE_SIZE},
-                where: {{token: "{address}", date_gt: {last_date}}},
-                orderBy: date,
-                orderDirection: asc
-            ) {{
-                date
-                priceUSD
-                dailyVolumeUSD
-                totalLiquidityUSD
-            }}
-        }}"""
+    For each date, takes the best price (V1 preferred) and sums volumes/liquidity.
+    """
+    def _fetch_from(endpoint: str) -> dict[int, dict]:
+        """Fetch from a single subgraph, keyed by unix timestamp."""
+        result = {}
+        last_date = since_timestamp
+        for _ in range(MAX_PAGES_PER_TOKEN):
+            query = f"""{{
+                tokenDayDatas(
+                    first: {PAGE_SIZE},
+                    where: {{token: "{address}", date_gt: {last_date}}},
+                    orderBy: date,
+                    orderDirection: asc
+                ) {{
+                    date
+                    priceUSD
+                    dailyVolumeUSD
+                    totalLiquidityUSD
+                }}
+            }}"""
+            data = _query_subgraph(query, endpoint)
+            day_datas = data.get("tokenDayDatas", [])
+            if not day_datas:
+                break
+            for dd in day_datas:
+                ts = int(dd["date"])
+                result[ts] = dd
+            last_date = day_datas[-1]["date"]
+            if len(day_datas) < PAGE_SIZE:
+                break
+            time.sleep(0.3)
+        return result
 
-        data = _query_subgraph(query)
-        day_datas = data.get("tokenDayDatas", [])
-        if not day_datas:
-            break
+    v1_data = _fetch_from(PULSEX_SUBGRAPH_V1)
+    v2_data = _fetch_from(PULSEX_SUBGRAPH_V2)
 
-        all_data.extend(day_datas)
-        last_date = day_datas[-1]["date"]
+    # Combine: for each date, sum volumes and liquidity, prefer V1 price
+    all_dates = sorted(set(v1_data.keys()) | set(v2_data.keys()))
+    combined = []
+    for ts in all_dates:
+        v1 = v1_data.get(ts, {})
+        v2 = v2_data.get(ts, {})
 
-        if len(day_datas) < PAGE_SIZE:
-            break
+        # Price: prefer V1, fallback V2
+        price = float(v1.get("priceUSD", 0)) or float(v2.get("priceUSD", 0))
+        vol = float(v1.get("dailyVolumeUSD", 0)) + float(v2.get("dailyVolumeUSD", 0))
+        liq = float(v1.get("totalLiquidityUSD", 0)) + float(v2.get("totalLiquidityUSD", 0))
 
-        time.sleep(0.3)
+        combined.append({
+            "date": str(ts),
+            "priceUSD": str(price),
+            "dailyVolumeUSD": str(vol),
+            "totalLiquidityUSD": str(liq),
+        })
 
-    return all_data
+    return combined
 
 
 def run():

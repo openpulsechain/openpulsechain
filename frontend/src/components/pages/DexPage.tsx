@@ -177,12 +177,11 @@ function DexDataSourceNote({ liveFactory }: { liveFactory: ReturnType<typeof use
           </div>
 
           {/* 30D Volume note */}
-          <div className="rounded bg-amber-500/5 border border-amber-500/15 p-2.5 text-[11px]">
-            <p className="text-amber-400 font-medium mb-1">About 30D Volume</p>
+          <div className="rounded bg-emerald-500/5 border border-emerald-500/15 p-2.5 text-[11px]">
+            <p className="text-emerald-400 font-medium mb-1">About 30D Volume</p>
             <p className="text-gray-400">
-              Our 30D Volume is computed from V1 daily snapshots only (historical data). It does not include V2 daily volume because the V2 subgraph
-              <code className="text-gray-300 mx-1">pulsexDayDatas</code>entity is not yet ingested. DefiLlama reports ~$115M total 30D volume
-              across all PulseChain DEXes (PulseX + 9mm + others). Our figure is lower because it covers V1 only.
+              Our 30D Volume is computed from V1 + V2 daily snapshots combined (<code className="text-gray-300 mx-1">pulsexDayDatas</code> from both subgraphs).
+              This covers all PulseX trading activity. DefiLlama may report slightly different figures as they also include 9mm, PHUX, and other DEXes.
             </p>
           </div>
 
@@ -235,7 +234,7 @@ function ChartDataSourceNote({ source }: { source: DexSource }) {
               <p className="font-medium text-gray-300">PulseX V1 (Subgraph) — Raw on-chain data from PulseX V1 router</p>
               <p>
                 This is our primary historical source, synced daily from the PulseX V1 subgraph (<code className="text-gray-300">pulsexDayDatas</code>).
-                It covers only V1 pools. V2 daily data is not yet ingested into our database.
+                It covers V1 + V2 pools combined.
               </p>
               <p>
                 Live data point (green dot) is fetched from the V1 subgraph factory contract in real-time every 30 seconds.
@@ -720,7 +719,7 @@ function CumulativeVolumeNote({ source, liveFactory }: { source: DexSource; live
 
 export function DexPage() {
   // Historical data from Supabase (sovereign)
-  const pulsex = usePulsexDailyStats()         // V1 subgraph daily
+  const pulsex = usePulsexDailyStats()         // V1+V2 subgraph daily (combined)
   const pulsexLLTvl = usePulsexDefillamaTvl()   // PulseX DefiLlama TVL
   const pulsexLLVol = usePulsexDefillamaVolume() // PulseX DefiLlama Volume
   const networkTvl = useNetworkTvl()             // All PulseChain TVL
@@ -871,7 +870,7 @@ export function DexPage() {
             <KpiCard
               title="30D Volume"
               value={formatUsd(kpis.volume30d)}
-              subtitle="Last 30 days (V1 only)"
+              subtitle="Last 30 days (V1+V2)"
               icon={<ArrowLeftRight className="h-5 w-5" />}
             />
             <KpiCard
@@ -964,6 +963,7 @@ export function DexPage() {
                 <tr className="border-b border-white/10 text-gray-400">
                   <th className="py-3 pr-4">#</th>
                   <th className="py-3 pr-4">Pair</th>
+                  <th className="py-3 pr-4 text-right">Volume (24h)</th>
                   <th className="py-3 pr-4 text-right">Volume (All Time)</th>
                   <th className="py-3 pr-4 text-right">Liquidity</th>
                   <th className="py-3 text-right">Transactions</th>
@@ -978,7 +978,7 @@ export function DexPage() {
 
                   return (
                     <tr key={pair.pair_address} className="border-b border-white/5">
-                      <td colSpan={5} className="p-0">
+                      <td colSpan={6} className="p-0">
                         {/* Main row */}
                         <button
                           onClick={() => setExpandedPair(isExpanded ? null : pair.pair_address)}
@@ -991,6 +991,7 @@ export function DexPage() {
                             <span className="text-gray-300">{pair.token1_symbol}</span>
                             <ChevronDown className={`inline-block ml-1.5 h-3 w-3 text-gray-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                           </span>
+                          <span className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{pair.daily_volume_usd != null ? formatUsd(pair.daily_volume_usd) : '--'}</span>
                           <span className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.volume_usd)}</span>
                           <span className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.reserve_usd)}</span>
                           <span className="py-2.5 text-right text-gray-400 whitespace-nowrap">{formatNumber(pair.total_transactions)}</span>
