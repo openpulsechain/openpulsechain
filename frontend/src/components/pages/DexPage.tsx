@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeftRight, Droplets, Hash, TrendingUp } from 'lucide-react'
+import { ArrowLeftRight, Droplets, Hash, TrendingUp, Info, ChevronDown } from 'lucide-react'
 import { KpiCard } from '../cards/KpiCard'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { BarChartComponent } from '../charts/BarChart'
@@ -18,6 +18,159 @@ function LiveIndicator() {
         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
       </span>
     </span>
+  )
+}
+
+function DexDataSourceNote({ liveFactory }: { liveFactory: ReturnType<typeof useLivePulsexFactory> }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300 transition-colors"
+      >
+        <Info className="h-3 w-3" />
+        <span>About these metrics &amp; cross-source audit</span>
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="mt-2 rounded-lg bg-white/5 border border-white/10 p-4 text-xs text-gray-400 space-y-4">
+          <p>
+            Live KPIs are fetched every 30 seconds directly from PulseX V1 and V2 subgraphs and combined.
+            Historical charts use daily snapshots stored in our database (sourced from the V1 subgraph).
+          </p>
+
+          {/* Liquidity comparison */}
+          <div>
+            <p className="font-medium text-gray-300 mb-2">Liquidity comparison (verified 11/03/2026)</p>
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="py-1 pr-3 text-gray-500 font-medium">Source</th>
+                  <th className="py-1 pr-3 text-right text-gray-500 font-medium">Liquidity</th>
+                  <th className="py-1 text-gray-500 font-medium">Scope</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-400">
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-3">Subgraph V1 (raw)</td>
+                  <td className="py-1 pr-3 text-right font-mono text-white">{liveFactory.v1LiquidityUSD != null ? formatUsd(liveFactory.v1LiquidityUSD) : '$31.74M'}</td>
+                  <td className="py-1">PulseX V1 pools, on-chain</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-3">Subgraph V2 (raw)</td>
+                  <td className="py-1 pr-3 text-right font-mono text-white">{liveFactory.v2LiquidityUSD != null ? formatUsd(liveFactory.v2LiquidityUSD) : '$20.59M'}</td>
+                  <td className="py-1">PulseX V2 pools, on-chain</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-3 font-medium text-emerald-400">V1 + V2 combined (our KPI)</td>
+                  <td className="py-1 pr-3 text-right font-mono text-emerald-400">{liveFactory.totalLiquidityUSD != null ? formatUsd(liveFactory.totalLiquidityUSD) : '$52.33M'}</td>
+                  <td className="py-1">Raw subgraph combined</td>
+                </tr>
+                <tr>
+                  <td className="py-1 pr-3">DefiLlama "PulseX"</td>
+                  <td className="py-1 pr-3 text-right font-mono text-gray-300">~$48.79M</td>
+                  <td className="py-1">V1+V2+StableSwap, spam-filtered</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Volume comparison */}
+          <div>
+            <p className="font-medium text-gray-300 mb-2">All-time volume comparison</p>
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="py-1 pr-3 text-gray-500 font-medium">Source</th>
+                  <th className="py-1 pr-3 text-right text-gray-500 font-medium">Volume</th>
+                  <th className="py-1 text-gray-500 font-medium">Scope</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-400">
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-3">Subgraph V1</td>
+                  <td className="py-1 pr-3 text-right font-mono text-white">{liveFactory.v1VolumeUSD != null ? formatUsd(liveFactory.v1VolumeUSD) : '$19.4B'}</td>
+                  <td className="py-1">V1 totalVolumeUSD</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-3">Subgraph V2</td>
+                  <td className="py-1 pr-3 text-right font-mono text-white">{liveFactory.v2VolumeUSD != null ? formatUsd(liveFactory.v2VolumeUSD) : '$7.1B'}</td>
+                  <td className="py-1">V2 totalVolumeUSD</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-3 font-medium text-emerald-400">V1 + V2 combined (our KPI)</td>
+                  <td className="py-1 pr-3 text-right font-mono text-emerald-400">{liveFactory.totalVolumeUSD != null ? formatUsd(liveFactory.totalVolumeUSD) : '$26.4B'}</td>
+                  <td className="py-1">Subgraph combined</td>
+                </tr>
+                <tr>
+                  <td className="py-1 pr-3">DefiLlama V1</td>
+                  <td className="py-1 pr-3 text-right font-mono text-gray-300">~$19.35B</td>
+                  <td className="py-1">Very close to subgraph V1</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Transactions comparison */}
+          <div>
+            <p className="font-medium text-gray-300 mb-2">Transaction count</p>
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="py-1 pr-3 text-gray-500 font-medium">Source</th>
+                  <th className="py-1 pr-3 text-right text-gray-500 font-medium">Transactions</th>
+                  <th className="py-1 text-gray-500 font-medium">Note</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-400">
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-3">Subgraph V1</td>
+                  <td className="py-1 pr-3 text-right font-mono text-white">{liveFactory.v1Transactions != null ? formatNumber(liveFactory.v1Transactions) : '79.5M'}</td>
+                  <td className="py-1">Swaps + adds/removes</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-1 pr-3">Subgraph V2</td>
+                  <td className="py-1 pr-3 text-right font-mono text-white">{liveFactory.v2Transactions != null ? formatNumber(liveFactory.v2Transactions) : '201.3M'}</td>
+                  <td className="py-1">V2 has more activity</td>
+                </tr>
+                <tr>
+                  <td className="py-1 pr-3 font-medium text-emerald-400">V1 + V2 combined (our KPI)</td>
+                  <td className="py-1 pr-3 text-right font-mono text-emerald-400">{liveFactory.totalTransactions != null ? formatNumber(liveFactory.totalTransactions) : '280.9M'}</td>
+                  <td className="py-1">Total PulseX activity</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* 30D Volume note */}
+          <div className="rounded bg-amber-500/5 border border-amber-500/15 p-2.5 text-[11px]">
+            <p className="text-amber-400 font-medium mb-1">About 30D Volume</p>
+            <p className="text-gray-400">
+              Our 30D Volume is computed from V1 daily snapshots only (historical data). It does not include V2 daily volume because the V2 subgraph
+              <code className="text-gray-300 mx-1">pulsexDayDatas</code>entity is not yet ingested. DefiLlama reports ~$115M total 30D volume
+              across all PulseChain DEXes (PulseX + 9mm + others). Our figure is lower because it covers V1 only.
+            </p>
+          </div>
+
+          <div className="rounded bg-blue-500/5 border border-blue-500/15 p-2.5 text-[11px]">
+            <p className="text-blue-400 font-medium mb-1">Why do subgraph values differ from DefiLlama?</p>
+            <p className="text-gray-400">
+              DefiLlama applies spam filtering on raw subgraph data. PulseChain subgraphs include pools with inflated
+              <code className="text-gray-300 mx-1">reserveUSD</code>from spam tokens. DefiLlama also uses a different valuation methodology
+              (pricing tokens via Ethereum bridges and CoinGecko), which can produce higher or lower values than raw
+              <code className="text-gray-300 mx-1">totalLiquidityUSD</code>depending on the pool.
+            </p>
+          </div>
+
+          <p className="text-[10px] text-gray-600">
+            This is not investment advice. Data is provided for educational and informational purposes only.
+          </p>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -75,7 +228,7 @@ export function DexPage() {
             title="Total Liquidity"
             titleSuffix={liveFactory.totalLiquidityUSD ? <LiveIndicator /> : undefined}
             value={formatUsd(liveFactory.totalLiquidityUSD ?? kpis.totalLiquidity)}
-            subtitle="PulseX V1"
+            subtitle="PulseX V1 + V2"
             icon={<Droplets className="h-5 w-5" />}
           />
           <KpiCard
@@ -99,6 +252,7 @@ export function DexPage() {
             icon={<Hash className="h-5 w-5" />}
           />
         </div>
+        <DexDataSourceNote liveFactory={liveFactory} />
       )}
 
       {/* Liquidity Chart */}
