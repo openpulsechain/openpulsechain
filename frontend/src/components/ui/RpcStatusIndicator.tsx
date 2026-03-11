@@ -29,20 +29,20 @@ function LatencyBadge({ ms }: { ms: number | null }) {
 export function RpcStatusIndicator() {
   const { services, overall, loading, bestRpcUrl } = useRpcHealth()
   const [open, setOpen] = useState(false)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const cfg = STATUS_CONFIG[overall]
-
-  if (loading) return null
-
-  const rect = btnRef.current?.getBoundingClientRect()
-
   const [copied, setCopied] = useState<string | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
 
   const copyUrl = useCallback((url: string) => {
     navigator.clipboard.writeText(url)
     setCopied(url)
     setTimeout(() => setCopied(null), 2000)
   }, [])
+
+  const cfg = STATUS_CONFIG[overall]
+
+  if (loading) return null
+
+  const rect = btnRef.current?.getBoundingClientRect()
 
   // Split services into RPC nodes vs indexers
   const rpcServices = services.filter((s) => s.type === 'rpc')
