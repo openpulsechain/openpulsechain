@@ -20,19 +20,22 @@ interface AreaChartProps {
   liveDot?: boolean
 }
 
-/** Custom dot renderer — only renders on the very last point when liveDot is enabled */
-function LiveDotRenderer(props: { cx?: number; cy?: number; index?: number; dataLength: number }) {
-  const { cx, cy, index, dataLength } = props
-  if (index !== dataLength - 1 || cx == null || cy == null) return null
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r={6} fill="#34d399" opacity={0.3}>
-        <animate attributeName="r" from="4" to="10" dur="1.5s" repeatCount="indefinite" />
-        <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" repeatCount="indefinite" />
-      </circle>
-      <circle cx={cx} cy={cy} r={3.5} fill="#34d399" />
-    </g>
-  )
+/** Returns a dot render function that only draws a pulsing green dot on the last point */
+function makeLiveDot(dataLength: number) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (props: any) => {
+    const { cx, cy, index } = props
+    if (index !== dataLength - 1 || cx == null || cy == null) return <g />
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={6} fill="#34d399" opacity={0.3}>
+          <animate attributeName="r" from="4" to="12" dur="1.5s" repeatCount="indefinite" />
+          <animate attributeName="opacity" from="0.6" to="0" dur="1.5s" repeatCount="indefinite" />
+        </circle>
+        <circle cx={cx} cy={cy} r={4} fill="#34d399" />
+      </g>
+    )
+  }
 }
 
 export function AreaChartComponent({ data, xKey, yKey, color = '#34d399', yFormatter, liveDot }: AreaChartProps) {
@@ -73,7 +76,7 @@ export function AreaChartComponent({ data, xKey, yKey, color = '#34d399', yForma
           stroke={color}
           fill={`url(#grad-${yKey})`}
           strokeWidth={2}
-          dot={liveDot ? <LiveDotRenderer dataLength={data.length} /> : false}
+          dot={liveDot ? makeLiveDot(data.length) : false}
           activeDot={liveDot ? { r: 5, fill: '#34d399', stroke: '#059669', strokeWidth: 2 } : undefined}
         />
       </RechartsArea>
