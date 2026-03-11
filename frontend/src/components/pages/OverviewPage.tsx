@@ -171,6 +171,7 @@ export function OverviewPage() {
           title="Latest Block"
           titleSuffix={<LiveIndicator />}
           value={liveBlockNumber ? formatNumber(liveBlockNumber) : '--'}
+          subtitle="~10s block time"
           icon={<Box className="h-5 w-5" />}
         />
       </div>
