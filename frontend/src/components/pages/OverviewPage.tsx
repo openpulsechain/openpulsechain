@@ -7,6 +7,7 @@ import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { useNetworkTvl, useNetworkDexVolume, useTokenPrices, useNetworkSnapshot } from '../../hooks/useSupabase'
 import { useLivePlsPrice } from '../../hooks/useLivePlsPrice'
 import { useLiveChainStats } from '../../hooks/useLiveChainStats'
+import { useLiveDexStats } from '../../hooks/useLiveDexStats'
 import { formatUsd, formatNumber, formatGwei } from '../../lib/format'
 
 // Standard gas limits for common operations on PulseChain
@@ -38,6 +39,7 @@ export function OverviewPage() {
   const snapshot = useNetworkSnapshot()
   const livePls = useLivePlsPrice()
   const liveChain = useLiveChainStats()
+  const liveDex = useLiveDexStats()
 
   const latestTvl = tvl.data.length > 0 ? tvl.data[tvl.data.length - 1] : null
   const latestSnapshot = snapshot.data.length > 0 ? snapshot.data[0] : null
@@ -64,8 +66,41 @@ export function OverviewPage() {
   const [tvlRange, setTvlRange] = useState<number | null>(null)
   const [dexRange, setDexRange] = useState<number | null>(null)
 
-  const tvlRecent = tvlRange ? tvl.data.slice(-tvlRange) : tvl.data
-  const dexRecent = dexRange ? dex.data.slice(-dexRange) : dex.data
+  // Today's date in YYYY-MM-DD (UTC)
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
+
+  // Append or replace today's live TVL point from PulseX subgraph
+  const tvlWithLive = useMemo(() => {
+    if (!liveDex.totalLiquidityUSD || tvl.data.length === 0) return tvl.data
+    const hist = [...tvl.data]
+    const last = hist[hist.length - 1]
+    if (last.date === todayStr) {
+      // Replace today's partial DefiLlama data with live subgraph value
+      hist[hist.length - 1] = { ...last, tvl_usd: liveDex.totalLiquidityUSD }
+    } else {
+      // Append live point for today
+      hist.push({ date: todayStr, tvl_usd: liveDex.totalLiquidityUSD })
+    }
+    return hist
+  }, [tvl.data, liveDex.totalLiquidityUSD, todayStr])
+
+  // Append or replace today's live DEX volume from PulseX subgraph
+  const dexWithLive = useMemo(() => {
+    if (!liveDex.dailyVolumeUSD || dex.data.length === 0) return dex.data
+    const hist = [...dex.data]
+    const last = hist[hist.length - 1]
+    if (last.date === todayStr) {
+      // Replace today's partial DefiLlama data with live subgraph value
+      hist[hist.length - 1] = { ...last, volume_usd: liveDex.dailyVolumeUSD }
+    } else {
+      // Append live point for today
+      hist.push({ date: todayStr, volume_usd: liveDex.dailyVolumeUSD })
+    }
+    return hist
+  }, [dex.data, liveDex.dailyVolumeUSD, todayStr])
+
+  const tvlRecent = tvlRange ? tvlWithLive.slice(-tvlRange) : tvlWithLive
+  const dexRecent = dexRange ? dexWithLive.slice(-dexRange) : dexWithLive
 
   // Known reliable tokens: prefer CoinGecko source for majors, PulseX for native
   // Filter out Ethereum fork copies with wrong prices (e.g. USDC at $0.0006)
@@ -156,8 +191,9 @@ export function OverviewPage() {
         />
         <KpiCard
           title="Chain TVL"
-          value={latestTvl ? formatUsd(latestTvl.tvl_usd) : '--'}
-          subtitle={latestTvl?.date || ''}
+          titleSuffix={liveDex.totalLiquidityUSD ? <LiveIndicator /> : undefined}
+          value={liveDex.totalLiquidityUSD ? formatUsd(liveDex.totalLiquidityUSD) : latestTvl ? formatUsd(latestTvl.tvl_usd) : '--'}
+          subtitle="PulseX liquidity"
           icon={<TrendingUp className="h-5 w-5" />}
         />
         <KpiCard
@@ -179,11 +215,14 @@ export function OverviewPage() {
       {/* TVL Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Total Value Locked (TVL)</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-white">Total Value Locked (TVL)</h2>
+            {liveDex.totalLiquidityUSD && <LiveIndicator />}
+          </div>
           <TimeRangeSelector value={tvlRange} onChange={setTvlRange} />
         </div>
         {tvlRecent.length > 0 ? (
-          <AreaChartComponent data={tvlRecent} xKey="date" yKey="tvl_usd" color="#00D4FF" />
+          <AreaChartComponent data={tvlRecent} xKey="date" yKey="tvl_usd" color="#00D4FF" liveDot={!!liveDex.totalLiquidityUSD} />
         ) : (
           <p className="py-12 text-center text-gray-500">No TVL data available</p>
         )}
@@ -192,11 +231,14 @@ export function OverviewPage() {
       {/* DEX Volume Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">DEX Volume (PulseX)</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-white">DEX Volume (PulseX)</h2>
+            {liveDex.dailyVolumeUSD && <LiveIndicator />}
+          </div>
           <TimeRangeSelector value={dexRange} onChange={setDexRange} />
         </div>
         {dexRecent.length > 0 ? (
-          <AreaChartComponent data={dexRecent} xKey="date" yKey="volume_usd" color="#8000E0" />
+          <AreaChartComponent data={dexRecent} xKey="date" yKey="volume_usd" color="#8000E0" liveDot={!!liveDex.dailyVolumeUSD} />
         ) : (
           <p className="py-12 text-center text-gray-500">No DEX volume data available</p>
         )}

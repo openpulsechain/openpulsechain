@@ -16,9 +16,26 @@ interface AreaChartProps {
   yKey: string
   color?: string
   yFormatter?: (v: number) => string
+  /** Show a pulsing green dot on the last data point */
+  liveDot?: boolean
 }
 
-export function AreaChartComponent({ data, xKey, yKey, color = '#34d399', yFormatter }: AreaChartProps) {
+/** Custom dot renderer — only renders on the very last point when liveDot is enabled */
+function LiveDotRenderer(props: { cx?: number; cy?: number; index?: number; dataLength: number }) {
+  const { cx, cy, index, dataLength } = props
+  if (index !== dataLength - 1 || cx == null || cy == null) return null
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={6} fill="#34d399" opacity={0.3}>
+        <animate attributeName="r" from="4" to="10" dur="1.5s" repeatCount="indefinite" />
+        <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" repeatCount="indefinite" />
+      </circle>
+      <circle cx={cx} cy={cy} r={3.5} fill="#34d399" />
+    </g>
+  )
+}
+
+export function AreaChartComponent({ data, xKey, yKey, color = '#34d399', yFormatter, liveDot }: AreaChartProps) {
   const fmt = yFormatter || formatUsd
 
   return (
@@ -56,6 +73,8 @@ export function AreaChartComponent({ data, xKey, yKey, color = '#34d399', yForma
           stroke={color}
           fill={`url(#grad-${yKey})`}
           strokeWidth={2}
+          dot={liveDot ? <LiveDotRenderer dataLength={data.length} /> : false}
+          activeDot={liveDot ? { r: 5, fill: '#34d399', stroke: '#059669', strokeWidth: 2 } : undefined}
         />
       </RechartsArea>
     </ResponsiveContainer>
