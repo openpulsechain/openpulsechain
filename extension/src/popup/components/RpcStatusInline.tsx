@@ -8,6 +8,8 @@ type Status = 'operational' | 'degraded' | 'down'
 
 interface Service {
   name: string
+  url: string
+  isRpc: boolean
   status: Status
   latencyMs: number | null
 }
@@ -86,6 +88,7 @@ function Dot({ status }: { status: Status }) {
 
 export function RpcStatusInline() {
   const [services, setServices] = useState<Service[]>([])
+  const [copied, setCopied] = useState<string | null>(null)
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -99,11 +102,15 @@ export function RpcStatusInline() {
       const svcs: Service[] = [
         ...RPC_NODES.map((node, i) => ({
           name: node.name,
+          url: node.url,
+          isRpc: true,
           status: rpcResults[i].valid ? statusFromLatency(rpcResults[i].ms, 500, 2000) : 'down' as Status,
           latencyMs: Math.round(rpcResults[i].ms),
         })),
         {
           name: 'PulseX Subgraph',
+          url: PULSEX_V2_SUBGRAPH,
+          isRpc: false,
           status: sgResult.valid ? statusFromLatency(sgResult.ms, 2000, 5000) : 'down',
           latencyMs: Math.round(sgResult.ms),
         },
@@ -124,24 +131,55 @@ export function RpcStatusInline() {
     )
   }
 
+  const hasRpcDown = services.some((s) => s.isRpc && s.status === 'down')
+  const workingRpcs = services.filter((s) => s.isRpc && s.status !== 'down')
+
+  function copyUrl(url: string) {
+    navigator.clipboard.writeText(url)
+    setCopied(url)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
   return (
-    <div className="grid grid-cols-2 gap-1.5">
-      {services.map((svc) => (
-        <div
-          key={svc.name}
-          className="bg-gray-800/30 rounded-lg p-2.5 border border-white/5 flex items-center justify-between"
-        >
-          <div className="flex items-center gap-1.5">
-            <Dot status={svc.status} />
-            <span className="text-[10px] font-medium text-white truncate">{svc.name}</span>
+    <div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {services.map((svc) => (
+          <div
+            key={svc.name}
+            className="bg-gray-800/30 rounded-lg p-2.5 border border-white/5 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-1.5">
+              <Dot status={svc.status} />
+              <span className="text-[10px] font-medium text-white truncate">{svc.name}</span>
+            </div>
+            <span className={`text-[10px] font-mono ${
+              (svc.latencyMs ?? 9999) < 500 ? 'text-emerald-400' : (svc.latencyMs ?? 9999) < 2000 ? 'text-amber-400' : 'text-red-400'
+            }`}>
+              {svc.latencyMs ?? '--'}ms
+            </span>
           </div>
-          <span className={`text-[10px] font-mono ${
-            (svc.latencyMs ?? 9999) < 500 ? 'text-emerald-400' : (svc.latencyMs ?? 9999) < 2000 ? 'text-amber-400' : 'text-red-400'
-          }`}>
-            {svc.latencyMs ?? '--'}ms
-          </span>
+        ))}
+      </div>
+
+      {hasRpcDown && workingRpcs.length > 0 && (
+        <div className="mt-2 p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+          <p className="text-[9px] text-amber-400 mb-1.5">RPC down — copy an alternative for your wallet:</p>
+          <div className="space-y-1">
+            {workingRpcs.map((svc) => (
+              <button
+                key={svc.url}
+                onClick={() => copyUrl(svc.url)}
+                className="w-full flex items-center justify-between px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors"
+              >
+                <span className="text-[9px] font-mono text-gray-300 truncate">{svc.url}</span>
+                <span className="text-[9px] text-gray-500 shrink-0 ml-1">
+                  {copied === svc.url ? 'Copied!' : 'Copy'}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      ))}
+      )}
     </div>
   )
 }

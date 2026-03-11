@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRpcHealth, type ServiceStatus } from '../../hooks/useRpcHealth'
 
@@ -36,11 +36,21 @@ export function RpcStatusIndicator() {
 
   const rect = btnRef.current?.getBoundingClientRect()
 
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const copyUrl = useCallback((url: string) => {
+    navigator.clipboard.writeText(url)
+    setCopied(url)
+    setTimeout(() => setCopied(null), 2000)
+  }, [])
+
   // Split services into RPC nodes vs indexers
-  const rpcServices = services.filter((s) => !s.name.includes('Subgraph'))
-  const indexerServices = services.filter((s) => s.name.includes('Subgraph'))
+  const rpcServices = services.filter((s) => s.type === 'rpc')
+  const indexerServices = services.filter((s) => s.type === 'subgraph')
   const rpcUp = rpcServices.filter((s) => s.status === 'operational').length
   const rpcTotal = rpcServices.length
+  const hasRpcDown = rpcServices.some((s) => s.status === 'down')
+  const workingRpcs = rpcServices.filter((s) => s.status !== 'down')
 
   return (
     <>
@@ -111,8 +121,33 @@ export function RpcStatusIndicator() {
               </div>
             </div>
 
-            {/* Best RPC indicator */}
-            {bestRpcUrl && (
+            {/* Alternative RPCs when one is down */}
+            {hasRpcDown && workingRpcs.length > 0 && (
+              <div className="mb-3 pt-3 border-t border-white/5">
+                <p className="text-[10px] font-medium text-amber-400 mb-2">Switch your wallet RPC to an alternative:</p>
+                <div className="space-y-1.5">
+                  {workingRpcs.map((svc) => (
+                    <button
+                      key={svc.endpoint}
+                      onClick={() => copyUrl(svc.endpoint)}
+                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <StatusDot status={svc.status} />
+                        <span className="text-[11px] font-mono text-gray-300 truncate">{svc.endpoint}</span>
+                      </div>
+                      <span className="text-[10px] text-gray-500 group-hover:text-[#00D4FF] shrink-0 ml-2">
+                        {copied === svc.endpoint ? 'Copied!' : 'Copy'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[9px] text-gray-600 mt-1.5">Paste in MetaMask / Rabby → Settings → Networks → PulseChain → RPC URL</p>
+              </div>
+            )}
+
+            {/* Best RPC indicator (when all are up) */}
+            {!hasRpcDown && bestRpcUrl && (
               <div className="mb-3 pt-3 border-t border-white/5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-gray-500">Fastest RPC:</span>

@@ -8,7 +8,9 @@ export type ServiceStatus = 'operational' | 'degraded' | 'down'
 export interface ServiceHealth {
   name: string
   url: string
+  endpoint: string
   description: string
+  type: 'rpc' | 'subgraph'
   status: ServiceStatus
   latencyMs: number | null
   lastChecked: Date | null
@@ -107,7 +109,7 @@ const SERVICE_META: ServiceMeta[] = [
 export function useRpcHealth(): RpcHealth {
   const [services, setServices] = useState<ServiceHealth[]>(
     SERVICE_META.map((m) => ({
-      name: m.name, url: m.url, description: m.description,
+      name: m.name, url: m.url, endpoint: m.endpoint, description: m.description, type: m.type,
       status: 'operational' as ServiceStatus, latencyMs: null, lastChecked: null,
     }))
   )
