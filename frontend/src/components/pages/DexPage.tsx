@@ -6,11 +6,25 @@ import { BarChartComponent } from '../charts/BarChart'
 import { Spinner } from '../ui/Spinner'
 import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { usePulsexDailyStats, usePulsexTopPairs } from '../../hooks/useSupabase'
+import { useLivePulsexFactory } from '../../hooks/useLivePulsexFactory'
 import { formatUsd, formatNumber } from '../../lib/format'
+
+function LiveIndicator() {
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400">
+      <span>(live)</span>
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+      </span>
+    </span>
+  )
+}
 
 export function DexPage() {
   const pulsex = usePulsexDailyStats()
   const topPairs = usePulsexTopPairs()
+  const liveFactory = useLivePulsexFactory()
 
   const latest = pulsex.data.length > 0 ? pulsex.data[pulsex.data.length - 1] : null
 
@@ -59,8 +73,9 @@ export function DexPage() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <KpiCard
             title="Total Liquidity"
-            value={formatUsd(kpis.totalLiquidity)}
-            subtitle="Current"
+            titleSuffix={liveFactory.totalLiquidityUSD ? <LiveIndicator /> : undefined}
+            value={formatUsd(liveFactory.totalLiquidityUSD ?? kpis.totalLiquidity)}
+            subtitle="PulseX V1"
             icon={<Droplets className="h-5 w-5" />}
           />
           <KpiCard
@@ -71,13 +86,15 @@ export function DexPage() {
           />
           <KpiCard
             title="Total Volume"
-            value={formatUsd(kpis.totalVolume)}
+            titleSuffix={liveFactory.totalVolumeUSD ? <LiveIndicator /> : undefined}
+            value={formatUsd(liveFactory.totalVolumeUSD ?? kpis.totalVolume)}
             subtitle="All time"
             icon={<TrendingUp className="h-5 w-5" />}
           />
           <KpiCard
             title="Total Transactions"
-            value={formatNumber(kpis.totalTxs)}
+            titleSuffix={liveFactory.totalTransactions ? <LiveIndicator /> : undefined}
+            value={formatNumber(liveFactory.totalTransactions ?? kpis.totalTxs)}
             subtitle="All time"
             icon={<Hash className="h-5 w-5" />}
           />
