@@ -4,7 +4,7 @@ import { useRpcHealth, type ServiceStatus } from '../../hooks/useRpcHealth'
 
 const STATUS_CONFIG: Record<ServiceStatus, { color: string; ping: string; label: string }> = {
   operational: { color: 'bg-emerald-400', ping: 'bg-emerald-400', label: 'All Systems Operational' },
-  degraded: { color: 'bg-amber-400', ping: 'bg-amber-400', label: 'Degraded Performance' },
+  degraded: { color: 'bg-amber-400', ping: 'bg-amber-400', label: 'Partial Degradation' },
   down: { color: 'bg-red-500', ping: 'bg-red-500', label: 'Service Disruption' },
 }
 
@@ -27,7 +27,7 @@ function LatencyBadge({ ms }: { ms: number | null }) {
 }
 
 export function RpcStatusIndicator() {
-  const { services, overall, loading } = useRpcHealth()
+  const { services, overall, loading, bestRpcUrl } = useRpcHealth()
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
   const cfg = STATUS_CONFIG[overall]
@@ -35,6 +35,12 @@ export function RpcStatusIndicator() {
   if (loading) return null
 
   const rect = btnRef.current?.getBoundingClientRect()
+
+  // Split services into RPC nodes vs indexers
+  const rpcServices = services.filter((s) => !s.name.includes('Subgraph'))
+  const indexerServices = services.filter((s) => s.name.includes('Subgraph'))
+  const rpcUp = rpcServices.filter((s) => s.status === 'operational').length
+  const rpcTotal = rpcServices.length
 
   return (
     <>
@@ -59,37 +65,72 @@ export function RpcStatusIndicator() {
             }}
           >
             {/* Header */}
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-4">
               <StatusDot status={overall} />
               <span className="text-sm font-medium text-white">{cfg.label}</span>
             </div>
 
-            {/* Services */}
-            <div className="space-y-3">
-              {services.map((svc) => (
-                <div key={svc.name}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <StatusDot status={svc.status} />
-                      <span className="text-xs font-medium text-gray-200">{svc.name}</span>
+            {/* RPC Nodes */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">RPC Nodes</span>
+                <span className="text-[10px] text-gray-500">{rpcUp}/{rpcTotal} online</span>
+              </div>
+              <div className="space-y-2">
+                {rpcServices.map((svc) => (
+                  <div key={svc.name}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <StatusDot status={svc.status} />
+                        <span className="text-xs font-medium text-gray-200">{svc.name}</span>
+                      </div>
+                      <LatencyBadge ms={svc.latencyMs} />
                     </div>
-                    <LatencyBadge ms={svc.latencyMs} />
+                    <p className="text-[10px] text-gray-500 ml-[18px] mt-0.5">{svc.description}</p>
                   </div>
-                  <p className="text-[10px] text-gray-500 ml-[18px] mt-0.5">{svc.description}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
+            {/* Indexers */}
+            <div className="mb-3 pt-3 border-t border-white/5">
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 block">Indexers</span>
+              <div className="space-y-2">
+                {indexerServices.map((svc) => (
+                  <div key={svc.name}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <StatusDot status={svc.status} />
+                        <span className="text-xs font-medium text-gray-200">{svc.name}</span>
+                      </div>
+                      <LatencyBadge ms={svc.latencyMs} />
+                    </div>
+                    <p className="text-[10px] text-gray-500 ml-[18px] mt-0.5">{svc.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Best RPC indicator */}
+            {bestRpcUrl && (
+              <div className="mb-3 pt-3 border-t border-white/5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-500">Fastest RPC:</span>
+                  <span className="text-[10px] font-mono text-emerald-400">{bestRpcUrl.replace('https://', '')}</span>
+                </div>
+              </div>
+            )}
+
             {/* Legend */}
-            <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
+            <div className="pt-3 border-t border-white/5 space-y-1.5">
               <p className="text-[10px] font-medium text-gray-400 mb-1.5">Status Legend</p>
               <div className="flex items-center gap-2">
                 <span className="inline-flex rounded-full h-2 w-2 bg-emerald-400 shrink-0" />
-                <span className="text-[10px] text-gray-400"><span className="text-emerald-400">Operational</span> — responding normally</span>
+                <span className="text-[10px] text-gray-400"><span className="text-emerald-400">Operational</span> — &lt;500ms (RPC) / &lt;2s (Subgraph)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="inline-flex rounded-full h-2 w-2 bg-amber-400 shrink-0" />
-                <span className="text-[10px] text-gray-400"><span className="text-amber-400">Degraded</span> — slow response, data may be delayed</span>
+                <span className="text-[10px] text-gray-400"><span className="text-amber-400">Degraded</span> — slow response, data may lag</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="inline-flex rounded-full h-2 w-2 bg-red-500 shrink-0" />

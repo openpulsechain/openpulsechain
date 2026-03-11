@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const PULSECHAIN_RPC = 'https://rpc.pulsechain.com'
-const PULSEX_V2_SUBGRAPH = 'https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2'
 const CHECK_INTERVAL = 15_000 // 15 seconds
 const TIMEOUT_MS = 5_000
 
@@ -20,6 +18,8 @@ export interface RpcHealth {
   services: ServiceHealth[]
   overall: ServiceStatus
   loading: boolean
+  /** Fastest operational RPC URL for fallback use */
+  bestRpcUrl: string | null
 }
 
 function statusFromLatency(latencyMs: number, fastThreshold: number, slowThreshold: number): ServiceStatus {
@@ -29,8 +29,8 @@ function statusFromLatency(latencyMs: number, fastThreshold: number, slowThresho
 }
 
 function overallStatus(services: ServiceHealth[]): ServiceStatus {
-  if (services.some((s) => s.status === 'down')) return 'down'
-  if (services.some((s) => s.status === 'degraded')) return 'degraded'
+  if (services.every((s) => s.status === 'down')) return 'down'
+  if (services.some((s) => s.status === 'down') || services.some((s) => s.status === 'degraded')) return 'degraded'
   return 'operational'
 }
 
@@ -42,12 +42,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ])
 }
 
-/** Check PulseChain RPC — same fetch pattern as useLiveChainStats (which works) */
-async function checkRpc(): Promise<{ valid: boolean; latencyMs: number }> {
+interface CheckResult {
+  valid: boolean
+  latencyMs: number
+}
+
+/** Generic RPC health check — validates JSON-RPC response has a hex block number */
+async function checkRpc(url: string): Promise<CheckResult> {
   const start = performance.now()
   try {
     const res = await withTimeout(
-      fetch(PULSECHAIN_RPC, {
+      fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
@@ -62,12 +67,12 @@ async function checkRpc(): Promise<{ valid: boolean; latencyMs: number }> {
   }
 }
 
-/** Check PulseX Subgraph — same fetch pattern as useLivePlsPrice (which works) */
-async function checkSubgraph(): Promise<{ valid: boolean; latencyMs: number }> {
+/** Check PulseX Subgraph — validates GraphQL returns a block number */
+async function checkSubgraph(url: string): Promise<CheckResult> {
   const start = performance.now()
   try {
     const res = await withTimeout(
-      fetch(PULSEX_V2_SUBGRAPH, {
+      fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: '{ _meta { block { number } } }' }),
@@ -82,12 +87,22 @@ async function checkSubgraph(): Promise<{ valid: boolean; latencyMs: number }> {
   }
 }
 
-const SERVICE_META = [
-  { name: 'PulseChain RPC', url: 'rpc.pulsechain.com', description: 'Blockchain node — blocks, gas, transactions', fast: 500, slow: 2000 },
-  { name: 'PulseX Subgraph', url: 'graph.pulsechain.com', description: 'DEX indexer — prices, swaps, liquidity', fast: 2000, slow: 5000 },
-] as const
+type ServiceMeta = {
+  name: string
+  url: string
+  endpoint: string
+  description: string
+  type: 'rpc' | 'subgraph'
+  fast: number
+  slow: number
+}
 
-const checkers = [checkRpc, checkSubgraph]
+const SERVICE_META: ServiceMeta[] = [
+  { name: 'PulseChain RPC', url: 'rpc.pulsechain.com', endpoint: 'https://rpc.pulsechain.com', description: 'Official PulseChain node', type: 'rpc', fast: 500, slow: 2000 },
+  { name: 'G4MM4 RPC', url: 'g4mm4.io', endpoint: 'https://rpc-pulsechain.g4mm4.io', description: 'G4MM4 public node', type: 'rpc', fast: 500, slow: 2000 },
+  { name: 'PublicNode RPC', url: 'publicnode.com', endpoint: 'https://pulsechain-rpc.publicnode.com', description: 'PublicNode infrastructure', type: 'rpc', fast: 500, slow: 2000 },
+  { name: 'PulseX Subgraph', url: 'graph.pulsechain.com', endpoint: 'https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2', description: 'DEX indexer — prices, swaps, liquidity', type: 'subgraph', fast: 2000, slow: 5000 },
+]
 
 export function useRpcHealth(): RpcHealth {
   const [services, setServices] = useState<ServiceHealth[]>(
@@ -97,11 +112,16 @@ export function useRpcHealth(): RpcHealth {
     }))
   )
   const [loading, setLoading] = useState(true)
+  const [bestRpcUrl, setBestRpcUrl] = useState<string | null>(null)
   const mountedRef = useRef(true)
 
   const checkHealth = useCallback(async () => {
     const now = new Date()
-    const results = await Promise.all(checkers.map((fn) => fn()))
+    const results = await Promise.all(
+      SERVICE_META.map((meta) =>
+        meta.type === 'rpc' ? checkRpc(meta.endpoint) : checkSubgraph(meta.endpoint)
+      )
+    )
 
     if (!mountedRef.current) return
 
@@ -117,7 +137,18 @@ export function useRpcHealth(): RpcHealth {
       }
     })
 
+    // Find fastest operational RPC for fallback
+    let bestUrl: string | null = null
+    let bestLatency = Infinity
+    SERVICE_META.forEach((meta, i) => {
+      if (meta.type === 'rpc' && results[i].valid && results[i].latencyMs < bestLatency) {
+        bestLatency = results[i].latencyMs
+        bestUrl = meta.endpoint
+      }
+    })
+
     setServices(updated)
+    setBestRpcUrl(bestUrl)
     setLoading(false)
   }, [])
 
@@ -135,5 +166,6 @@ export function useRpcHealth(): RpcHealth {
     services,
     overall: overallStatus(services),
     loading,
+    bestRpcUrl,
   }
 }
