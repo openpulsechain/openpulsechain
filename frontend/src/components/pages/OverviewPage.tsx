@@ -5,6 +5,7 @@ import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
 import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { useNetworkTvl, useNetworkDexVolume, useTokenPrices, useNetworkSnapshot } from '../../hooks/useSupabase'
+import { useLivePlsPrice } from '../../hooks/useLivePlsPrice'
 import { formatUsd, formatNumber, formatGwei } from '../../lib/format'
 
 // Standard gas limits for common operations on PulseChain
@@ -17,26 +18,42 @@ const GAS_ESTIMATES = [
   { label: 'Bridge Transfer', gasLimit: 250000 },
 ]
 
+function LiveIndicator() {
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400">
+      <span>(live)</span>
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+      </span>
+    </span>
+  )
+}
+
 export function OverviewPage() {
   const tvl = useNetworkTvl()
   const dex = useNetworkDexVolume()
   const prices = useTokenPrices()
   const snapshot = useNetworkSnapshot()
+  const livePls = useLivePlsPrice()
 
   const latestTvl = tvl.data.length > 0 ? tvl.data[tvl.data.length - 1] : null
   const latestSnapshot = snapshot.data.length > 0 ? snapshot.data[0] : null
   const plsPrice = prices.data.find((p) => p.symbol === 'PLS')
 
-  // Gas estimates computed from gas price + PLS price
+  // Use live subgraph price (max precision), fallback to Supabase cached
+  const plsPriceUsd = livePls.price ?? plsPrice?.price_usd ?? null
+
+  // Gas estimates computed from gas price + PLS price (live)
   const gasEstimates = useMemo(() => {
-    if (!latestSnapshot || !plsPrice?.price_usd) return null
+    if (!latestSnapshot || !plsPriceUsd) return null
     const gasPriceGwei = latestSnapshot.gas_price_gwei
     return GAS_ESTIMATES.map((e) => {
       const costPls = (gasPriceGwei * e.gasLimit) / 1e9
-      const costUsd = costPls * plsPrice.price_usd!
+      const costUsd = costPls * plsPriceUsd
       return { ...e, costPls, costUsd }
     })
-  }, [latestSnapshot, plsPrice])
+  }, [latestSnapshot, plsPriceUsd])
 
   const [tvlRange, setTvlRange] = useState<number | null>(null)
   const [dexRange, setDexRange] = useState<number | null>(null)
@@ -125,7 +142,8 @@ export function OverviewPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
           title="PLS Price"
-          value={plsPrice?.price_usd ? `$${plsPrice.price_usd.toFixed(6)}` : '--'}
+          titleSuffix={<LiveIndicator />}
+          value={plsPriceUsd ? `$${plsPriceUsd.toPrecision(6)}` : '--'}
           trend={plsPrice?.price_change_24h_pct ?? undefined}
           subtitle="24h change"
           icon={<DollarSign className="h-5 w-5" />}
