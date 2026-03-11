@@ -5,6 +5,7 @@ import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
 import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { formatUsd } from '../../lib/format'
+import { Sparkline } from '../ui/Sparkline'
 
 // Ethereum fork copies on PulseChain — these have same symbol as native bridged versions
 // but trade at massive discounts. Show a visual indicator to avoid confusion.
@@ -82,6 +83,7 @@ export function TokensPage() {
   const [priceRange, setPriceRange] = useState<number | null>(null)
   const [volRange, setVolRange] = useState<number | null>(null)
   const [showNote, setShowNote] = useState(false)
+  const [sparkData, setSparkData] = useState<Record<string, number[]>>({})
 
   const fetchTokens = useCallback(async () => {
     setLoading(true)
@@ -185,34 +187,47 @@ export function TokensPage() {
         }
       }
 
-      // Fetch 7d ago prices for change calculation
+      // Fetch 7d price history for change calculation + sparklines
       let change7dMap: Record<string, number> = {}
+      let sparkMap: Record<string, number[]> = {}
       if (addresses.length > 0) {
-        const sevenDaysAgo = new Date()
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 8)
-        const sixDaysAgo = new Date()
-        sixDaysAgo.setDate(sixDaysAgo.getDate() - 6)
+        const eightDaysAgo = new Date()
+        eightDaysAgo.setDate(eightDaysAgo.getDate() - 8)
 
         const { data: histRows } = await supabase
           .from('token_price_history')
           .select('address, date, price_usd')
           .in('address', addresses)
-          .gte('date', sevenDaysAgo.toISOString().slice(0, 10))
-          .lte('date', sixDaysAgo.toISOString().slice(0, 10))
-          .order('date', { ascending: false })
+          .gte('date', eightDaysAgo.toISOString().slice(0, 10))
+          .order('date', { ascending: true })
 
-        const seen = new Set<string>()
+        // Build sparkline arrays and find oldest price for 7d change
+        const oldestPrice: Record<string, number> = {}
         for (const row of (histRows || [])) {
           const addr = row.address.toLowerCase()
-          if (seen.has(addr)) continue
-          seen.add(addr)
-          const oldPrice = row.price_usd
+          const price = row.price_usd
+          if (!price || price <= 0) continue
+
+          // Sparkline data (ordered by date asc)
+          if (!sparkMap[addr]) sparkMap[addr] = []
+          sparkMap[addr].push(price)
+
+          // Track oldest price for 7d change
+          if (!(addr in oldestPrice)) {
+            oldestPrice[addr] = price
+          }
+        }
+
+        // Calculate 7d change from oldest price in window
+        for (const addr of Object.keys(oldestPrice)) {
           const currentPrice = pricesMap[addr]?.price_usd
-          if (oldPrice && oldPrice > 0 && currentPrice && currentPrice > 0) {
-            change7dMap[addr] = ((currentPrice - oldPrice) / oldPrice) * 100
+          const old = oldestPrice[addr]
+          if (old > 0 && currentPrice && currentPrice > 0) {
+            change7dMap[addr] = ((currentPrice - old) / old) * 100
           }
         }
       }
+      setSparkData(sparkMap)
 
       let enriched: TokenWithPrice[] = tokenList.map(t => ({
         ...t,
@@ -362,7 +377,8 @@ export function TokensPage() {
                     <th className="py-3 pr-4 text-right">7d</th>
                     <th className="py-3 pr-4 text-right">Market Cap</th>
                     <th className="py-3 pr-4 text-right">Volume (24h)</th>
-                    <th className="py-3 text-right">Liquidity</th>
+                    <th className="py-3 pr-4 text-right">Liquidity</th>
+                    <th className="py-3 text-right">7d Chart</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -392,10 +408,13 @@ export function TokensPage() {
                         <td className="py-2.5 pr-4 text-right text-gray-300" title={token.volume_24h_usd == null ? 'No recent daily volume data' : '24h trading volume'}>
                           {token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : '--'}
                         </td>
-                        <td className="py-2.5 text-right text-gray-300">
+                        <td className="py-2.5 pr-4 text-right text-gray-300">
                           {token.price_usd != null && token.total_liquidity > 0
                             ? formatUsd(token.total_liquidity * token.price_usd)
                             : '--'}
+                        </td>
+                        <td className="py-2.5 text-right">
+                          <Sparkline data={sparkData[token.address.toLowerCase()] || []} />
                         </td>
                       </tr>
                     )
