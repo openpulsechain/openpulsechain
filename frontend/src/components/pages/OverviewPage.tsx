@@ -68,6 +68,16 @@ function DataSourceNote({ source, type }: { source: DataSource; type: 'tvl' | 'v
         <div className="mt-2 rounded-lg bg-white/5 border border-white/10 p-4 text-xs text-gray-400 space-y-3">
           {type === 'tvl' ? (
             <>
+              <div className="rounded bg-gray-800/50 border border-white/5 p-3">
+                <p className="text-gray-300 font-medium mb-1">What is TVL?</p>
+                <p>
+                  Total Value Locked (TVL) measures the <strong className="text-gray-300">total USD value of all assets deposited</strong> in DeFi protocols on PulseChain.
+                  It includes liquidity pools, lending protocols, staking contracts, and other smart contracts that hold user funds.
+                  TVL is the most widely used metric to gauge the size and health of a blockchain&apos;s DeFi ecosystem —
+                  a rising TVL indicates growing confidence and capital inflows, while a declining TVL may signal capital flight.
+                </p>
+              </div>
+
               <p className="font-medium text-gray-300">
                 {source === 'all'
                   ? 'All PulseChain — Total Value Locked across all protocols'
@@ -133,6 +143,15 @@ function DataSourceNote({ source, type }: { source: DataSource; type: 'tvl' | 'v
             </>
           ) : (
             <>
+              <div className="rounded bg-gray-800/50 border border-white/5 p-3">
+                <p className="text-gray-300 font-medium mb-1">What is DEX Volume?</p>
+                <p>
+                  DEX Volume measures the <strong className="text-gray-300">total USD value of all token swaps</strong> executed on decentralized exchanges each day.
+                  It reflects real trading activity and market interest on-chain. High volume indicates active trading (often during price volatility),
+                  while low volume suggests reduced market activity. Unlike TVL (which measures deposited capital), volume measures the <em>flow</em> of capital.
+                </p>
+              </div>
+
               <p className="font-medium text-gray-300">
                 {source === 'all'
                   ? 'All PulseChain DEXes — Daily trading volume across all decentralized exchanges'
@@ -550,6 +569,14 @@ export function OverviewPage() {
           </table>
         </div>
         <div className="mt-4 rounded-lg bg-white/5 border border-white/10 p-4 text-xs text-gray-500 space-y-2">
+          <div className="rounded bg-gray-800/50 border border-white/5 p-3 mb-2">
+            <p className="text-gray-300 font-medium text-xs mb-1">What is this table?</p>
+            <p className="text-xs text-gray-400">
+              This table lists <strong className="text-gray-300">all tokens traded on PulseChain</strong> with their current price, market capitalization, and historical volume.
+              Prices are derived from on-chain liquidity pools (PulseX Subgraph) for PulseChain-native tokens, and from CoinGecko for major bridged assets (BTC, ETH, stablecoins).
+              This provides a comprehensive view of every asset available on the PulseChain ecosystem.
+            </p>
+          </div>
           <p className="font-medium text-gray-400">Data Methodology</p>
           <ul className="space-y-1 list-disc list-inside">
             <li>
