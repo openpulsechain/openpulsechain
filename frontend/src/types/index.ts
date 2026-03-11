@@ -73,6 +73,16 @@ export interface PulsexDailyStats {
   total_transactions: number
 }
 
+export interface PulsexDefillamaTvl {
+  date: string
+  tvl_usd: number
+}
+
+export interface PulsexDefillamaVolume {
+  date: string
+  volume_usd: number
+}
+
 export interface PulsexTopPair {
   pair_address: string
   token0_symbol: string

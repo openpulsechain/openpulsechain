@@ -5,11 +5,9 @@ import { AreaChartComponent } from '../charts/AreaChart'
 import { BarChartComponent } from '../charts/BarChart'
 import { Spinner } from '../ui/Spinner'
 import { TimeRangeSelector } from '../ui/TimeRangeSelector'
-import { usePulsexDailyStats, usePulsexTopPairs } from '../../hooks/useSupabase'
+import { usePulsexDailyStats, usePulsexTopPairs, usePulsexDefillamaTvl, usePulsexDefillamaVolume, useNetworkTvl, useNetworkDexVolume } from '../../hooks/useSupabase'
 import { useLivePulsexFactory } from '../../hooks/useLivePulsexFactory'
 import { useLiveDefiLlama } from '../../hooks/useLiveDefiLlama'
-import { usePulsexHistory } from '../../hooks/usePulsexHistory'
-import { useAllPulsechainDexHistory } from '../../hooks/useAllPulsechainDexHistory'
 import { formatUsd, formatNumber } from '../../lib/format'
 
 type DexSource = 'v1' | 'pulsex' | 'all'
@@ -482,18 +480,21 @@ function ChartDataSourceNote({ source }: { source: DexSource }) {
 }
 
 export function DexPage() {
-  const pulsex = usePulsexDailyStats()
+  // Historical data from Supabase (sovereign)
+  const pulsex = usePulsexDailyStats()         // V1 subgraph daily
+  const pulsexLLTvl = usePulsexDefillamaTvl()   // PulseX DefiLlama TVL
+  const pulsexLLVol = usePulsexDefillamaVolume() // PulseX DefiLlama Volume
+  const networkTvl = useNetworkTvl()             // All PulseChain TVL
+  const networkVol = useNetworkDexVolume()        // All PulseChain DEX Volume
   const topPairs = usePulsexTopPairs()
+
+  // Live data only (API calls, not stored)
   const liveFactory = useLivePulsexFactory()
   const liveLL = useLiveDefiLlama()
 
   // Source selection for charts
   const [liqSource, setLiqSource] = useState<DexSource>('v1')
   const [volSource, setVolSource] = useState<DexSource>('v1')
-
-  // Lazy-load DefiLlama histories when user switches dropdown
-  const pulsexHistory = usePulsexHistory(liqSource === 'pulsex' || volSource === 'pulsex')
-  const allDexHistory = useAllPulsechainDexHistory(liqSource === 'all' || volSource === 'all')
 
   const latest = pulsex.data.length > 0 ? pulsex.data[pulsex.data.length - 1] : null
 
@@ -520,10 +521,10 @@ export function DexPage() {
   // Today's date in YYYY-MM-DD (UTC)
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
-  // --- Liquidity data based on source ---
+  // --- Liquidity data based on source (all from Supabase) ---
   const v1LiqData = useMemo(() => validData.map((d) => ({ date: d.date, tvl_usd: d.total_liquidity_usd })), [validData])
 
-  const liqBaseData = liqSource === 'v1' ? v1LiqData : liqSource === 'pulsex' ? pulsexHistory.tvl : allDexHistory.tvl
+  const liqBaseData = liqSource === 'v1' ? v1LiqData : liqSource === 'pulsex' ? pulsexLLTvl.data : networkTvl.data
   const liveLiq = liqSource === 'v1'
     ? liveFactory.v1LiquidityUSD
     : liqSource === 'pulsex'
@@ -544,12 +545,12 @@ export function DexPage() {
 
   const liqRecent = liqRange ? liqWithLive.slice(-liqRange) : liqWithLive
 
-  // --- Volume data based on source ---
+  // --- Volume data based on source (all from Supabase) ---
   const v1VolData = useMemo(() => validData.map((d) => ({ date: d.date, volume_usd: d.daily_volume_usd })), [validData])
 
-  const volBaseData = volSource === 'v1' ? v1VolData : volSource === 'pulsex' ? pulsexHistory.volume : allDexHistory.volume
+  const volBaseData = volSource === 'v1' ? v1VolData : volSource === 'pulsex' ? pulsexLLVol.data : networkVol.data
   const liveVol = volSource === 'v1'
-    ? null // V1 subgraph doesn't provide live daily volume
+    ? null
     : volSource === 'pulsex'
       ? liveLL.volumePulsex
       : liveLL.volumeAll
@@ -581,8 +582,8 @@ export function DexPage() {
   const cumRecent = cumRange ? cumulativeVolume.slice(-cumRange) : cumulativeVolume
 
   // Loading states
-  const liqIsLoading = (liqSource === 'pulsex' && pulsexHistory.loading) || (liqSource === 'all' && allDexHistory.loading)
-  const volIsLoading = (volSource === 'pulsex' && pulsexHistory.loading) || (volSource === 'all' && allDexHistory.loading)
+  const liqIsLoading = (liqSource === 'pulsex' && pulsexLLTvl.loading) || (liqSource === 'all' && networkTvl.loading)
+  const volIsLoading = (volSource === 'pulsex' && pulsexLLVol.loading) || (volSource === 'all' && networkVol.loading)
 
   if (pulsex.loading) return <Spinner />
 

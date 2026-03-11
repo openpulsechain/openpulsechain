@@ -4,11 +4,10 @@ import { KpiCard } from '../cards/KpiCard'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
 import { TimeRangeSelector } from '../ui/TimeRangeSelector'
-import { useNetworkTvl, useNetworkDexVolume, useTokenPrices, useNetworkSnapshot } from '../../hooks/useSupabase'
+import { useNetworkTvl, useNetworkDexVolume, useTokenPrices, useNetworkSnapshot, usePulsexDefillamaTvl, usePulsexDefillamaVolume } from '../../hooks/useSupabase'
 import { useLivePlsPrice } from '../../hooks/useLivePlsPrice'
 import { useLiveChainStats } from '../../hooks/useLiveChainStats'
 import { useLiveDefiLlama } from '../../hooks/useLiveDefiLlama'
-import { usePulsexHistory } from '../../hooks/usePulsexHistory'
 import { formatUsd, formatNumber, formatGwei } from '../../lib/format'
 
 type DataSource = 'all' | 'pulsex'
@@ -213,12 +212,13 @@ export function OverviewPage() {
   const liveChain = useLiveChainStats()
   const liveLL = useLiveDefiLlama()
 
+  // PulseX DefiLlama historical data from Supabase (sovereign)
+  const pulsexLLTvl = usePulsexDefillamaTvl()
+  const pulsexLLVol = usePulsexDefillamaVolume()
+
   // Source selection
   const [tvlSource, setTvlSource] = useState<DataSource>('all')
   const [volSource, setVolSource] = useState<DataSource>('all')
-
-  // Lazy-load PulseX history when user selects "pulsex"
-  const pulsexHistory = usePulsexHistory(tvlSource === 'pulsex' || volSource === 'pulsex')
 
   const latestTvl = tvl.data.length > 0 ? tvl.data[tvl.data.length - 1] : null
   const latestSnapshot = snapshot.data.length > 0 ? snapshot.data[0] : null
@@ -250,7 +250,7 @@ export function OverviewPage() {
 
   // --- TVL data based on source ---
   const liveTvl = tvlSource === 'all' ? liveLL.tvlAll : liveLL.tvlPulsex
-  const tvlBaseData = tvlSource === 'all' ? tvl.data : pulsexHistory.tvl
+  const tvlBaseData = tvlSource === 'all' ? tvl.data : pulsexLLTvl.data
 
   const tvlWithLive = useMemo(() => {
     if (!liveTvl || tvlBaseData.length === 0) return tvlBaseData
@@ -268,7 +268,7 @@ export function OverviewPage() {
 
   // --- Volume data based on source ---
   const liveVol = volSource === 'all' ? liveLL.volumeAll : liveLL.volumePulsex
-  const volBaseData = volSource === 'all' ? dex.data : pulsexHistory.volume
+  const volBaseData = volSource === 'all' ? dex.data : pulsexLLVol.data
 
   const dexWithLive = useMemo(() => {
     if (!liveVol || volBaseData.length === 0) return volBaseData
@@ -354,8 +354,8 @@ export function OverviewPage() {
 
   if (tvl.loading && prices.loading) return <Spinner />
 
-  const tvlIsLoading = tvlSource === 'pulsex' && pulsexHistory.loading
-  const volIsLoading = volSource === 'pulsex' && pulsexHistory.loading
+  const tvlIsLoading = tvlSource === 'pulsex' && pulsexLLTvl.loading
+  const volIsLoading = volSource === 'pulsex' && pulsexLLVol.loading
 
   return (
     <div className="space-y-6">

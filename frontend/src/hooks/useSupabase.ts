@@ -10,6 +10,8 @@ import type {
   TokenPrice,
   NetworkSnapshot,
   PulsexDailyStats,
+  PulsexDefillamaTvl,
+  PulsexDefillamaVolume,
   PulsexTopPair,
   HyperlaneTransfer,
   HyperlaneDailyStats,
@@ -133,6 +135,20 @@ export function useNetworkSnapshot() {
 
 export function usePulsexDailyStats() {
   return useQuery<PulsexDailyStats>('pulsex_daily_stats', {
+    orderBy: 'date',
+    ascending: true,
+  })
+}
+
+export function usePulsexDefillamaTvl() {
+  return useQuery<PulsexDefillamaTvl>('pulsex_defillama_tvl', {
+    orderBy: 'date',
+    ascending: true,
+  })
+}
+
+export function usePulsexDefillamaVolume() {
+  return useQuery<PulsexDefillamaVolume>('pulsex_defillama_volume', {
     orderBy: 'date',
     ascending: true,
   })

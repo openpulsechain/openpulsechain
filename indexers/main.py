@@ -50,6 +50,7 @@ def main():
     from indexers import bridge_tvl
     from indexers import whale_tracker
     from indexers import whale_clustering
+    from indexers import pulsex_defillama
 
     indexers = [
         ("bridge_subgraph", bridge_subgraph),
@@ -58,6 +59,7 @@ def main():
         ("hyperlane_aggregator", hyperlane_aggregator),
         ("network_tvl", network_tvl),
         ("network_dex_volume", network_dex_volume),
+        ("pulsex_defillama", pulsex_defillama),
         ("token_prices", token_prices),
         ("network_snapshot", network_snapshot),
         ("pulsex_stats", pulsex_stats),
