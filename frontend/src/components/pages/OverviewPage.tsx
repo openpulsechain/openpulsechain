@@ -306,21 +306,21 @@ export function OverviewPage() {
   // --- KPI TVL value: always show "All PulseChain" ---
   const kpiTvl = liveLL.tvlAll ?? (latestTvl ? latestTvl.tvl_usd : null)
 
-  // Known reliable tokens: prefer CoinGecko source for majors, PulseX for native
-  // Filter out Ethereum fork copies with wrong prices (e.g. USDC at $0.0006)
+  // ETH fork addresses — same set as TokensPage for consistency
+  const ETH_FORK_ADDRESSES = useMemo(() => new Set([
+    '0x6b175474e89094c44da98b954eedeac495271d0f', // DAI (Ethereum fork)
+    '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', // USDC (Ethereum fork)
+    '0xdac17f958d2ee523a2206206994597c13d831ec7', // USDT (Ethereum fork)
+    '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', // WBTC (Ethereum fork)
+    '0x5b218ed1428cfc1e488b777bdd473cf2647d30e3', // PLSX v2 (spam/old)
+  ]), [])
+
+  // Keep all tokens — no silent filtering. Show ETH forks with badge (same as Tokens page)
   const cleanPrices = useMemo(() => {
-    // Stablecoin symbols that should be ~$1 — filter out copies with wrong price
-    const STABLES = new Set(['USDT', 'USDC', 'DAI'])
     return prices.data.filter((t) => {
       const price = t.price_usd ?? 0
-      if (STABLES.has(t.symbol.toUpperCase()) && t.source === 'pulsex_subgraph') {
-        // Keep only bridged stables with price close to $1 (±10%)
-        if (price < 0.9 || price > 1.1) return false
-      }
-      // Filter WBTC copies with wrong price (should be ~$60K+)
-      if (t.symbol.toUpperCase() === 'WBTC' && t.source === 'pulsex_subgraph' && price < 10000) return false
-      // Filter WETH copies with wrong price (should be ~$1500+)
-      if (t.symbol.toUpperCase() === 'WETH' && t.source === 'pulsex_subgraph' && price < 500) return false
+      // Only filter truly invalid prices (zero/negative)
+      if (price <= 0) return false
       return true
     })
   }, [prices.data])
@@ -521,16 +521,22 @@ export function OverviewPage() {
                   <span className="sm:hidden">MCap</span>
                   <span className="text-xs text-gray-500 ml-1" title="Fully Diluted Valuation for PulseChain tokens, Circulating for CoinGecko tokens">*</span>
                 </th>
-                <th className="py-3 text-right" title="All-time cumulative trading volume from PulseX">Volume (All-time)</th>
+                <th className="py-3 text-right" title="24h trading volume from PulseX tokenDayDatas">Volume (24h)</th>
               </tr>
             </thead>
             <tbody>
               {sortedPrices.map((token) => (
                 <tr key={token.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                   <td className="py-2.5 pr-4">
-                    <div>
+                    <div className="flex items-center gap-1.5">
                       <span className="font-medium text-white">{token.symbol}</span>
-                      <span className="ml-2 text-gray-500">{token.name}</span>
+                      <span className="text-gray-500">{token.name}</span>
+                      {token.address && ETH_FORK_ADDRESSES.has(token.address.toLowerCase()) && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20" title="Ethereum fork copy — not the native bridged version">Fork</span>
+                      )}
+                      {token.source === 'coingecko' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20" title="Price from CoinGecko (reference)">Ref</span>
+                      )}
                     </div>
                     {token.address && (
                       <a
@@ -572,9 +578,9 @@ export function OverviewPage() {
           <div className="rounded bg-gray-800/50 border border-white/5 p-3 mb-2">
             <p className="text-gray-300 font-medium text-xs mb-1">What is this table?</p>
             <p className="text-xs text-gray-400">
-              This table lists <strong className="text-gray-300">all tokens traded on PulseChain</strong> with their current price, market capitalization, and historical volume.
-              Prices are derived from on-chain liquidity pools (PulseX Subgraph) for PulseChain-native tokens, and from CoinGecko for major bridged assets (BTC, ETH, stablecoins).
-              This provides a comprehensive view of every asset available on the PulseChain ecosystem.
+              This table lists <strong className="text-gray-300">all tokens traded on PulseChain</strong> with their current price, market capitalization, and 24h trading volume.
+              Prices are derived from on-chain liquidity pools (PulseX Subgraph) for PulseChain-native tokens, and from CoinGecko for major bridged assets (BTC, ETH, stablecoins — marked <span className="text-blue-400">Ref</span>).
+              Ethereum fork copies are marked <span className="text-orange-400">Fork</span> — these are not the real bridged versions.
             </p>
           </div>
           <p className="font-medium text-gray-400">Data Methodology</p>
@@ -586,7 +592,7 @@ export function OverviewPage() {
               <strong className="text-gray-400">Market Cap*:</strong> For PulseChain tokens, this is the <span className="text-gray-400">Fully Diluted Valuation (FDV)</span> = Total Supply × Price. No reliable circulating supply data exists on-chain for PulseChain — this is a known ecosystem limitation (PulseChain Scan also reports $0 circulating market cap). For CoinGecko tokens, this is the standard circulating market cap.
             </li>
             <li>
-              <strong className="text-gray-400">Volume:</strong> All-time cumulative trading volume from PulseX Subgraph (<code className="text-[#00D4FF]/70">tradeVolumeUSD</code>). Not 24h volume.
+              <strong className="text-gray-400">Volume (24h):</strong> Daily trading volume from PulseX <code className="text-[#00D4FF]/70">tokenDayDatas</code>. Updated every 15 minutes.
             </li>
             <li>
               <strong className="text-gray-400">24h Change:</strong> Calculated from price history stored daily. Compares current price to the most recent historical price (1-3 days ago).

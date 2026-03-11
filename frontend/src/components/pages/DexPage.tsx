@@ -862,10 +862,10 @@ export function DexPage() {
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <KpiCard
-              title="Total Liquidity"
+              title="DEX Liquidity"
               titleSuffix={liveFactory.totalLiquidityUSD ? <LiveIndicator /> : undefined}
               value={formatUsd(liveFactory.totalLiquidityUSD ?? kpis.totalLiquidity)}
-              subtitle="PulseX V1 + V2"
+              subtitle="PulseX V1 + V2 pools"
               icon={<Droplets className="h-5 w-5" />}
             />
             <KpiCard
