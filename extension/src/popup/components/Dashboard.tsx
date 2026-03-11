@@ -215,6 +215,15 @@ export function Dashboard() {
         )}
       </div>
 
+      {/* Status RPC & Indexers */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Activity className="h-4 w-4 text-pulse-cyan" />
+          <span className="text-xs font-semibold text-white">Status RPC & Indexers</span>
+        </div>
+        <RpcStatusInline />
+      </div>
+
       {/* Recent Alerts */}
       <div className="bg-gray-800/30 rounded-lg p-3 border border-white/5">
         <div className="flex items-center justify-between mb-2">
@@ -261,15 +270,6 @@ export function Dashboard() {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Status RPC & Indexers */}
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Activity className="h-4 w-4 text-pulse-cyan" />
-          <span className="text-xs font-semibold text-white">Status RPC & Indexers</span>
-        </div>
-        <RpcStatusInline />
       </div>
     </div>
   )
