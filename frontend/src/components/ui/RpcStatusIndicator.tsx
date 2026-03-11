@@ -2,16 +2,16 @@ import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRpcHealth, type ServiceStatus } from '../../hooks/useRpcHealth'
 
-const STATUS_CONFIG: Record<ServiceStatus, { color: string; bg: string; ping: string; label: string }> = {
-  operational: { color: 'bg-emerald-400', bg: 'bg-emerald-400/20', ping: 'bg-emerald-400', label: 'All Systems Operational' },
-  degraded: { color: 'bg-amber-400', bg: 'bg-amber-400/20', ping: 'bg-amber-400', label: 'Degraded Performance' },
-  down: { color: 'bg-red-500', bg: 'bg-red-500/20', ping: 'bg-red-500', label: 'Service Disruption' },
+const STATUS_CONFIG: Record<ServiceStatus, { color: string; ping: string; label: string }> = {
+  operational: { color: 'bg-emerald-400', ping: 'bg-emerald-400', label: 'All Systems Operational' },
+  degraded: { color: 'bg-amber-400', ping: 'bg-amber-400', label: 'Degraded Performance' },
+  down: { color: 'bg-red-500', ping: 'bg-red-500', label: 'Service Disruption' },
 }
 
 function StatusDot({ status }: { status: ServiceStatus }) {
   const cfg = STATUS_CONFIG[status]
   return (
-    <span className="relative flex h-2.5 w-2.5">
+    <span className="relative flex h-2.5 w-2.5 shrink-0">
       {status !== 'operational' && (
         <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${cfg.ping} opacity-75`} />
       )}
@@ -52,32 +52,55 @@ export function RpcStatusIndicator() {
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
           <div
-            className="fixed z-[9999] w-72 rounded-xl border border-white/10 bg-gray-950 shadow-2xl p-4"
+            className="fixed z-[9999] w-80 rounded-xl border border-white/10 bg-gray-950 shadow-2xl p-4"
             style={{
               top: rect ? rect.bottom + 8 : 50,
               right: rect ? window.innerWidth - rect.right : 16,
             }}
           >
+            {/* Header */}
             <div className="flex items-center gap-2 mb-3">
               <StatusDot status={overall} />
               <span className="text-sm font-medium text-white">{cfg.label}</span>
             </div>
 
-            <div className="space-y-2.5">
+            {/* Services */}
+            <div className="space-y-3">
               {services.map((svc) => (
-                <div key={svc.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <StatusDot status={svc.status} />
-                    <span className="text-xs text-gray-300">{svc.name}</span>
+                <div key={svc.name}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <StatusDot status={svc.status} />
+                      <span className="text-xs font-medium text-gray-200">{svc.name}</span>
+                    </div>
+                    <LatencyBadge ms={svc.latencyMs} />
                   </div>
-                  <LatencyBadge ms={svc.latencyMs} />
+                  <p className="text-[10px] text-gray-500 ml-[18px] mt-0.5">{svc.description}</p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-3 pt-3 border-t border-white/5">
-              <span className="text-[10px] text-gray-500">
-                Checked every 15s — {services[0]?.lastChecked?.toLocaleTimeString() || '--'}
+            {/* Legend */}
+            <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
+              <p className="text-[10px] font-medium text-gray-400 mb-1.5">Status Legend</p>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex rounded-full h-2 w-2 bg-emerald-400 shrink-0" />
+                <span className="text-[10px] text-gray-400"><span className="text-emerald-400">Operational</span> — responding normally</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex rounded-full h-2 w-2 bg-amber-400 shrink-0" />
+                <span className="text-[10px] text-gray-400"><span className="text-amber-400">Degraded</span> — slow response, data may be delayed</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex rounded-full h-2 w-2 bg-red-500 shrink-0" />
+                <span className="text-[10px] text-gray-400"><span className="text-red-400">Down</span> — unreachable or timeout (&gt;5s)</span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-3 pt-2 border-t border-white/5">
+              <span className="text-[10px] text-gray-600">
+                Auto-checked every 15s — {services[0]?.lastChecked?.toLocaleTimeString() || '--'}
               </span>
             </div>
           </div>

@@ -10,6 +10,8 @@ export type ServiceStatus = 'operational' | 'degraded' | 'down'
 
 export interface ServiceHealth {
   name: string
+  url: string
+  description: string
   status: ServiceStatus
   latencyMs: number | null
   lastChecked: Date | null
@@ -33,82 +35,101 @@ function overallStatus(services: ServiceHealth[]): ServiceStatus {
   return 'operational'
 }
 
-async function checkWithTimeout(fn: () => Promise<Response>, timeoutMs: number): Promise<{ ok: boolean; latencyMs: number }> {
-  const start = performance.now()
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+interface CheckResult {
+  valid: boolean
+  latencyMs: number
+}
 
+/** Check PulseChain RPC — validates JSON-RPC result has a hex block number */
+async function checkRpc(): Promise<CheckResult> {
+  const start = performance.now()
   try {
-    const res = await fn()
-    const latencyMs = performance.now() - start
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+    const res = await fetch(PULSECHAIN_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
+      signal: controller.signal,
+    })
     clearTimeout(timer)
-    return { ok: res.ok, latencyMs }
+    const json = await res.json()
+    const valid = typeof json?.result === 'string' && json.result.startsWith('0x')
+    return { valid, latencyMs: performance.now() - start }
   } catch {
-    clearTimeout(timer)
-    const latencyMs = performance.now() - start
-    return { ok: false, latencyMs }
+    return { valid: false, latencyMs: performance.now() - start }
   }
 }
 
+/** Check PulseX Subgraph — validates GraphQL returns a block number */
+async function checkSubgraph(): Promise<CheckResult> {
+  const start = performance.now()
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+    const res = await fetch(PULSEX_V2_SUBGRAPH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: '{ _meta { block { number } } }' }),
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    const json = await res.json()
+    const valid = typeof json?.data?._meta?.block?.number === 'number'
+    return { valid, latencyMs: performance.now() - start }
+  } catch {
+    return { valid: false, latencyMs: performance.now() - start }
+  }
+}
+
+/** Check Scan API — validates response has total_blocks field */
+async function checkScan(): Promise<CheckResult> {
+  const start = performance.now()
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+    const res = await fetch(SCAN_API, {
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    const json = await res.json()
+    const valid = json?.total_blocks != null
+    return { valid, latencyMs: performance.now() - start }
+  } catch {
+    return { valid: false, latencyMs: performance.now() - start }
+  }
+}
+
+const SERVICE_META = [
+  { name: 'PulseChain RPC', url: 'rpc.pulsechain.com', description: 'Blockchain node — blocks, gas, transactions', fast: 500, slow: 2000 },
+  { name: 'PulseX Subgraph', url: 'graph.pulsechain.com', description: 'DEX indexer — prices, swaps, liquidity', fast: 2000, slow: 5000 },
+  { name: 'Scan API', url: 'scan.pulsechain.com', description: 'Block explorer — tokens, holders, contracts', fast: 1000, slow: 3000 },
+] as const
+
 export function useRpcHealth(): RpcHealth {
-  const [services, setServices] = useState<ServiceHealth[]>([
-    { name: 'PulseChain RPC', status: 'operational', latencyMs: null, lastChecked: null },
-    { name: 'PulseX Subgraph', status: 'operational', latencyMs: null, lastChecked: null },
-    { name: 'Scan API', status: 'operational', latencyMs: null, lastChecked: null },
-  ])
+  const [services, setServices] = useState<ServiceHealth[]>(
+    SERVICE_META.map((m) => ({ name: m.name, url: m.url, description: m.description, status: 'operational' as ServiceStatus, latencyMs: null, lastChecked: null }))
+  )
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
 
   const checkHealth = useCallback(async () => {
     const now = new Date()
-
-    const [rpc, subgraph, scan] = await Promise.all([
-      // 1. PulseChain RPC
-      checkWithTimeout(
-        () =>
-          fetch(PULSECHAIN_RPC, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
-          }),
-        TIMEOUT_MS
-      ),
-      // 2. PulseX Subgraph
-      checkWithTimeout(
-        () =>
-          fetch(PULSEX_V2_SUBGRAPH, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: '{ _meta { block { number } } }' }),
-          }),
-        TIMEOUT_MS
-      ),
-      // 3. Scan API
-      checkWithTimeout(() => fetch(SCAN_API), TIMEOUT_MS),
-    ])
+    const results = await Promise.all([checkRpc(), checkSubgraph(), checkScan()])
 
     if (!mountedRef.current) return
 
-    const updated: ServiceHealth[] = [
-      {
-        name: 'PulseChain RPC',
-        status: rpc.ok ? statusFromLatency(rpc.latencyMs, 500, 2000) : 'down',
-        latencyMs: Math.round(rpc.latencyMs),
+    const updated: ServiceHealth[] = SERVICE_META.map((meta, i) => {
+      const r = results[i]
+      return {
+        name: meta.name,
+        url: meta.url,
+        description: meta.description,
+        status: r.valid ? statusFromLatency(r.latencyMs, meta.fast, meta.slow) : 'down',
+        latencyMs: Math.round(r.latencyMs),
         lastChecked: now,
-      },
-      {
-        name: 'PulseX Subgraph',
-        status: subgraph.ok ? statusFromLatency(subgraph.latencyMs, 2000, 5000) : 'down',
-        latencyMs: Math.round(subgraph.latencyMs),
-        lastChecked: now,
-      },
-      {
-        name: 'Scan API',
-        status: scan.ok ? statusFromLatency(scan.latencyMs, 1000, 3000) : 'down',
-        latencyMs: Math.round(scan.latencyMs),
-        lastChecked: now,
-      },
-    ]
+      }
+    })
 
     setServices(updated)
     setLoading(false)
