@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Github, Menu, X, Shield, AlertTriangle, TrendingUp, Crown, Search, Loader2 } from 'lucide-react'
+import { RpcStatusIndicator } from '../ui/RpcStatusIndicator'
 
 interface HeaderProps {
   activePage: string
@@ -126,18 +127,20 @@ export function Header({ activePage }: HeaderProps) {
             <span className="hidden lg:inline">Search address</span>
             <kbd className="hidden lg:inline ml-1 text-[10px] text-gray-600 bg-white/5 px-1.5 py-0.5 rounded">/</kbd>
           </button>
+          <RpcStatusIndicator />
           <a
             href="https://github.com/openpulsechain/openpulsechain"
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-2 text-gray-400 hover:text-[#00D4FF] transition-colors"
+            className="ml-1 text-gray-400 hover:text-[#00D4FF] transition-colors"
           >
             <Github className="h-5 w-5" />
           </a>
         </nav>
 
-        {/* Mobile: search + hamburger */}
+        {/* Mobile: status + search + hamburger */}
         <div className="flex items-center gap-2 md:hidden">
+          <RpcStatusIndicator />
           <button
             onClick={() => setSearchOpen(true)}
             className="text-gray-400 hover:text-white transition-colors"
