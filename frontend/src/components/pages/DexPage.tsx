@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeftRight, Droplets, Hash, TrendingUp, Info, ChevronDown } from 'lucide-react'
+import { ArrowLeftRight, Droplets, Hash, TrendingUp, Info, ChevronDown, ExternalLink, Copy, Check } from 'lucide-react'
 import { KpiCard } from '../cards/KpiCard'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { BarChartComponent } from '../charts/BarChart'
@@ -735,6 +735,8 @@ export function DexPage() {
   const [liqSource, setLiqSource] = useState<DexSource>('v1')
   const [volSource, setVolSource] = useState<DexSource>('v1')
   const [cumSource, setCumSource] = useState<DexSource>('v1')
+  const [expandedPair, setExpandedPair] = useState<string | null>(null)
+  const [copiedAddr, setCopiedAddr] = useState<string | null>(null)
 
   const latest = pulsex.data.length > 0 ? pulsex.data[pulsex.data.length - 1] : null
 
@@ -968,19 +970,111 @@ export function DexPage() {
                 </tr>
               </thead>
               <tbody>
-                {topPairs.data.map((pair, i) => (
-                  <tr key={pair.pair_address} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="py-2.5 pr-4 text-gray-500">{i + 1}</td>
-                    <td className="py-2.5 pr-4">
-                      <span className="font-medium text-white">{pair.token0_symbol}</span>
-                      <span className="text-gray-500"> / </span>
-                      <span className="text-gray-300">{pair.token1_symbol}</span>
-                    </td>
-                    <td className="py-2.5 pr-4 text-right text-gray-300">{formatUsd(pair.volume_usd)}</td>
-                    <td className="py-2.5 pr-4 text-right text-gray-300">{formatUsd(pair.reserve_usd)}</td>
-                    <td className="py-2.5 text-right text-gray-400">{formatNumber(pair.total_transactions)}</td>
-                  </tr>
-                ))}
+                {topPairs.data.map((pair, i) => {
+                  const isExpanded = expandedPair === pair.pair_address
+                  const volLiqRatio = pair.reserve_usd > 0 ? pair.volume_usd / pair.reserve_usd : 0
+                  const explorerUrl = `https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${pair.pair_address}`
+                  const dexScreenerUrl = `https://dexscreener.com/pulsechain/${pair.pair_address}`
+
+                  return (
+                    <tr key={pair.pair_address} className="border-b border-white/5">
+                      <td colSpan={5} className="p-0">
+                        {/* Main row */}
+                        <button
+                          onClick={() => setExpandedPair(isExpanded ? null : pair.pair_address)}
+                          className="w-full flex items-center hover:bg-white/5 transition-colors text-left"
+                        >
+                          <span className="py-2.5 pr-4 pl-0 text-gray-500 w-12 shrink-0">{i + 1}</span>
+                          <span className="py-2.5 pr-4 flex-1 min-w-0">
+                            <span className="font-medium text-white">{pair.token0_symbol}</span>
+                            <span className="text-gray-500"> / </span>
+                            <span className="text-gray-300">{pair.token1_symbol}</span>
+                            <ChevronDown className={`inline-block ml-1.5 h-3 w-3 text-gray-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </span>
+                          <span className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.volume_usd)}</span>
+                          <span className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.reserve_usd)}</span>
+                          <span className="py-2.5 text-right text-gray-400 whitespace-nowrap">{formatNumber(pair.total_transactions)}</span>
+                        </button>
+
+                        {/* Expanded details */}
+                        {isExpanded && (
+                          <div className="px-4 pb-4 pt-1 bg-white/[0.02] border-t border-white/5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {/* Left: pair info */}
+                              <div className="space-y-2.5">
+                                <div>
+                                  <span className="text-[11px] text-gray-500 block mb-0.5">Pair Contract</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono text-xs text-gray-300 truncate">{pair.pair_address}</span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        navigator.clipboard.writeText(pair.pair_address)
+                                        setCopiedAddr(pair.pair_address)
+                                        setTimeout(() => setCopiedAddr(null), 2000)
+                                      }}
+                                      className="shrink-0 text-gray-500 hover:text-[#00D4FF] transition-colors"
+                                      title="Copy address"
+                                    >
+                                      {copiedAddr === pair.pair_address
+                                        ? <Check className="h-3 w-3 text-emerald-400" />
+                                        : <Copy className="h-3 w-3" />}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-[11px] text-gray-500 block mb-0.5">Tokens</span>
+                                  <div className="text-xs text-gray-300">
+                                    <span className="text-white font-medium">{pair.token0_symbol}</span>
+                                    {pair.token0_name && <span className="text-gray-500 ml-1">({pair.token0_name})</span>}
+                                    <span className="text-gray-600 mx-1.5">/</span>
+                                    <span className="text-white font-medium">{pair.token1_symbol}</span>
+                                    {pair.token1_name && <span className="text-gray-500 ml-1">({pair.token1_name})</span>}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-[11px] text-gray-500 block mb-0.5">Volume / Liquidity Ratio</span>
+                                  <span className={`text-xs font-mono ${volLiqRatio > 100 ? 'text-emerald-400' : volLiqRatio > 10 ? 'text-gray-300' : 'text-amber-400'}`}>
+                                    {volLiqRatio.toFixed(1)}x
+                                  </span>
+                                  <span className="text-[10px] text-gray-600 ml-1.5">
+                                    {volLiqRatio > 100 ? '(very active)' : volLiqRatio > 10 ? '(active)' : '(low activity)'}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-gray-600">
+                                  Source: PulseX V1 Subgraph — All-time data
+                                </div>
+                              </div>
+
+                              {/* Right: links */}
+                              <div className="space-y-2">
+                                <span className="text-[11px] text-gray-500 block mb-1">Verify on</span>
+                                <a
+                                  href={explorerUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-gray-300 hover:bg-white/10 hover:text-[#00D4FF] transition-colors"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                                  <span>PulseChain Explorer (Otterscan)</span>
+                                </a>
+                                <a
+                                  href={dexScreenerUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-gray-300 hover:bg-white/10 hover:text-emerald-400 transition-colors"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                                  <span>DexScreener (chart + live price)</span>
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
