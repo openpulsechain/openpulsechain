@@ -493,7 +493,7 @@ export function DexPage() {
 
   // Lazy-load DefiLlama histories when user switches dropdown
   const pulsexHistory = usePulsexHistory(liqSource === 'pulsex' || volSource === 'pulsex')
-  const allDexHistory = useAllPulsechainDexHistory(volSource === 'all')
+  const allDexHistory = useAllPulsechainDexHistory(liqSource === 'all' || volSource === 'all')
 
   const latest = pulsex.data.length > 0 ? pulsex.data[pulsex.data.length - 1] : null
 
@@ -523,12 +523,12 @@ export function DexPage() {
   // --- Liquidity data based on source ---
   const v1LiqData = useMemo(() => validData.map((d) => ({ date: d.date, tvl_usd: d.total_liquidity_usd })), [validData])
 
-  const liqBaseData = liqSource === 'v1' ? v1LiqData : pulsexHistory.tvl
+  const liqBaseData = liqSource === 'v1' ? v1LiqData : liqSource === 'pulsex' ? pulsexHistory.tvl : allDexHistory.tvl
   const liveLiq = liqSource === 'v1'
     ? liveFactory.v1LiquidityUSD
     : liqSource === 'pulsex'
       ? liveLL.tvlPulsex
-      : null // "all" not applicable for liquidity on DEX page (use Overview)
+      : liveLL.tvlAll
 
   const liqWithLive = useMemo(() => {
     if (!liveLiq || liqBaseData.length === 0) return liqBaseData
@@ -581,7 +581,7 @@ export function DexPage() {
   const cumRecent = cumRange ? cumulativeVolume.slice(-cumRange) : cumulativeVolume
 
   // Loading states
-  const liqIsLoading = liqSource === 'pulsex' && pulsexHistory.loading
+  const liqIsLoading = (liqSource === 'pulsex' && pulsexHistory.loading) || (liqSource === 'all' && allDexHistory.loading)
   const volIsLoading = (volSource === 'pulsex' && pulsexHistory.loading) || (volSource === 'all' && allDexHistory.loading)
 
   if (pulsex.loading) return <Spinner />
@@ -636,7 +636,7 @@ export function DexPage() {
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-white">Total Liquidity</h2>
           <div className="flex items-center gap-2">
-            <DexSourceSelector value={liqSource} onChange={(v) => { setLiqSource(v === 'all' ? 'pulsex' : v); }} />
+            <DexSourceSelector value={liqSource} onChange={setLiqSource} />
             <TimeRangeSelector value={liqRange} onChange={setLiqRange} />
           </div>
         </div>

@@ -1,20 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
 
+interface TvlPoint {
+  date: string
+  tvl_usd: number
+}
+
 interface VolumePoint {
   date: string
   volume_usd: number
 }
 
 export interface AllPulsechainDexHistory {
+  tvl: TvlPoint[]
   volume: VolumePoint[]
   loading: boolean
 }
 
 /**
- * Fetches "All PulseChain DEX" historical daily volume from DefiLlama.
+ * Fetches "All PulseChain" historical TVL + DEX volume from DefiLlama.
  * Only loads when `enabled` is true (lazy fetch on dropdown switch).
  */
 export function useAllPulsechainDexHistory(enabled: boolean): AllPulsechainDexHistory {
+  const [tvl, setTvl] = useState<TvlPoint[]>([])
   const [volume, setVolume] = useState<VolumePoint[]>([])
   const [loading, setLoading] = useState(false)
   const fetchedRef = useRef(false)
@@ -32,16 +39,27 @@ export function useAllPulsechainDexHistory(enabled: boolean): AllPulsechainDexHi
 
     async function fetchHistory() {
       try {
-        const res = await fetch('https://api.llama.fi/overview/dexs/PulseChain').then((r) => r.json())
+        const [tvlRes, volRes] = await Promise.all([
+          fetch('https://api.llama.fi/v2/historicalChainTvl/PulseChain').then((r) => r.json()),
+          fetch('https://api.llama.fi/overview/dexs/PulseChain').then((r) => r.json()),
+        ])
 
         if (!mountedRef.current) return
 
-        const chart = res?.totalDataChart ?? []
+        // TVL history
+        const tvlPoints: TvlPoint[] = (tvlRes ?? []).map((p: { date: number; tvl: number }) => ({
+          date: new Date(p.date * 1000).toISOString().slice(0, 10),
+          tvl_usd: p.tvl,
+        }))
+
+        // Volume history
+        const chart = volRes?.totalDataChart ?? []
         const volPoints: VolumePoint[] = chart.map((p: [number, number]) => ({
           date: new Date(p[0] * 1000).toISOString().slice(0, 10),
           volume_usd: p[1],
         }))
 
+        setTvl(tvlPoints)
         setVolume(volPoints)
       } catch {
         // Silently fail
@@ -53,5 +71,5 @@ export function useAllPulsechainDexHistory(enabled: boolean): AllPulsechainDexHi
     fetchHistory()
   }, [enabled])
 
-  return { volume, loading }
+  return { tvl, volume, loading }
 }
