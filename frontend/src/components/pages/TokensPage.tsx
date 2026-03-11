@@ -30,6 +30,7 @@ interface TokenWithPrice extends Token {
   price_usd: number | null
   price_change_24h_pct: number | null
   volume_24h_usd: number | null
+  market_cap_usd: number | null
 }
 
 interface PriceHistory {
@@ -82,15 +83,15 @@ export function TokensPage() {
 
       // Enrich with prices
       const addresses = tokenList.map(t => t.address.toLowerCase())
-      let pricesMap: Record<string, { price_usd: number | null; price_change_24h_pct: number | null; volume_24h_usd: number | null }> = {}
+      let pricesMap: Record<string, { price_usd: number | null; price_change_24h_pct: number | null; volume_24h_usd: number | null; market_cap_usd: number | null }> = {}
 
       if (addresses.length > 0) {
         const { data: prices } = await supabase
           .from('token_prices')
-          .select('id, price_usd, price_change_24h_pct, volume_24h_usd')
+          .select('id, price_usd, price_change_24h_pct, volume_24h_usd, market_cap_usd')
           .in('id', addresses)
         for (const p of (prices || [])) {
-          pricesMap[p.id] = { price_usd: p.price_usd, price_change_24h_pct: p.price_change_24h_pct, volume_24h_usd: p.volume_24h_usd }
+          pricesMap[p.id] = { price_usd: p.price_usd, price_change_24h_pct: p.price_change_24h_pct, volume_24h_usd: p.volume_24h_usd, market_cap_usd: p.market_cap_usd }
         }
       }
 
@@ -99,6 +100,7 @@ export function TokensPage() {
         price_usd: pricesMap[t.address.toLowerCase()]?.price_usd ?? null,
         price_change_24h_pct: pricesMap[t.address.toLowerCase()]?.price_change_24h_pct ?? null,
         volume_24h_usd: pricesMap[t.address.toLowerCase()]?.volume_24h_usd ?? null,
+        market_cap_usd: pricesMap[t.address.toLowerCase()]?.market_cap_usd ?? null,
       }))
 
       setTokens(enriched)
@@ -210,6 +212,7 @@ export function TokensPage() {
                     <th className="py-3 pr-4">Token</th>
                     <th className="py-3 pr-4 text-right">Price</th>
                     <th className="py-3 pr-4 text-right">24h</th>
+                    <th className="py-3 pr-4 text-right">Market Cap</th>
                     <th className="py-3 pr-4 text-right">Volume (24h)</th>
                     <th className="py-3 text-right">Liquidity</th>
                   </tr>
@@ -243,10 +246,17 @@ export function TokensPage() {
                           ? `${token.price_change_24h_pct >= 0 ? '+' : ''}${token.price_change_24h_pct.toFixed(2)}%`
                           : '--'}
                       </td>
-                      <td className="py-2.5 pr-4 text-right text-gray-300" title={token.volume_24h_usd == null ? 'All-time cumulative volume (24h not available)' : '24h trading volume'}>
-                        {token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : <span className="text-gray-500">{formatUsd(token.total_volume_usd)}</span>}
+                      <td className="py-2.5 pr-4 text-right text-gray-300">
+                        {token.market_cap_usd != null ? formatUsd(token.market_cap_usd) : '--'}
                       </td>
-                      <td className="py-2.5 text-right text-gray-300">{formatUsd(token.total_liquidity)}</td>
+                      <td className="py-2.5 pr-4 text-right text-gray-300" title={token.volume_24h_usd == null ? 'No recent daily volume data' : '24h trading volume'}>
+                        {token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : '--'}
+                      </td>
+                      <td className="py-2.5 text-right text-gray-300">
+                        {token.price_usd != null && token.total_liquidity > 0
+                          ? formatUsd(token.total_liquidity * token.price_usd)
+                          : '--'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -335,19 +345,51 @@ export function TokensPage() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-white/5">
                 <div>
-                  <div className="text-xs text-gray-500">Total Volume</div>
-                  <div className="text-sm font-medium text-white">{formatUsd(selectedToken.total_volume_usd)}</div>
+                  <div className="text-xs text-gray-500">Market Cap</div>
+                  <div className="text-sm font-medium text-white">
+                    {selectedToken.market_cap_usd != null ? formatUsd(selectedToken.market_cap_usd) : '--'}
+                  </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Liquidity</div>
-                  <div className="text-sm font-medium text-white">{formatUsd(selectedToken.total_liquidity)}</div>
+                  <div className="text-xs text-gray-500">Volume (24h)</div>
+                  <div className="text-sm font-medium text-white">
+                    {selectedToken.volume_24h_usd != null ? formatUsd(selectedToken.volume_24h_usd) : '--'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Liquidity (USD)</div>
+                  <div className="text-sm font-medium text-white">
+                    {selectedToken.price_usd != null && selectedToken.total_liquidity > 0
+                      ? formatUsd(selectedToken.total_liquidity * selectedToken.price_usd)
+                      : '--'}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-500">Decimals</div>
                   <div className="text-sm font-medium text-white">{selectedToken.decimals}</div>
                 </div>
+              </div>
+
+              {/* External links */}
+              <div className="flex gap-3 text-xs">
+                <a
+                  href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${selectedToken.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-gray-400 hover:text-[#00D4FF] transition-colors"
+                >
+                  <ExternalLink className="h-3 w-3" /> Explorer
+                </a>
+                <a
+                  href={`https://dexscreener.com/pulsechain/${selectedToken.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-gray-400 hover:text-[#00D4FF] transition-colors"
+                >
+                  <ExternalLink className="h-3 w-3" /> DexScreener
+                </a>
               </div>
 
               {/* Price chart */}

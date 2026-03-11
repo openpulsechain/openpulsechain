@@ -147,6 +147,46 @@ def _fetch_yesterday_prices(addresses: list[str]) -> dict:
     return prices
 
 
+def _fetch_latest_daily_volumes(addresses: list[str]) -> dict:
+    """Fetch the most recent daily_volume_usd from token_price_history.
+
+    This gives the REAL daily volume (from tokenDayDatas), not the all-time
+    tradeVolumeUSD which was incorrectly stored as volume_24h before.
+    Returns dict keyed by lowercase address.
+    """
+    if not addresses:
+        return {}
+
+    three_days_ago = (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%d")
+    lower_addresses = [a.lower() for a in addresses]
+
+    volumes = {}
+    batch_size = 50
+
+    for i in range(0, len(lower_addresses), batch_size):
+        batch = lower_addresses[i : i + batch_size]
+        try:
+            resp = (
+                supabase.table("token_price_history")
+                .select("address, date, daily_volume_usd")
+                .in_("address", batch)
+                .gte("date", three_days_ago)
+                .order("date", desc=True)
+                .execute()
+            )
+            for row in resp.data or []:
+                addr = row["address"].lower()
+                if addr in volumes:
+                    continue  # Already have the most recent
+                vol = row.get("daily_volume_usd")
+                if vol is not None and float(vol) >= 0:
+                    volumes[addr] = float(vol)
+        except Exception as e:
+            logger.warning(f"Failed to fetch latest daily volumes: {e}")
+
+    return volumes
+
+
 def _fetch_pulsechain_prices() -> list[dict]:
     """Fetch PulseChain token prices from PulseX subgraph (sovereign, no GeckoTerminal)."""
     # 1. Get top tokens from database
@@ -176,7 +216,10 @@ def _fetch_pulsechain_prices() -> list[dict]:
     # 3. Get yesterday's prices for 24h change calculation
     yesterday_prices = _fetch_yesterday_prices(addresses)
 
-    # 4. Build output rows
+    # 4. Get real daily volumes from token_price_history (NOT tradeVolumeUSD which is all-time)
+    daily_volumes = _fetch_latest_daily_volumes(addresses)
+
+    # 5. Build output rows
     rows = []
     now = datetime.now(timezone.utc).isoformat()
 
@@ -190,8 +233,10 @@ def _fetch_pulsechain_prices() -> list[dict]:
             continue
 
         meta = token_meta[addr]
-        volume_usd = float(sg.get("tradeVolumeUSD", 0))
         total_liquidity = float(sg.get("totalLiquidity", 0))
+
+        # Real 24h volume from token_price_history (tokenDayDatas), NOT tradeVolumeUSD (all-time)
+        real_daily_vol = daily_volumes.get(addr)
 
         # Calculate market cap from totalSupply and derivedUSD
         market_cap = None
@@ -216,7 +261,7 @@ def _fetch_pulsechain_prices() -> list[dict]:
             "symbol": meta["symbol"],
             "name": meta["name"],
             "price_usd": derived_usd,
-            "volume_24h_usd": volume_usd,
+            "volume_24h_usd": real_daily_vol,
             "market_cap_usd": market_cap,
             "price_change_24h_pct": change_pct,
             "last_updated": now,
