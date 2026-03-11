@@ -74,6 +74,7 @@ interface Token {
   decimals: number
   total_volume_usd: number
   total_liquidity: number
+  total_liquidity_usd: number | null
   is_active: boolean
   holder_count?: number | null
 }
@@ -223,7 +224,7 @@ export function TokensPage() {
 
         const { data: allTokens, count } = await supabase
           .from('pulsechain_tokens')
-          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, is_active, holder_count', { count: 'exact' })
+          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, total_liquidity_usd, is_active, holder_count', { count: 'exact' })
           .eq('is_active', true)
 
         totalCount = count || 0
@@ -252,11 +253,11 @@ export function TokensPage() {
       } else {
         let query = supabase
           .from('pulsechain_tokens')
-          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, is_active, holder_count', { count: 'exact' })
+          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, total_liquidity_usd, is_active, holder_count', { count: 'exact' })
           .eq('is_active', true)
 
         if (sortField === 'liquidity') {
-          query = query.order('total_liquidity', { ascending: false })
+          query = query.order('total_liquidity_usd', { ascending: false, nullsFirst: false })
         } else {
           query = query.order('total_volume_usd', { ascending: false })
         }
@@ -356,7 +357,7 @@ export function TokensPage() {
         if (filters.hasPriceOnly && t.price_usd == null) return false
         if (filters.positiveChange && (t.price_change_24h_pct == null || t.price_change_24h_pct <= 0)) return false
         if (filters.minLiquidity) {
-          const liqUsd = (t.price_usd && t.total_liquidity > 0) ? t.total_liquidity * t.price_usd : 0
+          const liqUsd = t.total_liquidity_usd ?? ((t.price_usd && t.total_liquidity > 0) ? t.total_liquidity * t.price_usd : 0)
           if (liqUsd < filters.minLiquidity) return false
         }
         if (filters.minMcap) {
@@ -645,9 +646,11 @@ export function TokensPage() {
                           {token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : '--'}
                         </td>
                         <td className="py-2.5 pr-4 text-right text-gray-300">
-                          {token.price_usd != null && token.total_liquidity > 0
-                            ? formatUsd(token.total_liquidity * token.price_usd)
-                            : '--'}
+                          {token.total_liquidity_usd != null
+                            ? formatUsd(token.total_liquidity_usd)
+                            : (token.price_usd != null && token.total_liquidity > 0)
+                              ? formatUsd(token.total_liquidity * token.price_usd)
+                              : '--'}
                         </td>
                         <td className="py-2.5 text-right">
                           <Sparkline data={sparkData[token.address.toLowerCase()] || []} />
@@ -896,9 +899,11 @@ export function TokensPage() {
                 <div>
                   <div className="text-xs text-gray-500">Liquidity (USD)</div>
                   <div className="text-sm font-medium text-white">
-                    {selectedToken.price_usd != null && selectedToken.total_liquidity > 0
-                      ? formatUsd(selectedToken.total_liquidity * selectedToken.price_usd)
-                      : '--'}
+                    {selectedToken.total_liquidity_usd != null
+                      ? formatUsd(selectedToken.total_liquidity_usd)
+                      : (selectedToken.price_usd != null && selectedToken.total_liquidity > 0)
+                        ? formatUsd(selectedToken.total_liquidity * selectedToken.price_usd)
+                        : '--'}
                   </div>
                 </div>
                 <div>

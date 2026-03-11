@@ -72,6 +72,7 @@ def _fetch_all_tokens() -> list[dict]:
                 decimals
                 tradeVolumeUSD
                 totalLiquidity
+                derivedUSD
             }}
         }}"""
 
@@ -133,13 +134,19 @@ def run():
         now = datetime.now(timezone.utc).isoformat()
         rows = []
         for t in valid_tokens:
+            total_liq = float(t.get("totalLiquidity", 0))
+            derived_usd = float(t.get("derivedUSD", 0))
+            # Compute USD liquidity: totalLiquidity (token units) × derivedUSD (price)
+            total_liq_usd = total_liq * derived_usd if total_liq > 0 and derived_usd > 0 else None
+
             rows.append({
                 "address": t["id"].lower(),
                 "symbol": t["symbol"],
                 "name": t["name"],
                 "decimals": int(t["decimals"]),
                 "total_volume_usd": float(t["tradeVolumeUSD"]),
-                "total_liquidity": float(t.get("totalLiquidity", 0)),
+                "total_liquidity": total_liq,
+                "total_liquidity_usd": total_liq_usd,
                 "is_active": True,
                 "updated_at": now,
             })

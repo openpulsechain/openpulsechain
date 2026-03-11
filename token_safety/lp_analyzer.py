@@ -233,8 +233,8 @@ def analyze_lp(token_address: str) -> dict:
     result["best_pair"] = best
     result["all_pairs"] = all_valid_pairs
 
-    # Check recent burns (LP removals) in last 24h
-    if best:
+    # Check recent burns (LP removals) and mints across ALL valid pairs (not just best)
+    if all_valid_pairs:
         ts_24h_ago = str(now - 86400)
         burns_query = """
         query($pair: String!, $timestamp: String!) {
@@ -249,12 +249,6 @@ def analyze_lp(token_address: str) -> dict:
             }
         }
         """
-        # Query the subgraph where we found the best pair
-        subgraph_url = PULSEX_V2_SUBGRAPH if best["dex"] == "PulseX_V2" else PULSEX_V1_SUBGRAPH
-        burn_data = _query_subgraph(subgraph_url, burns_query, {"pair": best["address"], "timestamp": ts_24h_ago})
-        result["recent_burns"] = burn_data.get("burns", [])
-
-        # Check recent mints (LP additions)
         mints_query = """
         query($pair: String!, $timestamp: String!) {
             mints(where: {pair: $pair, timestamp_gt: $timestamp}, orderBy: timestamp, orderDirection: desc, first: 10) {
@@ -268,7 +262,35 @@ def analyze_lp(token_address: str) -> dict:
             }
         }
         """
-        mint_data = _query_subgraph(subgraph_url, mints_query, {"pair": best["address"], "timestamp": ts_24h_ago})
-        result["recent_mints"] = mint_data.get("mints", [])
+
+        all_burns = []
+        all_mints = []
+        seen_burn_ids = set()
+        seen_mint_ids = set()
+
+        for pair_info in all_valid_pairs:
+            subgraph_url = PULSEX_V2_SUBGRAPH if pair_info["dex"] == "PulseX_V2" else PULSEX_V1_SUBGRAPH
+            variables = {"pair": pair_info["address"], "timestamp": ts_24h_ago}
+
+            burn_data = _query_subgraph(subgraph_url, burns_query, variables)
+            for b in burn_data.get("burns", []):
+                if b["id"] not in seen_burn_ids:
+                    seen_burn_ids.add(b["id"])
+                    b["_pair"] = pair_info["address"]
+                    all_burns.append(b)
+
+            mint_data = _query_subgraph(subgraph_url, mints_query, variables)
+            for m in mint_data.get("mints", []):
+                if m["id"] not in seen_mint_ids:
+                    seen_mint_ids.add(m["id"])
+                    m["_pair"] = pair_info["address"]
+                    all_mints.append(m)
+
+        # Sort by timestamp descending
+        all_burns.sort(key=lambda x: int(x.get("timestamp", 0)), reverse=True)
+        all_mints.sort(key=lambda x: int(x.get("timestamp", 0)), reverse=True)
+
+        result["recent_burns"] = all_burns
+        result["recent_mints"] = all_mints
 
     return result

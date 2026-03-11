@@ -87,13 +87,24 @@ def main():
     logger.info("=" * 60)
     logger.info(f"All indexers completed in {elapsed_total:.1f}s — {success} OK, {failed} failed")
 
-    if failed:
-        for name, ok in results.items():
-            if not ok:
-                logger.error(f"  FAILED: {name}")
+    # Critical indexers: if these fail, exit(1) to signal Railway
+    critical = {"bridge_subgraph", "token_prices", "pulsex_stats", "pulsex_pairs", "token_discovery"}
+    critical_failed = [name for name, ok in results.items() if not ok and name in critical]
+    non_critical_failed = [name for name, ok in results.items() if not ok and name not in critical]
+
+    if non_critical_failed:
+        for name in non_critical_failed:
+            logger.warning(f"  NON-CRITICAL FAILED: {name}")
+
+    if critical_failed:
+        for name in critical_failed:
+            logger.error(f"  CRITICAL FAILED: {name}")
         sys.exit(1)
 
-    logger.info("All indexers completed successfully")
+    if failed:
+        logger.info(f"All critical indexers OK — {failed} non-critical failed")
+    else:
+        logger.info("All indexers completed successfully")
 
 
 if __name__ == "__main__":
