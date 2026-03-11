@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 
 const PULSECHAIN_RPC = 'https://rpc.pulsechain.com'
 const PULSEX_V2_SUBGRAPH = 'https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2'
-const SCAN_API = 'https://api.scan.pulsechain.com/api/v2/stats'
 const CHECK_INTERVAL = 15_000
 const TIMEOUT_MS = 5_000
 
@@ -18,7 +17,6 @@ interface Service {
 const SERVICE_META = [
   { name: 'PulseChain RPC', description: 'Blockchain node', fast: 500, slow: 2000 },
   { name: 'PulseX Subgraph', description: 'DEX indexer', fast: 2000, slow: 5000 },
-  { name: 'Scan API', description: 'Block explorer', fast: 1000, slow: 3000 },
 ] as const
 
 function statusFromLatency(ms: number, fast: number, slow: number): Status {
@@ -70,18 +68,7 @@ async function checkSubgraph(): Promise<{ valid: boolean; ms: number }> {
   }
 }
 
-async function checkScan(): Promise<{ valid: boolean; ms: number }> {
-  const start = performance.now()
-  try {
-    const res = await withTimeout(fetch(SCAN_API), TIMEOUT_MS)
-    const json = await res.json()
-    return { valid: json?.total_blocks != null, ms: performance.now() - start }
-  } catch {
-    return { valid: false, ms: performance.now() - start }
-  }
-}
-
-const checkers = [checkRpc, checkSubgraph, checkScan]
+const checkers = [checkRpc, checkSubgraph]
 
 const COLORS: Record<Status, string> = {
   operational: 'bg-emerald-400',

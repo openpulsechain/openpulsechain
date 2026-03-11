@@ -45,7 +45,7 @@ export function RpcStatusIndicator() {
         title={cfg.label}
       >
         <StatusDot status={overall} />
-        <span className="text-[11px] text-gray-400 hidden sm:inline">RPC</span>
+        <span className="text-[11px] text-gray-400 hidden sm:inline">Status</span>
       </button>
 
       {open && createPortal(

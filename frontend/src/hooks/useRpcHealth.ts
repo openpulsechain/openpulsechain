@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 const PULSECHAIN_RPC = 'https://rpc.pulsechain.com'
 const PULSEX_V2_SUBGRAPH = 'https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2'
-const SCAN_API = 'https://api.scan.pulsechain.com/api/v2/stats'
 const CHECK_INTERVAL = 15_000 // 15 seconds
 const TIMEOUT_MS = 5_000
 
@@ -83,26 +82,12 @@ async function checkSubgraph(): Promise<{ valid: boolean; latencyMs: number }> {
   }
 }
 
-/** Check Scan API — GET request, may fail CORS in some browsers */
-async function checkScan(): Promise<{ valid: boolean; latencyMs: number }> {
-  const start = performance.now()
-  try {
-    const res = await withTimeout(fetch(SCAN_API), TIMEOUT_MS)
-    const json = await res.json()
-    const valid = json?.total_blocks != null
-    return { valid, latencyMs: performance.now() - start }
-  } catch {
-    return { valid: false, latencyMs: performance.now() - start }
-  }
-}
-
 const SERVICE_META = [
   { name: 'PulseChain RPC', url: 'rpc.pulsechain.com', description: 'Blockchain node — blocks, gas, transactions', fast: 500, slow: 2000 },
   { name: 'PulseX Subgraph', url: 'graph.pulsechain.com', description: 'DEX indexer — prices, swaps, liquidity', fast: 2000, slow: 5000 },
-  { name: 'Scan API', url: 'scan.pulsechain.com', description: 'Block explorer — tokens, holders, contracts', fast: 1000, slow: 3000 },
 ] as const
 
-const checkers = [checkRpc, checkSubgraph, checkScan]
+const checkers = [checkRpc, checkSubgraph]
 
 export function useRpcHealth(): RpcHealth {
   const [services, setServices] = useState<ServiceHealth[]>(
