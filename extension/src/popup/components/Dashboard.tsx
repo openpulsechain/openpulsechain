@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Search, Wallet, ArrowLeftRight, AlertTriangle, Loader2, Shield } from 'lucide-react'
+import { Search, Wallet, ArrowLeftRight, AlertTriangle, Loader2, Shield, Activity } from 'lucide-react'
 import { useStore } from '../../lib/store'
 import { getBridgeStats, getRecentAlerts, getTokenSafety, getWalletBalances, gradeColor, type BridgeSnapshot, type ScamAlert, type SafetyScore } from '../../lib/api'
 import { formatUsd, shortenAddress, timeAgo } from '../../lib/format'
+import { RpcStatusInline } from './RpcStatusInline'
 
 // PulseX CDN logos (checksum addresses)
 const TOKEN_LOGOS: Record<string, string> = {
@@ -262,45 +263,13 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Popular Tokens */}
+      {/* Status RPC & Indexers */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <Shield className="h-4 w-4 text-pulse-cyan" />
-          <span className="text-xs font-semibold text-white">Popular Tokens</span>
+          <Activity className="h-4 w-4 text-pulse-cyan" />
+          <span className="text-xs font-semibold text-white">Status RPC & Indexers</span>
         </div>
-        {tokensLoading ? (
-          <div className="flex justify-center py-4">
-            <Loader2 className="h-4 w-4 text-gray-500 animate-spin" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-1.5">
-            {POPULAR_TOKENS.map((token) => {
-              const safety = tokenGrades.get(token.symbol)
-              const grade = safety?.grade || token.fallbackGrade
-              const color = gradeColor(grade)
-              return (
-                <div
-                  key={token.symbol}
-                  onClick={() => setActiveSection('safety')}
-                  className="bg-gray-800/30 rounded-lg p-2.5 border border-white/5 flex items-center justify-between hover:bg-gray-800/50 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-1.5">
-                    {TOKEN_LOGOS[token.symbol] && (
-                      <img src={TOKEN_LOGOS[token.symbol]} alt="" className="h-4 w-4 rounded-full shrink-0" />
-                    )}
-                    <span className="text-xs font-medium text-white">{token.symbol}</span>
-                  </div>
-                  <span
-                    className="text-sm font-bold"
-                    style={{ color }}
-                  >
-                    {grade}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
+        <RpcStatusInline />
       </div>
     </div>
   )
