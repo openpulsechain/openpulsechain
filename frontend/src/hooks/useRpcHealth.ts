@@ -35,24 +35,26 @@ function overallStatus(services: ServiceHealth[]): ServiceStatus {
   return 'operational'
 }
 
-interface CheckResult {
-  valid: boolean
-  latencyMs: number
+/** Race a promise against a timeout */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ])
 }
 
-/** Check PulseChain RPC — validates JSON-RPC result has a hex block number */
-async function checkRpc(): Promise<CheckResult> {
+/** Check PulseChain RPC — same fetch pattern as useLiveChainStats (which works) */
+async function checkRpc(): Promise<{ valid: boolean; latencyMs: number }> {
   const start = performance.now()
   try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-    const res = await fetch(PULSECHAIN_RPC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
-      signal: controller.signal,
-    })
-    clearTimeout(timer)
+    const res = await withTimeout(
+      fetch(PULSECHAIN_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
+      }),
+      TIMEOUT_MS
+    )
     const json = await res.json()
     const valid = typeof json?.result === 'string' && json.result.startsWith('0x')
     return { valid, latencyMs: performance.now() - start }
@@ -61,19 +63,18 @@ async function checkRpc(): Promise<CheckResult> {
   }
 }
 
-/** Check PulseX Subgraph — validates GraphQL returns a block number */
-async function checkSubgraph(): Promise<CheckResult> {
+/** Check PulseX Subgraph — same fetch pattern as useLivePlsPrice (which works) */
+async function checkSubgraph(): Promise<{ valid: boolean; latencyMs: number }> {
   const start = performance.now()
   try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-    const res = await fetch(PULSEX_V2_SUBGRAPH, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: '{ _meta { block { number } } }' }),
-      signal: controller.signal,
-    })
-    clearTimeout(timer)
+    const res = await withTimeout(
+      fetch(PULSEX_V2_SUBGRAPH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '{ _meta { block { number } } }' }),
+      }),
+      TIMEOUT_MS
+    )
     const json = await res.json()
     const valid = typeof json?.data?._meta?.block?.number === 'number'
     return { valid, latencyMs: performance.now() - start }
@@ -82,16 +83,11 @@ async function checkSubgraph(): Promise<CheckResult> {
   }
 }
 
-/** Check Scan API — validates response has total_blocks field */
-async function checkScan(): Promise<CheckResult> {
+/** Check Scan API — GET request, may fail CORS in some browsers */
+async function checkScan(): Promise<{ valid: boolean; latencyMs: number }> {
   const start = performance.now()
   try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-    const res = await fetch(SCAN_API, {
-      signal: controller.signal,
-    })
-    clearTimeout(timer)
+    const res = await withTimeout(fetch(SCAN_API), TIMEOUT_MS)
     const json = await res.json()
     const valid = json?.total_blocks != null
     return { valid, latencyMs: performance.now() - start }
@@ -106,16 +102,21 @@ const SERVICE_META = [
   { name: 'Scan API', url: 'scan.pulsechain.com', description: 'Block explorer — tokens, holders, contracts', fast: 1000, slow: 3000 },
 ] as const
 
+const checkers = [checkRpc, checkSubgraph, checkScan]
+
 export function useRpcHealth(): RpcHealth {
   const [services, setServices] = useState<ServiceHealth[]>(
-    SERVICE_META.map((m) => ({ name: m.name, url: m.url, description: m.description, status: 'operational' as ServiceStatus, latencyMs: null, lastChecked: null }))
+    SERVICE_META.map((m) => ({
+      name: m.name, url: m.url, description: m.description,
+      status: 'operational' as ServiceStatus, latencyMs: null, lastChecked: null,
+    }))
   )
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
 
   const checkHealth = useCallback(async () => {
     const now = new Date()
-    const results = await Promise.all([checkRpc(), checkSubgraph(), checkScan()])
+    const results = await Promise.all(checkers.map((fn) => fn()))
 
     if (!mountedRef.current) return
 

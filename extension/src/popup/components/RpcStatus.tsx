@@ -27,18 +27,24 @@ function statusFromLatency(ms: number, fast: number, slow: number): Status {
   return 'down'
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ])
+}
+
 async function checkRpc(): Promise<{ valid: boolean; ms: number }> {
   const start = performance.now()
   try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-    const res = await fetch(PULSECHAIN_RPC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
-      signal: controller.signal,
-    })
-    clearTimeout(timer)
+    const res = await withTimeout(
+      fetch(PULSECHAIN_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
+      }),
+      TIMEOUT_MS
+    )
     const json = await res.json()
     return { valid: typeof json?.result === 'string' && json.result.startsWith('0x'), ms: performance.now() - start }
   } catch {
@@ -49,15 +55,14 @@ async function checkRpc(): Promise<{ valid: boolean; ms: number }> {
 async function checkSubgraph(): Promise<{ valid: boolean; ms: number }> {
   const start = performance.now()
   try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-    const res = await fetch(PULSEX_V2_SUBGRAPH, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: '{ _meta { block { number } } }' }),
-      signal: controller.signal,
-    })
-    clearTimeout(timer)
+    const res = await withTimeout(
+      fetch(PULSEX_V2_SUBGRAPH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '{ _meta { block { number } } }' }),
+      }),
+      TIMEOUT_MS
+    )
     const json = await res.json()
     return { valid: typeof json?.data?._meta?.block?.number === 'number', ms: performance.now() - start }
   } catch {
@@ -68,16 +73,15 @@ async function checkSubgraph(): Promise<{ valid: boolean; ms: number }> {
 async function checkScan(): Promise<{ valid: boolean; ms: number }> {
   const start = performance.now()
   try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-    const res = await fetch(SCAN_API, { signal: controller.signal })
-    clearTimeout(timer)
+    const res = await withTimeout(fetch(SCAN_API), TIMEOUT_MS)
     const json = await res.json()
     return { valid: json?.total_blocks != null, ms: performance.now() - start }
   } catch {
     return { valid: false, ms: performance.now() - start }
   }
 }
+
+const checkers = [checkRpc, checkSubgraph, checkScan]
 
 const COLORS: Record<Status, string> = {
   operational: 'bg-emerald-400',
@@ -111,7 +115,7 @@ export function RpcStatus() {
     mountedRef.current = true
 
     async function run() {
-      const results = await Promise.all([checkRpc(), checkSubgraph(), checkScan()])
+      const results = await Promise.all(checkers.map((fn) => fn()))
       if (!mountedRef.current) return
       setServices(
         SERVICE_META.map((meta, i) => ({
