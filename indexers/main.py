@@ -51,6 +51,7 @@ def main():
     from indexers import whale_tracker
     from indexers import whale_clustering
     from indexers import pulsex_defillama
+    from indexers import token_holders
 
     indexers = [
         ("bridge_subgraph", bridge_subgraph),
@@ -68,6 +69,7 @@ def main():
         ("token_history", token_history),
         ("bridge_tvl", bridge_tvl),
         ("whale_tracker", whale_tracker),
+        ("token_holders", token_holders),
         ("whale_clustering", whale_clustering),
     ]
 

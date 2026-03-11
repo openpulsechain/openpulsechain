@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { X, Search, ChevronLeft, ChevronRight, ExternalLink, Info, ChevronDown, ChevronUp, ArrowUpDown } from 'lucide-react'
+import { X, Search, ChevronLeft, ChevronRight, ExternalLink, Info, ChevronDown, ChevronUp, ArrowUpDown, Filter, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
@@ -17,6 +17,56 @@ const ETH_FORK_ADDRESSES = new Set([
   '0x5b218ed1428cfc1e488b777bdd473cf2647d30e3', // PLSX v2 (spam/old)
 ])
 
+// --- Token categories ---
+type TokenCategory = 'Native' | 'DEX' | 'DeFi' | 'Stablecoin' | 'Meme' | 'Bridge' | 'Governance' | 'NFT' | 'Other'
+
+const CATEGORY_COLORS: Record<TokenCategory, string> = {
+  Native: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  DEX: 'bg-green-500/10 text-green-400 border-green-500/20',
+  DeFi: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  Stablecoin: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  Meme: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  Bridge: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  Governance: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  NFT: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
+  Other: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+}
+
+// Curated category mapping for top tokens (lowercase address → category)
+const TOKEN_CATEGORIES: Record<string, TokenCategory> = {
+  '0xa1077a294dde1b09bb078844df40758a5d0f9a27': 'Native',   // WPLS
+  '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39': 'DeFi',     // HEX
+  '0x95b303987a60c71504d99aa1b13b4da07b0790ab': 'DEX',      // PLSX
+  '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d': 'DeFi',     // INC
+  '0x02dcdd04e3f455d838cd1249292c58f3b79e3c3c': 'Bridge',   // WETH (bridged)
+  '0x0cb6f5a34ad42ec934882a05265a7d5f59b51a2f': 'Bridge',   // USDT (bridged)
+  '0x15d38573d2feeb82e7ad5187ab8c1d52810b1f07': 'Bridge',   // USDC (bridged)
+  '0xefd766ccb38eaf1dfd701853bfce31359239f305': 'Bridge',   // DAI (bridged)
+  '0xb17d901469b9208b17d916112988a3fed19b5ca1': 'DEX',      // WBTC (bridged)
+  '0x57fde0a71132198bbec939b98976993d8d89d225': 'DeFi',     // eHEX
+  '0x5ee84583f67d5ecea5420dbb42b462896e7f8d06': 'Meme',     // PEPE
+  '0x347a96a5bd06d2e15199b032f46fb724d6c73047': 'DeFi',     // LOAN
+  '0x832396a5e87efd5e437a7134e25e3e2c05c963be': 'DeFi',     // MINT
+  '0x6386704cd6f7a584ea9d23ccca66af7eba5a727e': 'Meme',     // DOGE (fork)
+  '0x514910771af9ca656af840dff83e8264ecf986ca': 'DeFi',     // LINK (fork)
+  '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984': 'Governance', // UNI (fork)
+  '0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0': 'DeFi',     // MATIC (fork)
+  '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2': 'DEX',      // SUSHI (fork)
+}
+
+function getTokenCategory(address: string, symbol: string, price_usd: number | null): TokenCategory {
+  const addr = address.toLowerCase()
+  if (TOKEN_CATEGORIES[addr]) return TOKEN_CATEGORIES[addr]
+  // Auto-detection heuristics
+  const sym = symbol.toUpperCase()
+  if (price_usd && price_usd > 0.95 && price_usd < 1.05) return 'Stablecoin'
+  if (['DOGE', 'SHIB', 'PEPE', 'FLOKI', 'BONK', 'WOJAK', 'MEME', 'CHAD', 'BASED'].some(m => sym.includes(m))) return 'Meme'
+  if (['SWAP', 'DEX', 'LP'].some(m => sym.includes(m))) return 'DEX'
+  if (['USD', 'DAI', 'FRAX', 'LUSD', 'MIM'].some(m => sym.includes(m))) return 'Stablecoin'
+  return 'Other'
+}
+
+// --- Interfaces ---
 interface Token {
   address: string
   symbol: string
@@ -25,6 +75,7 @@ interface Token {
   total_volume_usd: number
   total_liquidity: number
   is_active: boolean
+  holder_count?: number | null
 }
 
 interface TokenWithPrice extends Token {
@@ -33,6 +84,7 @@ interface TokenWithPrice extends Token {
   price_change_7d_pct: number | null
   volume_24h_usd: number | null
   market_cap_usd: number | null
+  category: TokenCategory
 }
 
 interface PriceHistory {
@@ -53,6 +105,42 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'liquidity', label: 'Liquidity' },
 ]
 
+interface Filters {
+  minLiquidity: number | null
+  minMcap: number | null
+  positiveChange: boolean
+  hideEthForks: boolean
+  hasPriceOnly: boolean
+  category: TokenCategory | null
+}
+
+const DEFAULT_FILTERS: Filters = {
+  minLiquidity: null,
+  minMcap: null,
+  positiveChange: false,
+  hideEthForks: false,
+  hasPriceOnly: false,
+  category: null,
+}
+
+const LIQUIDITY_PRESETS = [
+  { value: null, label: 'Any' },
+  { value: 1000, label: '$1K+' },
+  { value: 10000, label: '$10K+' },
+  { value: 100000, label: '$100K+' },
+  { value: 1000000, label: '$1M+' },
+]
+
+const MCAP_PRESETS = [
+  { value: null, label: 'Any' },
+  { value: 10000, label: '$10K+' },
+  { value: 100000, label: '$100K+' },
+  { value: 1000000, label: '$1M+' },
+  { value: 10000000, label: '$10M+' },
+]
+
+const ALL_CATEGORIES: TokenCategory[] = ['Native', 'DEX', 'DeFi', 'Stablecoin', 'Meme', 'Bridge', 'Governance', 'NFT', 'Other']
+
 const PAGE_SIZE = 50
 
 function formatPrice(price: number | null): string {
@@ -70,6 +158,14 @@ function formatChange(pct: number | null): { text: string; className: string } {
   }
 }
 
+function formatCompact(n: number): string {
+  if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`
+  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`
+  return n.toLocaleString('en-US', { maximumFractionDigits: 0 })
+}
+
 export function TokensPage() {
   const [tokens, setTokens] = useState<TokenWithPrice[]>([])
   const [total, setTotal] = useState(0)
@@ -77,6 +173,8 @@ export function TokensPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState<SortField>('volume')
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
+  const [showFilters, setShowFilters] = useState(false)
   const [selectedToken, setSelectedToken] = useState<TokenWithPrice | null>(null)
   const [history, setHistory] = useState<PriceHistory[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -84,6 +182,17 @@ export function TokensPage() {
   const [volRange, setVolRange] = useState<number | null>(null)
   const [showNote, setShowNote] = useState(false)
   const [sparkData, setSparkData] = useState<Record<string, number[]>>({})
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0
+    if (filters.minLiquidity) n++
+    if (filters.minMcap) n++
+    if (filters.positiveChange) n++
+    if (filters.hideEthForks) n++
+    if (filters.hasPriceOnly) n++
+    if (filters.category) n++
+    return n
+  }, [filters])
 
   const fetchTokens = useCallback(async () => {
     setLoading(true)
@@ -112,10 +221,9 @@ export function TokensPage() {
 
         const priceAddresses = (priceRows || []).map(r => r.id)
 
-        // Fetch remaining tokens without prices
         const { data: allTokens, count } = await supabase
           .from('pulsechain_tokens')
-          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, is_active', { count: 'exact' })
+          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, is_active, holder_count', { count: 'exact' })
           .eq('is_active', true)
 
         totalCount = count || 0
@@ -124,7 +232,6 @@ export function TokensPage() {
           tokenMap.set(t.address.toLowerCase(), t as Token)
         }
 
-        // Build ordered list: price-sorted tokens first, then remaining by volume
         const ordered: Token[] = []
         const usedAddrs = new Set<string>()
 
@@ -143,10 +250,9 @@ export function TokensPage() {
         ordered.push(...remaining)
         tokenList = ordered.slice(from, to + 1)
       } else {
-        // Standard query on pulsechain_tokens
         let query = supabase
           .from('pulsechain_tokens')
-          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, is_active', { count: 'exact' })
+          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, is_active, holder_count', { count: 'exact' })
           .eq('is_active', true)
 
         if (sortField === 'liquidity') {
@@ -201,24 +307,20 @@ export function TokensPage() {
           .gte('date', eightDaysAgo.toISOString().slice(0, 10))
           .order('date', { ascending: true })
 
-        // Build sparkline arrays and find oldest price for 7d change
         const oldestPrice: Record<string, number> = {}
         for (const row of (histRows || [])) {
           const addr = row.address.toLowerCase()
           const price = row.price_usd
           if (!price || price <= 0) continue
 
-          // Sparkline data (ordered by date asc)
           if (!sparkMap[addr]) sparkMap[addr] = []
           sparkMap[addr].push(price)
 
-          // Track oldest price for 7d change
           if (!(addr in oldestPrice)) {
             oldestPrice[addr] = price
           }
         }
 
-        // Calculate 7d change from oldest price in window
         for (const addr of Object.keys(oldestPrice)) {
           const currentPrice = pricesMap[addr]?.price_usd
           const old = oldestPrice[addr]
@@ -229,19 +331,40 @@ export function TokensPage() {
       }
       setSparkData(sparkMap)
 
-      let enriched: TokenWithPrice[] = tokenList.map(t => ({
-        ...t,
-        price_usd: pricesMap[t.address.toLowerCase()]?.price_usd ?? null,
-        price_change_24h_pct: pricesMap[t.address.toLowerCase()]?.price_change_24h_pct ?? null,
-        price_change_7d_pct: change7dMap[t.address.toLowerCase()] ?? null,
-        volume_24h_usd: pricesMap[t.address.toLowerCase()]?.volume_24h_usd ?? null,
-        market_cap_usd: pricesMap[t.address.toLowerCase()]?.market_cap_usd ?? null,
-      }))
+      let enriched: TokenWithPrice[] = tokenList.map(t => {
+        const addr = t.address.toLowerCase()
+        const price = pricesMap[addr]?.price_usd ?? null
+        return {
+          ...t,
+          price_usd: price,
+          price_change_24h_pct: pricesMap[addr]?.price_change_24h_pct ?? null,
+          price_change_7d_pct: change7dMap[addr] ?? null,
+          volume_24h_usd: pricesMap[addr]?.volume_24h_usd ?? null,
+          market_cap_usd: pricesMap[addr]?.market_cap_usd ?? null,
+          category: getTokenCategory(t.address, t.symbol, price),
+        }
+      })
 
-      // Client-side sort for change_7d (not available server-side)
+      // Client-side sort for change_7d
       if (sortField === 'change_7d') {
         enriched.sort((a, b) => (b.price_change_7d_pct ?? -Infinity) - (a.price_change_7d_pct ?? -Infinity))
       }
+
+      // Apply client-side filters
+      enriched = enriched.filter(t => {
+        if (filters.hideEthForks && ETH_FORK_ADDRESSES.has(t.address.toLowerCase())) return false
+        if (filters.hasPriceOnly && t.price_usd == null) return false
+        if (filters.positiveChange && (t.price_change_24h_pct == null || t.price_change_24h_pct <= 0)) return false
+        if (filters.minLiquidity) {
+          const liqUsd = (t.price_usd && t.total_liquidity > 0) ? t.total_liquidity * t.price_usd : 0
+          if (liqUsd < filters.minLiquidity) return false
+        }
+        if (filters.minMcap) {
+          if (!t.market_cap_usd || t.market_cap_usd < filters.minMcap) return false
+        }
+        if (filters.category && t.category !== filters.category) return false
+        return true
+      })
 
       setTokens(enriched)
     } catch (e) {
@@ -249,16 +372,16 @@ export function TokensPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, sortField])
+  }, [page, search, sortField, filters])
 
   useEffect(() => {
     fetchTokens()
   }, [fetchTokens])
 
-  // Reset page on search/sort change
+  // Reset page on search/sort/filter change
   useEffect(() => {
     setPage(0)
-  }, [search, sortField])
+  }, [search, sortField, filters])
 
   const fetchHistory = useCallback(async (address: string) => {
     setHistoryLoading(true)
@@ -294,7 +417,6 @@ export function TokensPage() {
 
   const overlayRef = useRef<HTMLDivElement>(null)
 
-  // Close modal on Escape
   useEffect(() => {
     if (!selectedToken) return
     const handleKey = (e: KeyboardEvent) => {
@@ -304,7 +426,6 @@ export function TokensPage() {
     return () => document.removeEventListener('keydown', handleKey)
   }, [selectedToken, closeModal])
 
-  // Prevent body scroll when modal open
   useEffect(() => {
     if (selectedToken) {
       document.body.style.overflow = 'hidden'
@@ -314,13 +435,11 @@ export function TokensPage() {
     return () => { document.body.style.overflow = '' }
   }, [selectedToken])
 
-  // Compute supply from market_cap / price for modal
   const selectedSupply = useMemo(() => {
     if (!selectedToken?.market_cap_usd || !selectedToken?.price_usd || selectedToken.price_usd <= 0) return null
     return selectedToken.market_cap_usd / selectedToken.price_usd
   }, [selectedToken])
 
-  // Token list view
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -346,6 +465,19 @@ export function TokensPage() {
             </select>
           </div>
 
+          {/* Filter toggle */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${
+              activeFilterCount > 0
+                ? 'border-[#00D4FF]/50 text-[#00D4FF] bg-[#00D4FF]/5'
+                : 'border-white/10 text-gray-400 hover:bg-white/5'
+            }`}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            Filters{activeFilterCount > 0 && ` (${activeFilterCount})`}
+          </button>
+
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
@@ -359,6 +491,99 @@ export function TokensPage() {
           </div>
         </div>
       </div>
+
+      {/* Filter panel */}
+      {showFilters && (
+        <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-white">Filters</span>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => setFilters(DEFAULT_FILTERS)}
+                className="text-xs text-gray-400 hover:text-white transition-colors"
+              >
+                Reset all
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Min Liquidity */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Min Liquidity</label>
+              <select
+                value={filters.minLiquidity ?? ''}
+                onChange={(e) => setFilters(f => ({ ...f, minLiquidity: e.target.value ? Number(e.target.value) : null }))}
+                className="w-full bg-gray-900/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#00D4FF]/50"
+              >
+                {LIQUIDITY_PRESETS.map(p => (
+                  <option key={p.label} value={p.value ?? ''}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Min Market Cap */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Min Market Cap</label>
+              <select
+                value={filters.minMcap ?? ''}
+                onChange={(e) => setFilters(f => ({ ...f, minMcap: e.target.value ? Number(e.target.value) : null }))}
+                className="w-full bg-gray-900/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#00D4FF]/50"
+              >
+                {MCAP_PRESETS.map(p => (
+                  <option key={p.label} value={p.value ?? ''}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Category</label>
+              <select
+                value={filters.category ?? ''}
+                onChange={(e) => setFilters(f => ({ ...f, category: (e.target.value || null) as TokenCategory | null }))}
+                className="w-full bg-gray-900/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#00D4FF]/50"
+              >
+                <option value="">All</option>
+                {ALL_CATEGORIES.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Toggles */}
+            <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.positiveChange}
+                onChange={(e) => setFilters(f => ({ ...f, positiveChange: e.target.checked }))}
+                className="rounded border-white/20 bg-gray-800 text-[#00D4FF] focus:ring-[#00D4FF]/50"
+              />
+              Gainers only
+            </label>
+
+            <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.hideEthForks}
+                onChange={(e) => setFilters(f => ({ ...f, hideEthForks: e.target.checked }))}
+                className="rounded border-white/20 bg-gray-800 text-[#00D4FF] focus:ring-[#00D4FF]/50"
+              />
+              Hide ETH forks
+            </label>
+
+            <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.hasPriceOnly}
+                onChange={(e) => setFilters(f => ({ ...f, hasPriceOnly: e.target.checked }))}
+                className="rounded border-white/20 bg-gray-800 text-[#00D4FF] focus:ring-[#00D4FF]/50"
+              />
+              With price only
+            </label>
+          </div>
+        </div>
+      )}
 
       {/* Token table */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
@@ -385,6 +610,7 @@ export function TokensPage() {
                   {tokens.map((token, i) => {
                     const c24 = formatChange(token.price_change_24h_pct)
                     const c7d = formatChange(token.price_change_7d_pct)
+                    const catColor = CATEGORY_COLORS[token.category]
                     return (
                       <tr
                         key={token.address}
@@ -393,11 +619,21 @@ export function TokensPage() {
                       >
                         <td className="py-2.5 pr-4 text-gray-500">{page * PAGE_SIZE + i + 1}</td>
                         <td className="py-2.5 pr-4">
-                          <span className="font-medium text-white">{token.symbol}</span>
-                          {ETH_FORK_ADDRESSES.has(token.address.toLowerCase()) && (
-                            <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20" title="Ethereum fork copy — not the native bridged version">ETH fork</span>
-                          )}
-                          <span className="ml-2 text-gray-500 text-xs">{token.name}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-medium text-white">{token.symbol}</span>
+                            <span className={`text-[10px] px-1 py-0.5 rounded border ${catColor}`}>{token.category}</span>
+                            {ETH_FORK_ADDRESSES.has(token.address.toLowerCase()) && (
+                              <span className="text-[10px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20" title="Ethereum fork copy — not the native bridged version">ETH fork</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-gray-500 text-xs">{token.name}</span>
+                            {token.holder_count != null && token.holder_count > 0 && (
+                              <span className="flex items-center gap-0.5 text-[10px] text-gray-500" title="Holder count">
+                                <Users className="h-2.5 w-2.5" />{formatCompact(token.holder_count)}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-2.5 pr-4 text-right text-white">{formatPrice(token.price_usd)}</td>
                         <td className={`py-2.5 pr-4 text-right ${c24.className}`}>{c24.text}</td>
@@ -419,6 +655,13 @@ export function TokensPage() {
                       </tr>
                     )
                   })}
+                  {tokens.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center text-gray-500 text-sm">
+                        No tokens match the current filters
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -493,19 +736,14 @@ export function TokensPage() {
                     <td className="py-1.5">derivedUSD — refreshed every 15 min</td>
                   </tr>
                   <tr className="border-b border-white/5">
-                    <td className="py-1.5">Change 24h</td>
+                    <td className="py-1.5">Change 24h / 7d</td>
                     <td className="py-1.5">token_price_history</td>
-                    <td className="py-1.5">Calculated from yesterday's snapshot vs current price</td>
-                  </tr>
-                  <tr className="border-b border-white/5">
-                    <td className="py-1.5">Change 7d</td>
-                    <td className="py-1.5">token_price_history</td>
-                    <td className="py-1.5">Calculated from ~7 days ago snapshot vs current price</td>
+                    <td className="py-1.5">Calculated from historical snapshots vs current price</td>
                   </tr>
                   <tr className="border-b border-white/5">
                     <td className="py-1.5">Market Cap</td>
                     <td className="py-1.5">PulseX V1 Subgraph</td>
-                    <td className="py-1.5">totalSupply / 10^decimals × derivedUSD — estimated, no vesting data</td>
+                    <td className="py-1.5">totalSupply / 10^decimals x derivedUSD — estimated, no vesting data</td>
                   </tr>
                   <tr className="border-b border-white/5">
                     <td className="py-1.5">Volume (24h)</td>
@@ -515,7 +753,17 @@ export function TokensPage() {
                   <tr className="border-b border-white/5">
                     <td className="py-1.5">Liquidity</td>
                     <td className="py-1.5">PulseX V1 Subgraph</td>
-                    <td className="py-1.5">totalLiquidity (token units) × derivedUSD = approximate USD value</td>
+                    <td className="py-1.5">totalLiquidity (token units) x derivedUSD = approximate USD value</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">Holders</td>
+                    <td className="py-1.5">PulseChain Scan API</td>
+                    <td className="py-1.5">Blockscout v2 — refreshed daily (top 50 tokens)</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">Categories</td>
+                    <td className="py-1.5">Curated + heuristics</td>
+                    <td className="py-1.5">Top tokens manually tagged, others auto-detected (stablecoins, memes)</td>
                   </tr>
                 </tbody>
               </table>
@@ -525,9 +773,10 @@ export function TokensPage() {
               <p className="text-gray-300 font-medium mb-2">Known limitations</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li><span className="text-orange-400">ETH fork tokens</span> — Ethereum fork copies (DAI, USDC, USDT, WBTC) trade at large discounts vs native bridged versions. Marked with <span className="text-orange-400">ETH fork</span> badge.</li>
-                <li><span className="text-gray-300">Market cap</span> — Uses total supply (not circulating). May be inflated for tokens with locked/burned supply. No FDV distinction.</li>
+                <li><span className="text-gray-300">Market cap</span> — Uses total supply (not circulating). May be inflated for tokens with locked/burned supply.</li>
                 <li><span className="text-gray-300">V1 only</span> — Only PulseX V1 pools are indexed. V2 liquidity/volume is not included yet.</li>
-                <li><span className="text-gray-300">Coverage</span> — ~{total.toLocaleString()} tokens discovered vs ~15K on PulseCoinList. Coverage depends on PulseX V1 trading activity.</li>
+                <li><span className="text-gray-300">Categories</span> — Auto-detection is approximate. Some tokens may be miscategorized.</li>
+                <li><span className="text-gray-300">Holders</span> — Updated daily for top 50 tokens only. Other tokens show no holder count.</li>
               </ul>
             </div>
 
@@ -570,7 +819,7 @@ export function TokensPage() {
       </div>
 
       <div className="text-xs text-gray-600 text-center">
-        Source: PulseX Subgraph (graph.pulsechain.com) — 100% on-chain, sovereign data
+        Source: PulseX Subgraph (graph.pulsechain.com) + PulseChain Scan API — 100% on-chain, sovereign data
       </div>
 
       {/* Token Detail Modal */}
@@ -582,7 +831,6 @@ export function TokensPage() {
           className="fixed inset-0 z-50 flex items-start justify-center backdrop-blur-md overflow-y-auto p-4 pt-12 sm:pt-16"
         >
           <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-gray-900 shadow-2xl">
-            {/* Close button */}
             <button
               onClick={closeModal}
               className="absolute top-4 right-4 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors z-10"
@@ -594,12 +842,13 @@ export function TokensPage() {
               {/* Token header */}
               <div className="flex items-center justify-between flex-wrap gap-4 pr-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">
-                    {selectedToken.symbol}
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-white">{selectedToken.symbol}</h2>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${CATEGORY_COLORS[selectedToken.category]}`}>{selectedToken.category}</span>
                     {ETH_FORK_ADDRESSES.has(selectedToken.address.toLowerCase()) && (
-                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 align-middle">ETH fork</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">ETH fork</span>
                     )}
-                  </h2>
+                  </div>
                   <p className="text-gray-400 text-sm">{selectedToken.name}</p>
                   <button
                     type="button"
@@ -630,7 +879,7 @@ export function TokensPage() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-4 border-t border-white/5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 pt-4 border-t border-white/5">
                 <div>
                   <div className="text-xs text-gray-500">Market Cap</div>
                   <div className="text-sm font-medium text-white">
@@ -652,16 +901,17 @@ export function TokensPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Circulating Supply</div>
+                  <div className="text-xs text-gray-500">Supply</div>
                   <div className="text-sm font-medium text-white">
-                    {selectedSupply != null
-                      ? selectedSupply > 1e12
-                        ? `${(selectedSupply / 1e12).toFixed(2)}T`
-                        : selectedSupply > 1e9
-                          ? `${(selectedSupply / 1e9).toFixed(2)}B`
-                          : selectedSupply > 1e6
-                            ? `${(selectedSupply / 1e6).toFixed(2)}M`
-                            : selectedSupply.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                    {selectedSupply != null ? formatCompact(selectedSupply) : '--'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Holders</div>
+                  <div className="text-sm font-medium text-white flex items-center gap-1">
+                    <Users className="h-3 w-3 text-gray-500" />
+                    {selectedToken.holder_count != null && selectedToken.holder_count > 0
+                      ? selectedToken.holder_count.toLocaleString()
                       : '--'}
                   </div>
                 </div>
@@ -734,7 +984,7 @@ export function TokensPage() {
 
               {/* Source */}
               <div className="text-xs text-gray-600 text-center">
-                Source: PulseX Subgraph — 100% on-chain data
+                Source: PulseX Subgraph + PulseChain Scan — 100% on-chain data
               </div>
             </div>
           </div>
