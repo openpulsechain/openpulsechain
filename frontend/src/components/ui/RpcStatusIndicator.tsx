@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRpcHealth, type ServiceStatus } from '../../hooks/useRpcHealth'
 
 const STATUS_CONFIG: Record<ServiceStatus, { color: string; bg: string; ping: string; label: string }> = {
@@ -28,13 +29,17 @@ function LatencyBadge({ ms }: { ms: number | null }) {
 export function RpcStatusIndicator() {
   const { services, overall, loading } = useRpcHealth()
   const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
   const cfg = STATUS_CONFIG[overall]
 
   if (loading) return null
 
+  const rect = btnRef.current?.getBoundingClientRect()
+
   return (
-    <div className="relative">
+    <>
       <button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors"
         title={cfg.label}
@@ -43,10 +48,16 @@ export function RpcStatusIndicator() {
         <span className="text-[11px] text-gray-400 hidden sm:inline">RPC</span>
       </button>
 
-      {open && (
+      {open && createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 z-50 w-72 rounded-xl border border-white/10 bg-gray-900/95 backdrop-blur-md shadow-2xl p-4">
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[9999] w-72 rounded-xl border border-white/10 bg-gray-950 shadow-2xl p-4"
+            style={{
+              top: rect ? rect.bottom + 8 : 50,
+              right: rect ? window.innerWidth - rect.right : 16,
+            }}
+          >
             <div className="flex items-center gap-2 mb-3">
               <StatusDot status={overall} />
               <span className="text-sm font-medium text-white">{cfg.label}</span>
@@ -70,8 +81,9 @@ export function RpcStatusIndicator() {
               </span>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
