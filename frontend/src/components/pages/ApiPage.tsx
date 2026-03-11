@@ -192,8 +192,9 @@ const ENDPOINTS: Record<string, Endpoint[]> = {
         { name: 'symbol', type: 'text' },
         { name: 'name', type: 'text' },
         { name: 'decimals', type: 'integer' },
-        { name: 'total_volume_usd', type: 'numeric' },
-        { name: 'total_liquidity', type: 'numeric' },
+        { name: 'total_volume_usd', type: 'numeric (all-time cumulative)' },
+        { name: 'total_liquidity', type: 'numeric (in token units, not USD)' },
+        { name: 'holder_count', type: 'integer (daily, top 50 tokens)' },
         { name: 'is_active', type: 'boolean' },
         { name: 'updated_at', type: 'timestamptz' },
       ],
@@ -212,15 +213,17 @@ const ENDPOINTS: Record<string, Endpoint[]> = {
     },
     {
       table: 'token_prices',
-      description: 'Current prices for PulseChain tokens + majors (source: PulseX Subgraph)',
+      description: 'Current prices for PulseChain tokens + majors (source: PulseX Subgraph + CoinGecko)',
       columns: [
-        { name: 'id', type: 'text' },
+        { name: 'id', type: 'text (address for PulseChain, CoinGecko ID for majors)' },
         { name: 'symbol', type: 'text' },
         { name: 'name', type: 'text' },
         { name: 'price_usd', type: 'numeric' },
-        { name: 'market_cap_usd', type: 'numeric' },
-        { name: 'volume_24h_usd', type: 'numeric' },
+        { name: 'market_cap_usd', type: 'numeric (totalSupply × price)' },
+        { name: 'volume_24h_usd', type: 'numeric (real daily volume from tokenDayDatas)' },
         { name: 'price_change_24h_pct', type: 'numeric' },
+        { name: 'address', type: 'text (contract address, null for CoinGecko)' },
+        { name: 'source', type: "text ('pulsex_subgraph' | 'coingecko')" },
         { name: 'last_updated', type: 'timestamptz' },
       ],
     },
@@ -341,10 +344,10 @@ print(stats)`,
   },
   prices: {
     title: 'Current token prices',
-    curl: `curl '${SUPABASE_BASE}token_prices?select=symbol,price_usd,price_change_24h_pct' \\
+    curl: `curl '${SUPABASE_BASE}token_prices?select=symbol,price_usd,market_cap_usd,volume_24h_usd,price_change_24h_pct,source' \\
   -H "apikey: ${SUPABASE_KEY}"`,
     javascript: `const res = await fetch(
-  '${SUPABASE_BASE}token_prices?select=symbol,price_usd,price_change_24h_pct',
+  '${SUPABASE_BASE}token_prices?select=symbol,price_usd,market_cap_usd,volume_24h_usd,price_change_24h_pct,source',
   { headers: { apikey: '${SUPABASE_KEY}' } }
 )
 const prices = await res.json()
@@ -353,7 +356,7 @@ console.log(prices)`,
 
 url = "${SUPABASE_BASE}token_prices"
 headers = {"apikey": "${SUPABASE_KEY}"}
-params = {"select": "symbol,price_usd,price_change_24h_pct"}
+params = {"select": "symbol,price_usd,market_cap_usd,volume_24h_usd,price_change_24h_pct,source"}
 
 prices = requests.get(url, headers=headers, params=params).json()
 print(prices)`,
