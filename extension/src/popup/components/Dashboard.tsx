@@ -216,7 +216,7 @@ export function Dashboard() {
       </div>
 
       {/* Status RPC & Indexers */}
-      <div>
+      <div className="bg-gray-800/30 rounded-lg px-3 py-2.5 border border-white/5">
         <div className="flex items-center gap-2 mb-2">
           <Activity className="h-4 w-4 text-pulse-cyan" />
           <span className="text-xs font-semibold text-white">Status RPC & Indexers</span>
