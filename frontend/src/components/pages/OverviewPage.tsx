@@ -567,7 +567,7 @@ export function OverviewPage() {
                     {formatUsd(token.market_cap_usd)}
                   </td>
                   <td className="py-2.5 text-right text-gray-300">
-                    {formatUsd(token.volume_24h_usd)}
+                    {token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : '--'}
                   </td>
                 </tr>
               ))}
@@ -600,7 +600,7 @@ export function OverviewPage() {
           </ul>
           <p className="text-gray-600 pt-1">
             Contract addresses link to <a href="https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/" target="_blank" rel="noopener noreferrer" className="text-[#00D4FF]/50 hover:text-[#00D4FF] transition-colors">PulseChain Explorer</a> (Otterscan) for independent verification.
-            Not financial advice. Data provided for informational purposes only.
+            This is not investment advice. Data is provided for educational and informational purposes only.
           </p>
         </div>
       </div>

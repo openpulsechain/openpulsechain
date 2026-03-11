@@ -60,7 +60,7 @@ function DexDataSourceNote({ liveFactory }: { liveFactory: ReturnType<typeof use
           <div className="rounded bg-gray-800/50 border border-white/5 p-3">
             <p className="text-gray-300 font-medium mb-1">What are these KPIs?</p>
             <p>
-              These four cards provide a real-time snapshot of PulseX DEX activity. <strong className="text-gray-300">Total Liquidity</strong> is the combined value of assets deposited in all PulseX V1 and V2 liquidity pools.
+              These four cards provide a real-time snapshot of PulseX DEX activity. <strong className="text-gray-300">DEX Liquidity</strong> is the combined value of assets deposited in all PulseX V1 and V2 liquidity pools.
               <strong className="text-gray-300"> 30D Volume</strong> is the total value of swaps executed over the last 30 days.
               <strong className="text-gray-300"> Total Volume</strong> is the all-time cumulative value of every swap since PulseX launch.
               <strong className="text-gray-300"> Total Transactions</strong> counts every swap, liquidity add, and liquidity removal.
@@ -197,7 +197,7 @@ function DexDataSourceNote({ liveFactory }: { liveFactory: ReturnType<typeof use
           </div>
 
           <p className="text-[10px] text-gray-600">
-            This is not investment advice. Data is provided for educational and informational purposes only.
+            This is not investment advice. Data is provided for educational and informational purposes only. Data is provided for educational and informational purposes only.
           </p>
         </div>
       )}
@@ -224,7 +224,7 @@ function ChartDataSourceNote({ source }: { source: DexSource }) {
           <div className="rounded bg-gray-800/50 border border-white/5 p-3">
             <p className="text-gray-300 font-medium mb-1">What does this chart show?</p>
             <p>
-              The <strong className="text-gray-300">Total Liquidity</strong> chart tracks the total value of assets deposited in DEX liquidity pools over time — it reflects how much capital is available for traders to swap against.
+              The <strong className="text-gray-300">DEX Liquidity</strong> chart tracks the total value of assets deposited in DEX liquidity pools over time — it reflects how much capital is available for traders to swap against.
               The <strong className="text-gray-300">Daily Trading Volume</strong> chart shows the total USD value of all swaps executed each day — it measures actual trading activity and market interest.
               Use the source selector to compare data from different providers and scopes (V1 only, PulseX full, or all PulseChain DEXes).
             </p>
@@ -491,7 +491,7 @@ function ChartDataSourceNote({ source }: { source: DexSource }) {
 
           <p className="text-gray-600 text-[10px] pt-1 border-t border-white/5">
             Historical data: DefiLlama API or Supabase (V1 subgraph). Live data point: same source as chart for consistency.
-            This is not investment advice.
+            This is not investment advice. Data is provided for educational and informational purposes only.
           </p>
         </div>
       )}
@@ -710,7 +710,7 @@ function CumulativeVolumeNote({ source, liveFactory }: { source: DexSource; live
           </div>
 
           <p className="text-[10px] text-gray-600 pt-1 border-t border-white/5">
-            This is not investment advice. Data is provided for educational and informational purposes only.
+            This is not investment advice. Data is provided for educational and informational purposes only. Data is provided for educational and informational purposes only.
           </p>
         </div>
       )}
@@ -871,7 +871,7 @@ export function DexPage() {
             <KpiCard
               title="30D Volume"
               value={formatUsd(kpis.volume30d)}
-              subtitle="Last 30 days (V1)"
+              subtitle="Last 30 days (V1 only)"
               icon={<ArrowLeftRight className="h-5 w-5" />}
             />
             <KpiCard
@@ -896,7 +896,7 @@ export function DexPage() {
       {/* Liquidity Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-white">Total Liquidity</h2>
+          <h2 className="text-lg font-semibold text-white">DEX Liquidity</h2>
           <div className="flex items-center gap-2">
             <DexSourceSelector value={liqSource} onChange={setLiqSource} />
             <TimeRangeSelector value={liqRange} onChange={setLiqRange} />

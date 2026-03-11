@@ -623,7 +623,7 @@ export function TokensPage() {
                             <span className="font-medium text-white">{token.symbol}</span>
                             <span className={`text-[10px] px-1 py-0.5 rounded border ${catColor}`}>{token.category}</span>
                             {ETH_FORK_ADDRESSES.has(token.address.toLowerCase()) && (
-                              <span className="text-[10px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20" title="Ethereum fork copy — not the native bridged version">ETH fork</span>
+                              <span className="text-[10px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20" title="Ethereum fork copy — not the native bridged version">Fork</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
@@ -772,7 +772,7 @@ export function TokensPage() {
             <div>
               <p className="text-gray-300 font-medium mb-2">Known limitations</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li><span className="text-orange-400">ETH fork tokens</span> — Ethereum fork copies (DAI, USDC, USDT, WBTC) trade at large discounts vs native bridged versions. Marked with <span className="text-orange-400">ETH fork</span> badge.</li>
+                <li><span className="text-orange-400">ETH fork tokens</span> — Ethereum fork copies (DAI, USDC, USDT, WBTC) trade at large discounts vs native bridged versions. Marked with <span className="text-orange-400">Fork</span> badge.</li>
                 <li><span className="text-gray-300">Market cap</span> — Uses total supply (not circulating). May be inflated for tokens with locked/burned supply.</li>
                 <li><span className="text-gray-300">V1 only</span> — Only PulseX V1 pools are indexed. V2 liquidity/volume is not included yet.</li>
                 <li><span className="text-gray-300">Categories</span> — Auto-detection is approximate. Some tokens may be miscategorized.</li>
@@ -818,8 +818,9 @@ export function TokensPage() {
         )}
       </div>
 
-      <div className="text-xs text-gray-600 text-center">
-        Source: PulseX Subgraph (graph.pulsechain.com) + PulseChain Scan API — 100% on-chain, sovereign data
+      <div className="text-xs text-gray-600 text-center space-y-1">
+        <p>Source: PulseX Subgraph (graph.pulsechain.com) + PulseChain Scan API — 100% on-chain, sovereign data</p>
+        <p>This is not investment advice. Data is provided for educational and informational purposes only.</p>
       </div>
 
       {/* Token Detail Modal */}
@@ -846,7 +847,7 @@ export function TokensPage() {
                     <h2 className="text-2xl font-bold text-white">{selectedToken.symbol}</h2>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded border ${CATEGORY_COLORS[selectedToken.category]}`}>{selectedToken.category}</span>
                     {ETH_FORK_ADDRESSES.has(selectedToken.address.toLowerCase()) && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">ETH fork</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">Fork</span>
                     )}
                   </div>
                   <p className="text-gray-400 text-sm">{selectedToken.name}</p>
