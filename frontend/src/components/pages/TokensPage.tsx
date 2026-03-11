@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, Search, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { X, Search, ChevronLeft, ChevronRight, ExternalLink, Info, ChevronDown, ChevronUp, ArrowUpDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
@@ -29,6 +29,7 @@ interface Token {
 interface TokenWithPrice extends Token {
   price_usd: number | null
   price_change_24h_pct: number | null
+  price_change_7d_pct: number | null
   volume_24h_usd: number | null
   market_cap_usd: number | null
 }
@@ -40,7 +41,33 @@ interface PriceHistory {
   total_liquidity_usd: number
 }
 
+type SortField = 'volume' | 'market_cap' | 'price' | 'change_24h' | 'change_7d' | 'liquidity'
+
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: 'volume', label: 'Volume (all-time)' },
+  { value: 'market_cap', label: 'Market Cap' },
+  { value: 'price', label: 'Price' },
+  { value: 'change_24h', label: 'Change 24h' },
+  { value: 'change_7d', label: 'Change 7d' },
+  { value: 'liquidity', label: 'Liquidity' },
+]
+
 const PAGE_SIZE = 50
+
+function formatPrice(price: number | null): string {
+  if (price == null) return '--'
+  if (price < 0.01) return `$${price.toFixed(6)}`
+  return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+}
+
+function formatChange(pct: number | null): { text: string; className: string } {
+  if (pct == null) return { text: '--', className: 'text-gray-500' }
+  const sign = pct >= 0 ? '+' : ''
+  return {
+    text: `${sign}${pct.toFixed(2)}%`,
+    className: pct >= 0 ? 'text-emerald-400' : 'text-red-400',
+  }
+}
 
 export function TokensPage() {
   const [tokens, setTokens] = useState<TokenWithPrice[]>([])
@@ -48,11 +75,13 @@ export function TokensPage() {
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortField, setSortField] = useState<SortField>('volume')
   const [selectedToken, setSelectedToken] = useState<TokenWithPrice | null>(null)
   const [history, setHistory] = useState<PriceHistory[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [priceRange, setPriceRange] = useState<number | null>(null)
   const [volRange, setVolRange] = useState<number | null>(null)
+  const [showNote, setShowNote] = useState(false)
 
   const fetchTokens = useCallback(async () => {
     setLoading(true)
@@ -60,26 +89,87 @@ export function TokensPage() {
       const from = page * PAGE_SIZE
       const to = from + PAGE_SIZE - 1
 
-      let query = supabase
-        .from('pulsechain_tokens')
-        .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, is_active', { count: 'exact' })
-        .eq('is_active', true)
-        .order('total_volume_usd', { ascending: false })
+      // For sorts that use token_prices columns, query token_prices first
+      const priceBasedSort = ['market_cap', 'price', 'change_24h'].includes(sortField)
 
-      if (search.trim()) {
-        const s = search.trim()
-        if (s.startsWith('0x')) {
-          query = query.ilike('address', `${s}%`)
-        } else {
-          query = query.or(`symbol.ilike.%${s}%,name.ilike.%${s}%`)
+      let tokenList: Token[] = []
+      let totalCount = 0
+
+      if (priceBasedSort && !search.trim()) {
+        // Query token_prices first, sorted by the requested field
+        const priceOrderCol = sortField === 'market_cap' ? 'market_cap_usd'
+          : sortField === 'price' ? 'price_usd'
+          : 'price_change_24h_pct'
+
+        const { data: priceRows } = await supabase
+          .from('token_prices')
+          .select('id')
+          .eq('source', 'pulsex_subgraph')
+          .not(priceOrderCol, 'is', null)
+          .order(priceOrderCol, { ascending: false })
+
+        const priceAddresses = (priceRows || []).map(r => r.id)
+
+        // Fetch remaining tokens without prices
+        const { data: allTokens, count } = await supabase
+          .from('pulsechain_tokens')
+          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, is_active', { count: 'exact' })
+          .eq('is_active', true)
+
+        totalCount = count || 0
+        const tokenMap = new Map<string, Token>()
+        for (const t of (allTokens || [])) {
+          tokenMap.set(t.address.toLowerCase(), t as Token)
         }
+
+        // Build ordered list: price-sorted tokens first, then remaining by volume
+        const ordered: Token[] = []
+        const usedAddrs = new Set<string>()
+
+        for (const addr of priceAddresses) {
+          const t = tokenMap.get(addr)
+          if (t) {
+            ordered.push(t)
+            usedAddrs.add(addr)
+          }
+        }
+
+        const remaining = Array.from(tokenMap.values())
+          .filter(t => !usedAddrs.has(t.address.toLowerCase()))
+          .sort((a, b) => (b.total_volume_usd || 0) - (a.total_volume_usd || 0))
+
+        ordered.push(...remaining)
+        tokenList = ordered.slice(from, to + 1)
+      } else {
+        // Standard query on pulsechain_tokens
+        let query = supabase
+          .from('pulsechain_tokens')
+          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, is_active', { count: 'exact' })
+          .eq('is_active', true)
+
+        if (sortField === 'liquidity') {
+          query = query.order('total_liquidity', { ascending: false })
+        } else {
+          query = query.order('total_volume_usd', { ascending: false })
+        }
+
+        if (search.trim()) {
+          const s = search.trim()
+          if (s.startsWith('0x')) {
+            query = query.ilike('address', `${s}%`)
+          } else {
+            query = query.or(`symbol.ilike.%${s}%,name.ilike.%${s}%`)
+          }
+        }
+
+        const { data: rows, count, error } = await query.range(from, to)
+        if (error) throw error
+
+        tokenList = (rows || []) as Token[]
+        totalCount = count || 0
       }
 
-      const { data: rows, count, error } = await query.range(from, to)
-      if (error) throw error
-
-      const tokenList = (rows || []) as Token[]
-      setTotal(count || 0)
+      setTotal(totalCount)
 
       // Enrich with prices
       const addresses = tokenList.map(t => t.address.toLowerCase())
@@ -95,13 +185,48 @@ export function TokensPage() {
         }
       }
 
-      const enriched: TokenWithPrice[] = tokenList.map(t => ({
+      // Fetch 7d ago prices for change calculation
+      let change7dMap: Record<string, number> = {}
+      if (addresses.length > 0) {
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 8)
+        const sixDaysAgo = new Date()
+        sixDaysAgo.setDate(sixDaysAgo.getDate() - 6)
+
+        const { data: histRows } = await supabase
+          .from('token_price_history')
+          .select('address, date, price_usd')
+          .in('address', addresses)
+          .gte('date', sevenDaysAgo.toISOString().slice(0, 10))
+          .lte('date', sixDaysAgo.toISOString().slice(0, 10))
+          .order('date', { ascending: false })
+
+        const seen = new Set<string>()
+        for (const row of (histRows || [])) {
+          const addr = row.address.toLowerCase()
+          if (seen.has(addr)) continue
+          seen.add(addr)
+          const oldPrice = row.price_usd
+          const currentPrice = pricesMap[addr]?.price_usd
+          if (oldPrice && oldPrice > 0 && currentPrice && currentPrice > 0) {
+            change7dMap[addr] = ((currentPrice - oldPrice) / oldPrice) * 100
+          }
+        }
+      }
+
+      let enriched: TokenWithPrice[] = tokenList.map(t => ({
         ...t,
         price_usd: pricesMap[t.address.toLowerCase()]?.price_usd ?? null,
         price_change_24h_pct: pricesMap[t.address.toLowerCase()]?.price_change_24h_pct ?? null,
+        price_change_7d_pct: change7dMap[t.address.toLowerCase()] ?? null,
         volume_24h_usd: pricesMap[t.address.toLowerCase()]?.volume_24h_usd ?? null,
         market_cap_usd: pricesMap[t.address.toLowerCase()]?.market_cap_usd ?? null,
       }))
+
+      // Client-side sort for change_7d (not available server-side)
+      if (sortField === 'change_7d') {
+        enriched.sort((a, b) => (b.price_change_7d_pct ?? -Infinity) - (a.price_change_7d_pct ?? -Infinity))
+      }
 
       setTokens(enriched)
     } catch (e) {
@@ -109,16 +234,16 @@ export function TokensPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search])
+  }, [page, search, sortField])
 
   useEffect(() => {
     fetchTokens()
   }, [fetchTokens])
 
-  // Reset page on search change
+  // Reset page on search/sort change
   useEffect(() => {
     setPage(0)
-  }, [search])
+  }, [search, sortField])
 
   const fetchHistory = useCallback(async (address: string) => {
     setHistoryLoading(true)
@@ -174,6 +299,12 @@ export function TokensPage() {
     return () => { document.body.style.overflow = '' }
   }, [selectedToken])
 
+  // Compute supply from market_cap / price for modal
+  const selectedSupply = useMemo(() => {
+    if (!selectedToken?.market_cap_usd || !selectedToken?.price_usd || selectedToken.price_usd <= 0) return null
+    return selectedToken.market_cap_usd / selectedToken.price_usd
+  }, [selectedToken])
+
   // Token list view
   return (
     <div className="space-y-6">
@@ -185,16 +316,32 @@ export function TokensPage() {
           </p>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search symbol, name, or address..."
-            className="bg-gray-900/60 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/50 w-72"
-          />
+        <div className="flex items-center gap-3">
+          {/* Sort selector */}
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown className="h-3.5 w-3.5 text-gray-500" />
+            <select
+              value={sortField}
+              onChange={(e) => setSortField(e.target.value as SortField)}
+              className="bg-gray-900/60 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00D4FF]/50"
+            >
+              {SORT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search symbol, name, or address..."
+              className="bg-gray-900/60 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/50 w-72"
+            />
+          </div>
         </div>
       </div>
 
@@ -212,53 +359,47 @@ export function TokensPage() {
                     <th className="py-3 pr-4">Token</th>
                     <th className="py-3 pr-4 text-right">Price</th>
                     <th className="py-3 pr-4 text-right">24h</th>
+                    <th className="py-3 pr-4 text-right">7d</th>
                     <th className="py-3 pr-4 text-right">Market Cap</th>
                     <th className="py-3 pr-4 text-right">Volume (24h)</th>
                     <th className="py-3 text-right">Liquidity</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tokens.map((token, i) => (
-                    <tr
-                      key={token.address}
-                      onClick={() => handleSelectToken(token)}
-                      className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
-                    >
-                      <td className="py-2.5 pr-4 text-gray-500">{page * PAGE_SIZE + i + 1}</td>
-                      <td className="py-2.5 pr-4">
-                        <span className="font-medium text-white">{token.symbol}</span>
-                        {ETH_FORK_ADDRESSES.has(token.address.toLowerCase()) && (
-                          <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20" title="Ethereum fork copy — not the native bridged version">ETH fork</span>
-                        )}
-                        <span className="ml-2 text-gray-500 text-xs">{token.name}</span>
-                      </td>
-                      <td className="py-2.5 pr-4 text-right text-white">
-                        {token.price_usd != null
-                          ? token.price_usd < 0.01
-                            ? `$${token.price_usd.toFixed(6)}`
-                            : `$${token.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
-                          : '--'}
-                      </td>
-                      <td className={`py-2.5 pr-4 text-right ${
-                        (token.price_change_24h_pct ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
-                      }`}>
-                        {token.price_change_24h_pct != null
-                          ? `${token.price_change_24h_pct >= 0 ? '+' : ''}${token.price_change_24h_pct.toFixed(2)}%`
-                          : '--'}
-                      </td>
-                      <td className="py-2.5 pr-4 text-right text-gray-300">
-                        {token.market_cap_usd != null ? formatUsd(token.market_cap_usd) : '--'}
-                      </td>
-                      <td className="py-2.5 pr-4 text-right text-gray-300" title={token.volume_24h_usd == null ? 'No recent daily volume data' : '24h trading volume'}>
-                        {token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : '--'}
-                      </td>
-                      <td className="py-2.5 text-right text-gray-300">
-                        {token.price_usd != null && token.total_liquidity > 0
-                          ? formatUsd(token.total_liquidity * token.price_usd)
-                          : '--'}
-                      </td>
-                    </tr>
-                  ))}
+                  {tokens.map((token, i) => {
+                    const c24 = formatChange(token.price_change_24h_pct)
+                    const c7d = formatChange(token.price_change_7d_pct)
+                    return (
+                      <tr
+                        key={token.address}
+                        onClick={() => handleSelectToken(token)}
+                        className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <td className="py-2.5 pr-4 text-gray-500">{page * PAGE_SIZE + i + 1}</td>
+                        <td className="py-2.5 pr-4">
+                          <span className="font-medium text-white">{token.symbol}</span>
+                          {ETH_FORK_ADDRESSES.has(token.address.toLowerCase()) && (
+                            <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20" title="Ethereum fork copy — not the native bridged version">ETH fork</span>
+                          )}
+                          <span className="ml-2 text-gray-500 text-xs">{token.name}</span>
+                        </td>
+                        <td className="py-2.5 pr-4 text-right text-white">{formatPrice(token.price_usd)}</td>
+                        <td className={`py-2.5 pr-4 text-right ${c24.className}`}>{c24.text}</td>
+                        <td className={`py-2.5 pr-4 text-right ${c7d.className}`}>{c7d.text}</td>
+                        <td className="py-2.5 pr-4 text-right text-gray-300">
+                          {token.market_cap_usd != null ? formatUsd(token.market_cap_usd) : '--'}
+                        </td>
+                        <td className="py-2.5 pr-4 text-right text-gray-300" title={token.volume_24h_usd == null ? 'No recent daily volume data' : '24h trading volume'}>
+                          {token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : '--'}
+                        </td>
+                        <td className="py-2.5 text-right text-gray-300">
+                          {token.price_usd != null && token.total_liquidity > 0
+                            ? formatUsd(token.total_liquidity * token.price_usd)
+                            : '--'}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -291,6 +432,124 @@ export function TokensPage() {
         )}
       </div>
 
+      {/* Educational note */}
+      <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm">
+        <button
+          onClick={() => setShowNote(!showNote)}
+          className="flex items-center justify-between w-full p-4 text-left"
+        >
+          <div className="flex items-center gap-2 text-gray-400 text-sm">
+            <Info className="h-4 w-4" />
+            <span>About this data — Sources, methodology & limitations</span>
+          </div>
+          {showNote ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
+        </button>
+
+        {showNote && (
+          <div className="px-4 pb-4 space-y-4 text-sm text-gray-400">
+            <div className="rounded bg-gray-800/50 border border-white/5 p-3">
+              <p className="text-gray-300 font-medium mb-1">What is the Token Explorer?</p>
+              <p>
+                The Token Explorer lists all tokens discovered on PulseChain via the PulseX V1 subgraph.
+                It shows real-time prices (derivedUSD), 24h and 7d price changes calculated from historical snapshots,
+                market capitalization estimated from on-chain total supply, daily trading volume from tokenDayDatas,
+                and liquidity computed from pool reserves. All data is 100% on-chain — no third-party price feeds.
+              </p>
+            </div>
+
+            <div>
+              <p className="text-gray-300 font-medium mb-2">Data sources</p>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-white/10 text-gray-500">
+                    <th className="py-1.5 text-left">Metric</th>
+                    <th className="py-1.5 text-left">Source</th>
+                    <th className="py-1.5 text-left">Details</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-400">
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">Price</td>
+                    <td className="py-1.5">PulseX V1 Subgraph</td>
+                    <td className="py-1.5">derivedUSD — refreshed every 15 min</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">Change 24h</td>
+                    <td className="py-1.5">token_price_history</td>
+                    <td className="py-1.5">Calculated from yesterday's snapshot vs current price</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">Change 7d</td>
+                    <td className="py-1.5">token_price_history</td>
+                    <td className="py-1.5">Calculated from ~7 days ago snapshot vs current price</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">Market Cap</td>
+                    <td className="py-1.5">PulseX V1 Subgraph</td>
+                    <td className="py-1.5">totalSupply / 10^decimals × derivedUSD — estimated, no vesting data</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">Volume (24h)</td>
+                    <td className="py-1.5">tokenDayDatas</td>
+                    <td className="py-1.5">Real daily swap volume from PulseX V1 (not all-time cumulative)</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">Liquidity</td>
+                    <td className="py-1.5">PulseX V1 Subgraph</td>
+                    <td className="py-1.5">totalLiquidity (token units) × derivedUSD = approximate USD value</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <p className="text-gray-300 font-medium mb-2">Known limitations</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li><span className="text-orange-400">ETH fork tokens</span> — Ethereum fork copies (DAI, USDC, USDT, WBTC) trade at large discounts vs native bridged versions. Marked with <span className="text-orange-400">ETH fork</span> badge.</li>
+                <li><span className="text-gray-300">Market cap</span> — Uses total supply (not circulating). May be inflated for tokens with locked/burned supply. No FDV distinction.</li>
+                <li><span className="text-gray-300">V1 only</span> — Only PulseX V1 pools are indexed. V2 liquidity/volume is not included yet.</li>
+                <li><span className="text-gray-300">Coverage</span> — ~{total.toLocaleString()} tokens discovered vs ~15K on PulseCoinList. Coverage depends on PulseX V1 trading activity.</li>
+              </ul>
+            </div>
+
+            <div>
+              <p className="text-gray-300 font-medium mb-2">Cross-source verification (sample)</p>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-white/10 text-gray-500">
+                    <th className="py-1.5 text-left">Token</th>
+                    <th className="py-1.5 text-left">OpenPulsechain</th>
+                    <th className="py-1.5 text-left">DexScreener</th>
+                    <th className="py-1.5 text-left">Deviation</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-400">
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">WPLS</td>
+                    <td className="py-1.5">$0.00001054</td>
+                    <td className="py-1.5">$0.00001050</td>
+                    <td className="py-1.5 text-emerald-400">-0.4%</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">HEX</td>
+                    <td className="py-1.5">$0.001983</td>
+                    <td className="py-1.5">$0.001980</td>
+                    <td className="py-1.5 text-emerald-400">-0.15%</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">PLSX</td>
+                    <td className="py-1.5">$0.000007570</td>
+                    <td className="py-1.5">$0.000007565</td>
+                    <td className="py-1.5 text-emerald-400">-0.07%</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="text-xs text-gray-500 mt-1">Prices verified on 11/03/2026. All within 0.5% — expected due to 15-min refresh delay.</p>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="text-xs text-gray-600 text-center">
         Source: PulseX Subgraph (graph.pulsechain.com) — 100% on-chain, sovereign data
       </div>
@@ -316,7 +575,12 @@ export function TokensPage() {
               {/* Token header */}
               <div className="flex items-center justify-between flex-wrap gap-4 pr-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">{selectedToken.symbol}</h2>
+                  <h2 className="text-2xl font-bold text-white">
+                    {selectedToken.symbol}
+                    {ETH_FORK_ADDRESSES.has(selectedToken.address.toLowerCase()) && (
+                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 align-middle">ETH fork</span>
+                    )}
+                  </h2>
                   <p className="text-gray-400 text-sm">{selectedToken.name}</p>
                   <button
                     type="button"
@@ -328,24 +592,26 @@ export function TokensPage() {
                   </button>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-white">
-                    {selectedToken.price_usd != null
-                      ? selectedToken.price_usd < 0.01
-                        ? `$${selectedToken.price_usd.toFixed(8)}`
-                        : `$${selectedToken.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
-                      : '--'}
+                  <div className="text-2xl font-bold text-white">{formatPrice(selectedToken.price_usd)}</div>
+                  <div className="flex items-center gap-3 justify-end mt-1">
+                    {selectedToken.price_change_24h_pct != null && (
+                      <span className={`text-sm font-medium ${selectedToken.price_change_24h_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {selectedToken.price_change_24h_pct >= 0 ? '+' : ''}{selectedToken.price_change_24h_pct.toFixed(2)}%
+                        <span className="text-gray-500 ml-1">24h</span>
+                      </span>
+                    )}
+                    {selectedToken.price_change_7d_pct != null && (
+                      <span className={`text-sm font-medium ${selectedToken.price_change_7d_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {selectedToken.price_change_7d_pct >= 0 ? '+' : ''}{selectedToken.price_change_7d_pct.toFixed(2)}%
+                        <span className="text-gray-500 ml-1">7d</span>
+                      </span>
+                    )}
                   </div>
-                  {selectedToken.price_change_24h_pct != null && (
-                    <span className={`text-sm font-medium ${selectedToken.price_change_24h_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {selectedToken.price_change_24h_pct >= 0 ? '+' : ''}{selectedToken.price_change_24h_pct.toFixed(2)}%
-                      <span className="text-gray-500 ml-1">24h</span>
-                    </span>
-                  )}
                 </div>
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-white/5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-4 border-t border-white/5">
                 <div>
                   <div className="text-xs text-gray-500">Market Cap</div>
                   <div className="text-sm font-medium text-white">
@@ -363,6 +629,20 @@ export function TokensPage() {
                   <div className="text-sm font-medium text-white">
                     {selectedToken.price_usd != null && selectedToken.total_liquidity > 0
                       ? formatUsd(selectedToken.total_liquidity * selectedToken.price_usd)
+                      : '--'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Circulating Supply</div>
+                  <div className="text-sm font-medium text-white">
+                    {selectedSupply != null
+                      ? selectedSupply > 1e12
+                        ? `${(selectedSupply / 1e12).toFixed(2)}T`
+                        : selectedSupply > 1e9
+                          ? `${(selectedSupply / 1e9).toFixed(2)}B`
+                          : selectedSupply > 1e6
+                            ? `${(selectedSupply / 1e6).toFixed(2)}M`
+                            : selectedSupply.toLocaleString('en-US', { maximumFractionDigits: 0 })
                       : '--'}
                   </div>
                 </div>
