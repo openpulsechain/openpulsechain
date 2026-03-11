@@ -196,7 +196,7 @@ function DexDataSourceNote({ liveFactory }: { liveFactory: ReturnType<typeof use
           </div>
 
           <p className="text-[10px] text-gray-600">
-            This is not investment advice. Data is provided for educational and informational purposes only. Data is provided for educational and informational purposes only.
+            This is not investment advice. Data is provided for educational and informational purposes only.
           </p>
         </div>
       )}
@@ -709,7 +709,7 @@ function CumulativeVolumeNote({ source, liveFactory }: { source: DexSource; live
           </div>
 
           <p className="text-[10px] text-gray-600 pt-1 border-t border-white/5">
-            This is not investment advice. Data is provided for educational and informational purposes only. Data is provided for educational and informational purposes only.
+            This is not investment advice. Data is provided for educational and informational purposes only.
           </p>
         </div>
       )}

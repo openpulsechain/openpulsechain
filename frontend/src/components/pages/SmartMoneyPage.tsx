@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, RefreshCw } from 'lucide-react'
 import { ShareButton } from '../ui/ShareButton'
+import { shortenAddress, formatTimeAgo } from '../../lib/format'
 
 const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
 
@@ -34,19 +35,7 @@ interface Feed {
   generated_at: string
 }
 
-function formatTime(ts: number) {
-  const d = new Date(ts * 1000)
-  const now = new Date()
-  const diff = (now.getTime() - d.getTime()) / 1000
-  if (diff < 60) return `${Math.floor(diff)}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
-}
-
-function shortenAddr(addr: string) {
-  return addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '?'
-}
+// Use shared formatTimeAgo and shortenAddress from lib/format
 
 export function SmartMoneyPage() {
   const navigate = useNavigate()
@@ -201,14 +190,14 @@ export function SmartMoneyPage() {
                         className="text-gray-500 font-mono cursor-pointer hover:text-[#00D4FF] transition-colors"
                         onClick={() => navigate(`/wallet/${swap.wallet}`)}
                       >
-                        {shortenAddr(swap.wallet)}
+                        {shortenAddress(swap.wallet)}
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell text-gray-500">
                       {swap.dex}
                     </td>
                     <td className="text-right px-4 py-3 text-gray-500 whitespace-nowrap">
-                      {formatTime(swap.timestamp)}
+                      {formatTimeAgo(swap.timestamp)}
                     </td>
                   </tr>
                 ))}
@@ -242,7 +231,7 @@ export function SmartMoneyPage() {
                   >
                     <td className="px-4 py-3 text-gray-500 font-bold">{i + 1}</td>
                     <td className="px-4 py-3">
-                      <span className="font-mono text-[#00D4FF] hover:underline">{shortenAddr(wallet.wallet)}</span>
+                      <span className="font-mono text-[#00D4FF] hover:underline">{shortenAddress(wallet.wallet)}</span>
                     </td>
                     <td className="text-right px-4 py-3 font-medium text-white">
                       ${wallet.total_volume_usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -269,6 +258,9 @@ export function SmartMoneyPage() {
           </div>
         )
       )}
+      <p className="text-center text-xs text-gray-600 pt-4">
+        This is not investment advice. Data is provided for educational and informational purposes only.
+      </p>
     </div>
   )
 }

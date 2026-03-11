@@ -537,6 +537,9 @@ export function IntelligencePage() {
           </div>
         </div>
       </div>
+      <p className="text-center text-xs text-gray-600 pt-4">
+        This is not investment advice. Data is provided for educational and informational purposes only.
+      </p>
     </div>
   )
 }

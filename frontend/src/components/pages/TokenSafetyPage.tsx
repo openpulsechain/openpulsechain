@@ -327,7 +327,7 @@ export function TokenSafetyPage() {
           <p className="text-sm text-gray-400 font-mono mb-3">
             {address}
             <a
-              href={`https://scan.pulsechain.com/address/${address}`}
+              href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}`}
               target="_blank"
               rel="noopener noreferrer"
               className="ml-2 inline-flex items-center gap-1 text-[#00D4FF] hover:underline"

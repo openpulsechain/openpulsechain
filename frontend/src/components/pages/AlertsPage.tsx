@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Shield, TrendingDown, Coins, Clock, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { formatTimeAgo } from '../../lib/format'
 
 interface Alert {
   id: number
@@ -64,14 +65,7 @@ export function AlertsPage() {
   })
 
   function formatTime(ts: string) {
-    const d = new Date(ts)
-    const now = new Date()
-    const diff = (now.getTime() - d.getTime()) / 1000
-
-    if (diff < 60) return `${Math.floor(diff)}s ago`
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-    return `${Math.floor(diff / 86400)}d ago`
+    return formatTimeAgo(ts)
   }
 
   return (
@@ -177,6 +171,9 @@ export function AlertsPage() {
           })}
         </div>
       )}
+      <p className="text-center text-xs text-gray-600 pt-4">
+        This is not investment advice. Data is provided for educational and informational purposes only.
+      </p>
     </div>
   )
 }

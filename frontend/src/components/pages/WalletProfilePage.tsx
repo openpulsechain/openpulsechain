@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Wallet, ArrowUpRight, ArrowDownRight, ExternalLink, Loader2, Clock } from 'lucide-react'
 import { ShareButton } from '../ui/ShareButton'
+import { shortenAddress, formatTimeAgo } from '../../lib/format'
 
 const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
 
@@ -23,19 +24,7 @@ interface Swap {
   timestamp: number
 }
 
-function shortenAddr(addr: string) {
-  return addr ? `${addr.slice(0, 8)}...${addr.slice(-6)}` : '?'
-}
-
-function formatTime(ts: number) {
-  const d = new Date(ts * 1000)
-  const now = new Date()
-  const diff = (now.getTime() - d.getTime()) / 1000
-  if (diff < 60) return `${Math.floor(diff)}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
-}
+// Use shared formatTimeAgo and shortenAddress from lib/format
 
 export function WalletProfilePage() {
   const { address } = useParams<{ address: string }>()
@@ -80,11 +69,11 @@ export function WalletProfilePage() {
             <Wallet className="h-8 w-8 text-[#8000E0]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold font-mono">{shortenAddr(address || '')}</h1>
+            <h1 className="text-xl font-bold font-mono">{shortenAddress(address || '')}</h1>
             <p className="text-sm text-gray-500 font-mono">
               {address}
               <a
-                href={`https://scan.pulsechain.com/address/${address}`}
+                href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ml-2 inline-flex items-center gap-1 text-[#00D4FF] hover:underline"
@@ -94,7 +83,7 @@ export function WalletProfilePage() {
             </p>
           </div>
           <div className="ml-auto shrink-0">
-            <ShareButton title={`Wallet ${shortenAddr(address || '')}`} text="PulseChain wallet profile on OpenPulsechain" />
+            <ShareButton title={`Wallet ${shortenAddress(address || '')}`} text="PulseChain wallet profile on OpenPulsechain" />
           </div>
         </div>
       </div>
@@ -215,7 +204,7 @@ export function WalletProfilePage() {
                   <span className="text-xs text-gray-500">{swap.dex}</span>
                   <span className="text-xs text-gray-500 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {formatTime(swap.timestamp)}
+                    {formatTimeAgo(swap.timestamp)}
                   </span>
                 </div>
               </div>
@@ -223,6 +212,9 @@ export function WalletProfilePage() {
           </div>
         )
       )}
+      <p className="text-center text-xs text-gray-600 pt-4">
+        This is not investment advice. Data is provided for educational and informational purposes only.
+      </p>
     </div>
   )
 }
