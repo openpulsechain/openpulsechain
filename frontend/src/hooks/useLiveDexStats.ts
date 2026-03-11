@@ -4,7 +4,7 @@ const PULSEX_V2_SUBGRAPH = 'https://graph.pulsechain.com/subgraphs/name/pulsecha
 const REFRESH_INTERVAL = 30_000 // 30 seconds
 
 const QUERY = `{
-  pulsexFactories(first: 1) {
+  pulseXFactories(first: 1) {
     totalLiquidityUSD
   }
   pulsexDayDatas(first: 1, orderBy: date, orderDirection: desc) {
@@ -40,7 +40,7 @@ export function useLiveDexStats(): LiveDexStats {
         const json = await res.json()
         if (!mountedRef.current) return
 
-        const factory = json?.data?.pulsexFactories?.[0]
+        const factory = json?.data?.pulseXFactories?.[0]
         const dayData = json?.data?.pulsexDayDatas?.[0]
 
         setStats({
