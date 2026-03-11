@@ -132,8 +132,10 @@ export function useRpcHealth(): RpcHealth {
       return {
         name: meta.name,
         url: meta.url,
+        endpoint: meta.endpoint,
         description: meta.description,
-        status: r.valid ? statusFromLatency(r.latencyMs, meta.fast, meta.slow) : 'down',
+        type: meta.type,
+        status: r.valid ? statusFromLatency(r.latencyMs, meta.fast, meta.slow) : 'down' as ServiceStatus,
         latencyMs: Math.round(r.latencyMs),
         lastChecked: now,
       }
