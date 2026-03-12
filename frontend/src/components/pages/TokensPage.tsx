@@ -211,6 +211,7 @@ function formatCompact(n: number): string {
 }
 
 interface PoolRow {
+  token_address: string
   pair_address: string
   dex_id: string | null
   base_token_symbol: string | null
@@ -294,6 +295,9 @@ export function TokensPage() {
   const [liveSummary, setLiveSummary] = useState<LivePoolSummary | null>(null)
   const [livePools, setLivePools] = useState<PoolRow[]>([])
   const [liveLoading, setLiveLoading] = useState(false)
+
+  // Async LP cache — preloaded for all tokens on the current page
+  const poolCacheRef = useRef<Map<string, { summary: LivePoolSummary | null; pools: PoolRow[] }>>(new Map())
 
   const activeFilterCount = useMemo(() => {
     let n = 0
@@ -521,6 +525,51 @@ export function TokensPage() {
     fetchTokens()
   }, [fetchTokens])
 
+  // Background preload LP data for all tokens on the current page
+  useEffect(() => {
+    if (tokens.length === 0) return
+    const cache = poolCacheRef.current
+    const uncached = tokens.filter(t => !cache.has(t.address.toLowerCase()))
+    if (uncached.length === 0) return
+
+    const addresses = uncached.map(t => t.address.toLowerCase())
+    const controller = new AbortController()
+
+    ;(async () => {
+      try {
+        // Batch fetch all summaries + pools for current page in 2 queries
+        const [summaryRes, poolsRes] = await Promise.all([
+          supabase.from('token_live_summary').select('*').in('token_address', addresses),
+          supabase.from('token_pools_live').select('*').in('token_address', addresses).order('liquidity_usd', { ascending: false, nullsFirst: false }),
+        ])
+        if (controller.signal.aborted) return
+
+        const summaryMap = new Map<string, LivePoolSummary>()
+        for (const s of (summaryRes.data ?? [])) {
+          summaryMap.set(s.token_address, s as LivePoolSummary)
+        }
+
+        const poolsMap = new Map<string, PoolRow[]>()
+        for (const p of (poolsRes.data ?? []) as PoolRow[]) {
+          const addr = (p as any).token_address as string
+          if (!poolsMap.has(addr)) poolsMap.set(addr, [])
+          poolsMap.get(addr)!.push(p)
+        }
+
+        for (const addr of addresses) {
+          cache.set(addr, {
+            summary: summaryMap.get(addr) ?? null,
+            pools: poolsMap.get(addr) ?? [],
+          })
+        }
+      } catch (e) {
+        console.error('LP preload failed:', e)
+      }
+    })()
+
+    return () => controller.abort()
+  }, [tokens])
+
   // Reset page on search/sort/filter change
   useEffect(() => {
     setPage(0)
@@ -548,22 +597,37 @@ export function TokensPage() {
     setSelectedToken(token)
     setPriceRange(null)
     setVolRange(null)
-    setLiveSummary(null)
-    setLivePools([])
     fetchHistory(token.address)
-    setLiveLoading(true)
-    try {
-      const addr = token.address.toLowerCase()
-      const [summaryRes, poolsRes] = await Promise.all([
-        supabase.from('token_live_summary').select('*').eq('token_address', addr).limit(1),
-        supabase.from('token_pools_live').select('*').eq('token_address', addr).order('liquidity_usd', { ascending: false, nullsFirst: false }),
-      ])
-      setLiveSummary(summaryRes.data?.[0] ?? null)
-      setLivePools((poolsRes.data ?? []) as PoolRow[])
-    } catch (e) {
-      console.error('Failed to fetch live data:', e)
-    } finally {
+
+    const addr = token.address.toLowerCase()
+    const cached = poolCacheRef.current.get(addr)
+
+    if (cached) {
+      // Instant open from preloaded cache
+      setLiveSummary(cached.summary)
+      setLivePools(cached.pools)
       setLiveLoading(false)
+    } else {
+      // Fallback: fetch on demand (token not yet preloaded)
+      setLiveSummary(null)
+      setLivePools([])
+      setLiveLoading(true)
+      try {
+        const [summaryRes, poolsRes] = await Promise.all([
+          supabase.from('token_live_summary').select('*').eq('token_address', addr).limit(1),
+          supabase.from('token_pools_live').select('*').eq('token_address', addr).order('liquidity_usd', { ascending: false, nullsFirst: false }),
+        ])
+        const summary = summaryRes.data?.[0] ?? null
+        const pools = (poolsRes.data ?? []) as PoolRow[]
+        setLiveSummary(summary)
+        setLivePools(pools)
+        // Store in cache for next open
+        poolCacheRef.current.set(addr, { summary: summary as LivePoolSummary | null, pools })
+      } catch (e) {
+        console.error('Failed to fetch live data:', e)
+      } finally {
+        setLiveLoading(false)
+      }
     }
   }
 
