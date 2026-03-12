@@ -11,12 +11,24 @@ from datetime import datetime, timezone, timedelta
 import requests
 
 from db import supabase
-from config import COINGECKO_BASE, COINGECKO_API_KEY, PULSEX_SUBGRAPH_V1
+from config import COINGECKO_BASE, COINGECKO_API_KEY, PULSEX_SUBGRAPH_V1, PULSEX_SUBGRAPH_V2
 from utils.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
 PULSEX_SUBGRAPH = PULSEX_SUBGRAPH_V1
+
+# Tokens with known broken V1 totalSupply (frozen/incorrect)
+# These MUST use V2 totalSupply for Market Cap calculation
+V1_SUPPLY_BROKEN = {
+    "0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d",  # INC: V1=640, real=55.8M
+    "0x02dcdd04e3f455d838cd1249292c58f3b79e3c3c",  # WETH: V1=0.018, real=10,771
+    "0xb17d901469b9208b17d916112988a3fed19b5ca1",  # WBTC(br): V1=0.20, real=367
+    "0x15d38573d2feeb82e7ad5187ab8c1d52810b1f07",  # USDC(br): V1=1143, real=34.6M
+    "0x0cb6f5a34ad42ec934882a05265a7d5f59b51a2f",  # USDT(br): V1=21304, real=~4.5M
+    "0xefd766ccb38eaf1dfd701853bfce31359239f305",  # DAI(br): V1≈0, real=33.3M
+    "0x57fde0a71132198bbec939b98976993d8d89d225",  # eHEX: V1 broken
+}
 
 # Major tokens from CoinGecko (reliable for these — not PulseChain native)
 COINGECKO_TOKENS = {
@@ -188,7 +200,14 @@ def _fetch_latest_daily_volumes(addresses: list[str]) -> dict:
 
 
 def _fetch_pulsechain_prices() -> list[dict]:
-    """Fetch PulseChain token prices from PulseX subgraph (sovereign, no GeckoTerminal)."""
+    """Fetch PulseChain token prices from PulseX V1+V2 subgraphs (sovereign, no GeckoTerminal).
+
+    Aggregates V1 and V2:
+    - Price: V1 preferred, V2 fallback
+    - Volume: from token_price_history (already V1+V2 via token_history.py)
+    - Liquidity: V1 totalLiquidity + V2 totalLiquidity (in token units × price)
+    - Market Cap: derivedUSD × totalSupply, with V2 fallback for broken V1 supplies
+    """
     # 1. Get top tokens from database
     db_tokens = _fetch_top_tokens_from_db(limit=50)
     if not db_tokens:
@@ -207,45 +226,118 @@ def _fetch_pulsechain_prices() -> list[dict]:
         }
         addresses.append(addr)
 
-    # 2. Query PulseX subgraph for current prices
-    subgraph_data = _query_subgraph_prices(addresses)
-    if not subgraph_data:
-        logger.warning("No data returned from PulseX subgraph")
+    # 2. Query BOTH V1 and V2 subgraphs for current prices
+    v1_data = _query_subgraph_prices(addresses)
+    logger.info(f"  V1 subgraph: {len(v1_data)} tokens")
+
+    # Query V2 subgraph (same schema)
+    v2_data = {}
+    lower_addresses = [a.lower() for a in addresses]
+    batch_size = 100
+    for i in range(0, len(lower_addresses), batch_size):
+        batch = lower_addresses[i : i + batch_size]
+        query = """
+        {
+          tokens(where: {id_in: %s}) {
+            id
+            symbol
+            name
+            decimals
+            derivedUSD
+            tradeVolumeUSD
+            totalLiquidity
+            totalSupply
+          }
+        }
+        """ % str(batch).replace("'", '"')
+        try:
+            resp = requests.post(
+                PULSEX_SUBGRAPH_V2,
+                json={"query": query},
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if "errors" not in data:
+                    for t in data.get("data", {}).get("tokens", []):
+                        v2_data[t["id"].lower()] = t
+        except Exception as e:
+            logger.warning(f"V2 subgraph request failed: {e}")
+    logger.info(f"  V2 subgraph: {len(v2_data)} tokens")
+
+    if not v1_data and not v2_data:
+        logger.warning("No data returned from either subgraph")
         return []
 
     # 3. Get yesterday's prices for 24h change calculation
     yesterday_prices = _fetch_yesterday_prices(addresses)
 
-    # 4. Get real daily volumes from token_price_history (NOT tradeVolumeUSD which is all-time)
+    # 4. Get real daily volumes from token_price_history (already V1+V2 via token_history.py)
     daily_volumes = _fetch_latest_daily_volumes(addresses)
 
-    # 5. Build output rows
+    # 5. Build output rows with V1+V2 aggregation
     rows = []
     now = datetime.now(timezone.utc).isoformat()
 
     for addr in addresses:
-        sg = subgraph_data.get(addr)
-        if not sg:
+        v1 = v1_data.get(addr)
+        v2 = v2_data.get(addr)
+
+        if not v1 and not v2:
             continue
 
-        derived_usd = float(sg.get("derivedUSD", 0))
+        # Price: V1 preferred, V2 fallback
+        v1_price = float(v1.get("derivedUSD", 0)) if v1 else 0
+        v2_price = float(v2.get("derivedUSD", 0)) if v2 else 0
+        derived_usd = v1_price or v2_price
         if derived_usd <= 0:
             continue
 
         meta = token_meta[addr]
-        total_liquidity = float(sg.get("totalLiquidity", 0))
 
-        # Real 24h volume from token_price_history (tokenDayDatas), NOT tradeVolumeUSD (all-time)
+        # Liquidity: V1 + V2 totalLiquidity (in token units) × price
+        v1_liq = float(v1.get("totalLiquidity", 0)) if v1 else 0
+        v2_liq = float(v2.get("totalLiquidity", 0)) if v2 else 0
+        total_liquidity_usd = (v1_liq + v2_liq) * derived_usd
+
+        # Volume: from token_price_history (already V1+V2 via token_history.py)
         real_daily_vol = daily_volumes.get(addr)
 
-        # Calculate market cap from totalSupply and derivedUSD
+        # Market Cap: use V2 totalSupply for tokens with broken V1 supply
         market_cap = None
         try:
-            total_supply_raw = float(sg.get("totalSupply", 0))
-            decimals = int(sg.get("decimals", 18))
-            if total_supply_raw > 0:
-                total_supply = total_supply_raw / (10 ** decimals)
-                market_cap = derived_usd * total_supply
+            # Determine which subgraph to use for totalSupply
+            if addr in V1_SUPPLY_BROKEN and v2:
+                # V1 supply is known broken — use V2
+                supply_source = v2
+                supply_label = "V2"
+            elif v1:
+                supply_source = v1
+                supply_label = "V1"
+            elif v2:
+                supply_source = v2
+                supply_label = "V2"
+            else:
+                supply_source = None
+                supply_label = None
+
+            if supply_source:
+                total_supply_raw = float(supply_source.get("totalSupply", 0))
+                decimals = int(supply_source.get("decimals", 18))
+                if total_supply_raw > 0:
+                    total_supply = total_supply_raw / (10 ** decimals)
+                    market_cap = derived_usd * total_supply
+
+                    # Sanity check: if MCap < $100 and we used V1, try V2 as fallback
+                    if market_cap < 100 and supply_label == "V1" and v2:
+                        v2_supply_raw = float(v2.get("totalSupply", 0))
+                        v2_decimals = int(v2.get("decimals", 18))
+                        if v2_supply_raw > 0:
+                            v2_supply = v2_supply_raw / (10 ** v2_decimals)
+                            v2_mcap = derived_usd * v2_supply
+                            if v2_mcap > market_cap:
+                                market_cap = v2_mcap
+                                logger.info(f"  {meta['symbol']}: V1 MCap=${market_cap:.0f} broken, using V2 MCap=${v2_mcap:.0f}")
         except (ValueError, TypeError):
             pass
 
@@ -255,7 +347,6 @@ def _fetch_pulsechain_prices() -> list[dict]:
         if yesterday_price and yesterday_price > 0:
             change_pct = ((derived_usd - yesterday_price) / yesterday_price) * 100
 
-        # Use address as id for PulseChain tokens (unique identifier)
         rows.append({
             "id": addr,
             "symbol": meta["symbol"],
@@ -265,10 +356,12 @@ def _fetch_pulsechain_prices() -> list[dict]:
             "market_cap_usd": market_cap,
             "price_change_24h_pct": change_pct,
             "last_updated": now,
-            "source": "pulsex_subgraph",
+            "source": "pulsex_subgraph_v1v2",
             "address": meta["address"],
         })
-        logger.info(f"  {meta['symbol']}: ${derived_usd:.8f} (PulseX subgraph)")
+        v1_tag = "V1" if v1_price else ""
+        v2_tag = "V2" if v2_price else ""
+        logger.info(f"  {meta['symbol']}: ${derived_usd:.8f} ({v1_tag}+{v2_tag}, liq=${total_liquidity_usd:.0f})")
 
     return rows
 
@@ -335,6 +428,8 @@ def run():
 
             # Also snapshot PulseChain prices into token_price_history
             # so tomorrow's run has a "yesterday price" for 24h change calculation
+            # NOTE: do NOT write daily_volume_usd here — token_history.py handles that
+            # from tokenDayDatas.dailyVolumeUSD (correct daily volume)
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             history_rows = []
             for row in pls_rows:
@@ -344,8 +439,6 @@ def run():
                         "address": addr.lower(),
                         "date": today,
                         "price_usd": row["price_usd"],
-                        "daily_volume_usd": row.get("volume_24h_usd"),
-                        "total_liquidity_usd": None,
                         "source": "pulsex_subgraph",
                     })
             if history_rows:
