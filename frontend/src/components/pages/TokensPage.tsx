@@ -259,17 +259,34 @@ const COLUMN_DESCRIPTIONS: Record<string, string> = {
 
 function ClickableHeader({ label, className }: { label: string; className?: string }) {
   const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLTableCellElement>(null)
   const desc = COLUMN_DESCRIPTIONS[label]
+
+  // Close on click outside
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  // Split description into paragraphs on sentence boundaries
+  const paragraphs = desc ? desc.split(/\.(?:\s)/).map(s => s.endsWith('.') ? s : s + '.') : []
+
   return (
     <th
+      ref={ref}
       className={`py-2 text-center relative select-none ${desc ? 'cursor-pointer hover:text-gray-300' : ''} ${className || ''}`}
       onClick={() => desc && setOpen(v => !v)}
     >
       {label}
       {open && desc && (
-        <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 w-56 rounded-lg bg-gray-900 border border-white/10 p-3 text-left text-[11px] text-gray-300 font-normal leading-relaxed shadow-xl whitespace-normal">
-          {desc}
-          <div className="mt-1.5 text-[10px] text-gray-500 italic">Click header to dismiss</div>
+        <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 w-56 rounded-lg bg-gray-900 border border-white/10 p-3 text-left text-[11px] text-gray-300 font-normal shadow-xl whitespace-normal">
+          {paragraphs.map((p, i) => (
+            <p key={i} className={i > 0 ? 'mt-1.5' : ''}>{p}</p>
+          ))}
         </div>
       )}
     </th>
