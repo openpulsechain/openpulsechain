@@ -251,3 +251,53 @@ export interface HolderLeagueFamily {
   link_types: string[]
   scraped_at: string
 }
+
+export interface LivePoolSummary {
+  token_address: string
+  token_symbol: string | null
+  last_updated: string
+  tier: 'hot' | 'warm' | 'cold'
+  price_usd: number | null
+  fdv: number | null
+  market_cap_usd: number | null
+  price_change_24h: number | null
+  total_liquidity_usd: number | null
+  total_volume_24h_usd: number | null
+  total_buys_24h: number | null
+  total_sells_24h: number | null
+  pool_count_legitimate: number
+  pool_count_total: number
+  dex_count: number
+  dex_list: string[]
+  data_age_seconds: number | null
+}
+
+export interface LivePool {
+  token_address: string
+  pair_address: string
+  updated_at: string
+  tier: 'hot' | 'warm' | 'cold'
+  token_symbol: string | null
+  token_name: string | null
+  dex_id: string | null
+  base_token_symbol: string | null
+  quote_token_symbol: string | null
+  price_usd: number | null
+  volume_24h_usd: number | null
+  liquidity_usd: number | null
+  buys_24h: number | null
+  sells_24h: number | null
+  txns_24h: number | null
+  fdv: number | null
+  market_cap_usd: number | null
+  price_change_5m: number | null
+  price_change_1h: number | null
+  price_change_6h: number | null
+  price_change_24h: number | null
+  dx_url: string | null
+  pool_is_legitimate: boolean
+  pool_confidence: string | null
+  pool_spam_reason: string | null
+  data_age_seconds: number | null
+  freshness: string | null
+}
