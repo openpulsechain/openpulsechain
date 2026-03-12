@@ -270,6 +270,11 @@ export interface LivePoolSummary {
   dex_count: number
   dex_list: string[]
   data_age_seconds: number | null
+  price_median: number | null
+  price_min: number | null
+  price_max: number | null
+  total_liquidity_base: number | null
+  total_liquidity_quote: number | null
 }
 
 export interface LivePool {
@@ -285,6 +290,8 @@ export interface LivePool {
   price_usd: number | null
   volume_24h_usd: number | null
   liquidity_usd: number | null
+  liquidity_base: number | null
+  liquidity_quote: number | null
   buys_24h: number | null
   sells_24h: number | null
   txns_24h: number | null

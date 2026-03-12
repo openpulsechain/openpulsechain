@@ -7,6 +7,7 @@ import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { formatUsd } from '../../lib/format'
 import { Sparkline } from '../ui/Sparkline'
 import { keccak256 } from 'js-sha3'
+import type { LivePoolSummary } from '../../types'
 
 function toChecksumAddress(address: string): string {
   const addr = address.toLowerCase().replace('0x', '')
@@ -208,6 +209,36 @@ function formatCompact(n: number): string {
   return n.toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 
+interface PoolRow {
+  pair_address: string
+  dex_id: string | null
+  base_token_symbol: string | null
+  quote_token_symbol: string | null
+  price_usd: number | null
+  liquidity_usd: number | null
+  liquidity_base: number | null
+  liquidity_quote: number | null
+  volume_24h_usd: number | null
+  buys_24h: number | null
+  sells_24h: number | null
+  pool_is_legitimate: boolean
+  pool_confidence: string | null
+  pool_spam_reason: string | null
+  tier: string
+  dx_url: string | null
+  price_change_24h: number | null
+  updated_at: string
+}
+
+const DEX_NAMES: Record<string, string> = {
+  pulsex: 'PulseX', '9mm': '9mm', '9inch': '9inch',
+  'pulse-rate': 'Pulse Rate', dextop: 'DexTop', eazyswap: 'EazySwap',
+}
+function formatDexName(dex: string | null): string {
+  if (!dex) return '--'
+  return DEX_NAMES[dex] || dex.charAt(0).toUpperCase() + dex.slice(1)
+}
+
 export function TokensPage() {
   const [tokens, setTokens] = useState<TokenWithPrice[]>([])
   const [total, setTotal] = useState(0)
@@ -224,6 +255,9 @@ export function TokensPage() {
   const [volRange, setVolRange] = useState<number | null>(null)
   const [showNote, setShowNote] = useState(false)
   const [sparkData, setSparkData] = useState<Record<string, number[]>>({})
+  const [liveSummary, setLiveSummary] = useState<LivePoolSummary | null>(null)
+  const [livePools, setLivePools] = useState<PoolRow[]>([])
+  const [liveLoading, setLiveLoading] = useState(false)
 
   const activeFilterCount = useMemo(() => {
     let n = 0
@@ -474,11 +508,27 @@ export function TokensPage() {
     }
   }, [])
 
-  const handleSelectToken = (token: TokenWithPrice) => {
+  const handleSelectToken = async (token: TokenWithPrice) => {
     setSelectedToken(token)
     setPriceRange(null)
     setVolRange(null)
+    setLiveSummary(null)
+    setLivePools([])
     fetchHistory(token.address)
+    setLiveLoading(true)
+    try {
+      const addr = token.address.toLowerCase()
+      const [summaryRes, poolsRes] = await Promise.all([
+        supabase.from('token_live_summary').select('*').eq('token_address', addr).limit(1),
+        supabase.from('token_pools_live').select('*').eq('token_address', addr).order('liquidity_usd', { ascending: false, nullsFirst: false }),
+      ])
+      setLiveSummary(summaryRes.data?.[0] ?? null)
+      setLivePools((poolsRes.data ?? []) as PoolRow[])
+    } catch (e) {
+      console.error('Failed to fetch live data:', e)
+    } finally {
+      setLiveLoading(false)
+    }
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
@@ -486,6 +536,8 @@ export function TokensPage() {
   const closeModal = useCallback(() => {
     setSelectedToken(null)
     setHistory([])
+    setLiveSummary(null)
+    setLivePools([])
   }, [])
 
   const overlayRef = useRef<HTMLDivElement>(null)
@@ -512,6 +564,21 @@ export function TokensPage() {
     if (!selectedToken?.market_cap_usd || !selectedToken?.price_usd || selectedToken.price_usd <= 0) return null
     return selectedToken.market_cap_usd / selectedToken.price_usd
   }, [selectedToken])
+
+  const chartHistory = useMemo(() => {
+    if (!history.length) return history
+    const livePrice = liveSummary?.price_usd
+    if (!livePrice) return history
+    const today = new Date().toISOString().slice(0, 10)
+    const lastDate = history[history.length - 1]?.date
+    if (lastDate === today) return history
+    return [...history, {
+      date: today,
+      price_usd: livePrice,
+      daily_volume_usd: liveSummary?.total_volume_24h_usd ?? 0,
+      total_liquidity_usd: liveSummary?.total_liquidity_usd ?? 0,
+    }]
+  }, [history, liveSummary])
 
   return (
     <div className="space-y-6">
@@ -881,15 +948,15 @@ export function TokensPage() {
         <p>This is not investment advice. Data is provided for educational and informational purposes only.</p>
       </div>
 
-      {/* Token Detail Modal */}
+      {/* Token Detail Modal — equal margins top=left=right */}
       {selectedToken && (
         <div
           key={selectedToken.address}
           ref={overlayRef}
           onClick={(e) => { if (e.target === overlayRef.current) closeModal() }}
-          className="fixed inset-0 z-50 flex items-start justify-center backdrop-blur-md overflow-y-auto p-4 pt-12 sm:pt-16"
+          className="fixed inset-0 z-50 backdrop-blur-md overflow-y-auto p-4 sm:p-[3vw]"
         >
-          <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-gray-900 shadow-2xl">
+          <div className="relative w-full rounded-2xl border border-white/10 bg-gray-900 shadow-2xl">
             <button
               onClick={closeModal}
               className="absolute top-4 right-4 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors z-10"
@@ -897,36 +964,42 @@ export function TokensPage() {
               <X className="h-5 w-5" />
             </button>
 
-            <div className="p-5 sm:p-6 space-y-5">
-              {/* Token header */}
+            <div className="p-5 sm:p-6 lg:p-8 space-y-6">
+              {/* Token Header */}
               <div className="flex items-center justify-between flex-wrap gap-4 pr-8">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold text-white">{selectedToken.symbol}</h2>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${CATEGORY_COLORS[selectedToken.category]}`}>{selectedToken.category}</span>
-                    {ETH_FORK_ADDRESSES.has(selectedToken.address.toLowerCase()) && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">Fork</span>
-                    )}
+                <div className="flex items-center gap-3">
+                  <TokenLogo address={selectedToken.address} />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-2xl font-bold text-white">{selectedToken.symbol}</h2>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${CATEGORY_COLORS[selectedToken.category]}`}>{selectedToken.category}</span>
+                      {ETH_FORK_ADDRESSES.has(selectedToken.address.toLowerCase()) && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">Fork</span>
+                      )}
+                    </div>
+                    <p className="text-gray-400 text-sm">{selectedToken.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => window.open(`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${selectedToken.address}`, '_blank', 'noopener,noreferrer')}
+                      className="flex items-center gap-1 text-gray-500 text-xs font-mono mt-1 hover:text-[#00D4FF] transition-colors cursor-pointer"
+                    >
+                      {selectedToken.address}
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
                   </div>
-                  <p className="text-gray-400 text-sm">{selectedToken.name}</p>
-                  <button
-                    type="button"
-                    onClick={() => window.open(`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${selectedToken.address}`, '_blank', 'noopener,noreferrer')}
-                    className="flex items-center gap-1 text-gray-500 text-xs font-mono mt-1 hover:text-[#00D4FF] transition-colors cursor-pointer"
-                  >
-                    {selectedToken.address}
-                    <ExternalLink className="h-3 w-3" />
-                  </button>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-white">{formatPrice(selectedToken.price_usd)}</div>
+                  <div className="text-3xl font-bold text-white">{formatPrice(liveSummary?.price_usd ?? selectedToken.price_usd)}</div>
                   <div className="flex items-center gap-3 justify-end mt-1">
-                    {selectedToken.price_change_24h_pct != null && (
-                      <span className={`text-sm font-medium ${selectedToken.price_change_24h_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {selectedToken.price_change_24h_pct >= 0 ? '+' : ''}{selectedToken.price_change_24h_pct.toFixed(2)}%
-                        <span className="text-gray-500 ml-1">24h</span>
-                      </span>
-                    )}
+                    {(() => {
+                      const c = liveSummary?.price_change_24h ?? selectedToken.price_change_24h_pct
+                      return c != null ? (
+                        <span className={`text-sm font-medium ${c >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {c >= 0 ? '+' : ''}{c.toFixed(2)}%
+                          <span className="text-gray-500 ml-1">24h</span>
+                        </span>
+                      ) : null
+                    })()}
                     {selectedToken.price_change_7d_pct != null && (
                       <span className={`text-sm font-medium ${selectedToken.price_change_7d_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         {selectedToken.price_change_7d_pct >= 0 ? '+' : ''}{selectedToken.price_change_7d_pct.toFixed(2)}%
@@ -937,36 +1010,58 @@ export function TokensPage() {
                 </div>
               </div>
 
-              {/* Stats */}
+              {/* Live Metrics — Row 1 */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 pt-4 border-t border-white/5">
                 <div>
                   <div className="text-xs text-gray-500">Market Cap</div>
                   <div className="text-sm font-medium text-white">
-                    {selectedToken.market_cap_usd != null ? formatUsd(selectedToken.market_cap_usd) : '--'}
+                    {(liveSummary?.market_cap_usd ?? selectedToken.market_cap_usd) != null
+                      ? formatUsd((liveSummary?.market_cap_usd ?? selectedToken.market_cap_usd)!)
+                      : '--'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">FDV</div>
+                  <div className="text-sm font-medium text-white">
+                    {liveSummary?.fdv != null ? formatUsd(liveSummary.fdv) : '--'}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-500">Volume (24h)</div>
                   <div className="text-sm font-medium text-white">
-                    {selectedToken.volume_24h_usd != null ? formatUsd(selectedToken.volume_24h_usd) : '--'}
+                    {(liveSummary?.total_volume_24h_usd ?? selectedToken.volume_24h_usd) != null
+                      ? formatUsd((liveSummary?.total_volume_24h_usd ?? selectedToken.volume_24h_usd)!)
+                      : '--'}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Liquidity (USD)</div>
+                  <div className="text-xs text-gray-500">Liquidity</div>
                   <div className="text-sm font-medium text-white">
-                    {selectedToken.total_liquidity_usd != null
-                      ? formatUsd(selectedToken.total_liquidity_usd)
-                      : (selectedToken.price_usd != null && selectedToken.total_liquidity > 0)
-                        ? formatUsd(selectedToken.total_liquidity * selectedToken.price_usd)
-                        : '--'}
+                    {(liveSummary?.total_liquidity_usd ?? selectedToken.total_liquidity_usd) != null
+                      ? formatUsd((liveSummary?.total_liquidity_usd ?? selectedToken.total_liquidity_usd)!)
+                      : '--'}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Supply</div>
+                  <div className="text-xs text-gray-500">Buys / Sells (24h)</div>
                   <div className="text-sm font-medium text-white">
-                    {selectedSupply != null ? formatCompact(selectedSupply) : '--'}
+                    {liveSummary?.total_buys_24h != null
+                      ? `${liveSummary.total_buys_24h.toLocaleString()} / ${(liveSummary.total_sells_24h ?? 0).toLocaleString()}`
+                      : '--'}
                   </div>
                 </div>
+                <div>
+                  <div className="text-xs text-gray-500">Pools / DEXes</div>
+                  <div className="text-sm font-medium text-white">
+                    {liveSummary
+                      ? `${liveSummary.pool_count_legitimate} pools · ${liveSummary.dex_count} DEXes`
+                      : '--'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Metrics — Row 2 */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div>
                   <div className="text-xs text-gray-500">Holders</div>
                   <div className="text-sm font-medium text-white flex items-center gap-1">
@@ -977,13 +1072,45 @@ export function TokensPage() {
                   </div>
                 </div>
                 <div>
+                  <div className="text-xs text-gray-500">Supply</div>
+                  <div className="text-sm font-medium text-white">
+                    {selectedSupply != null ? formatCompact(selectedSupply) : '--'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Price Median</div>
+                  <div className="text-sm font-medium text-white">
+                    {liveSummary?.price_median != null ? formatPrice(liveSummary.price_median) : '--'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Price Spread</div>
+                  <div className="text-sm font-medium text-white">
+                    {liveSummary?.price_min != null && liveSummary?.price_max != null && liveSummary?.price_median
+                      ? `${(((liveSummary.price_max - liveSummary.price_min) / liveSummary.price_median) * 100).toFixed(2)}%`
+                      : '--'}
+                  </div>
+                </div>
+                <div>
                   <div className="text-xs text-gray-500">Decimals</div>
                   <div className="text-sm font-medium text-white">{selectedToken.decimals}</div>
                 </div>
+                <div>
+                  <div className="text-xs text-gray-500">Data Freshness</div>
+                  <div className="text-sm font-medium text-white">
+                    {liveSummary?.data_age_seconds != null
+                      ? liveSummary.data_age_seconds < 60
+                        ? `${liveSummary.data_age_seconds}s ago`
+                        : liveSummary.data_age_seconds < 3600
+                          ? `${Math.round(liveSummary.data_age_seconds / 60)}min ago`
+                          : `${Math.round(liveSummary.data_age_seconds / 3600)}h ago`
+                      : '--'}
+                  </div>
+                </div>
               </div>
 
-              {/* External links */}
-              <div className="flex gap-3 text-xs">
+              {/* External links + DEX list */}
+              <div className="flex items-center gap-3 flex-wrap text-xs">
                 <a
                   href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${selectedToken.address}`}
                   target="_blank"
@@ -1000,6 +1127,15 @@ export function TokensPage() {
                 >
                   <ExternalLink className="h-3 w-3" /> DexScreener
                 </a>
+                {liveSummary?.dex_list && liveSummary.dex_list.length > 0 && (
+                  <>
+                    <span className="text-gray-600">|</span>
+                    <span className="text-gray-500">Listed on:</span>
+                    {liveSummary.dex_list.map((dex: string) => (
+                      <span key={dex} className="px-2 py-0.5 rounded-full bg-white/5 text-gray-400">{formatDexName(dex)}</span>
+                    ))}
+                  </>
+                )}
               </div>
 
               {/* Price chart */}
@@ -1010,13 +1146,14 @@ export function TokensPage() {
                 </div>
                 {historyLoading ? (
                   <Spinner />
-                ) : history.length > 0 ? (
+                ) : chartHistory.length > 0 ? (
                   <AreaChartComponent
-                    data={priceRange ? history.slice(-priceRange) : history}
+                    data={priceRange ? chartHistory.slice(-priceRange) : chartHistory}
                     xKey="date"
                     yKey="price_usd"
                     color="#00D4FF"
                     yFormatter={(v) => v < 0.01 ? `$${v.toFixed(6)}` : `$${v.toFixed(4)}`}
+                    liveDot
                   />
                 ) : (
                   <p className="py-8 text-center text-gray-500 text-sm">No price history available</p>
@@ -1031,15 +1168,90 @@ export function TokensPage() {
                 </div>
                 {historyLoading ? (
                   <Spinner />
-                ) : history.filter(h => h.daily_volume_usd > 0).length > 0 ? (
+                ) : chartHistory.filter(h => h.daily_volume_usd > 0).length > 0 ? (
                   <AreaChartComponent
-                    data={volRange ? history.slice(-volRange) : history}
+                    data={volRange ? chartHistory.slice(-volRange) : chartHistory}
                     xKey="date"
                     yKey="daily_volume_usd"
                     color="#8000E0"
                   />
                 ) : (
                   <p className="py-8 text-center text-gray-500 text-sm">No volume data available</p>
+                )}
+              </div>
+
+              {/* LP Pools Table */}
+              <div className="rounded-xl border border-white/5 bg-gray-900/60 p-4">
+                <div className="mb-3">
+                  <h3 className="text-sm font-semibold text-white">
+                    Liquidity Pools
+                    {liveSummary && (
+                      <span className="text-gray-500 font-normal ml-2">
+                        {liveSummary.pool_count_legitimate} legitimate / {liveSummary.pool_count_total} total · {liveSummary.dex_count} DEXes
+                      </span>
+                    )}
+                  </h3>
+                </div>
+                {liveLoading ? (
+                  <Spinner />
+                ) : livePools.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-white/10 text-gray-500">
+                          <th className="py-2 pr-2 text-left">#</th>
+                          <th className="py-2 pr-3 text-left">DEX</th>
+                          <th className="py-2 pr-3 text-left">Pair</th>
+                          <th className="py-2 pr-3 text-right">Price</th>
+                          <th className="py-2 pr-3 text-right">Liquidity</th>
+                          <th className="py-2 pr-3 text-right">Volume 24h</th>
+                          <th className="py-2 pr-3 text-right">Buys</th>
+                          <th className="py-2 pr-3 text-right">Sells</th>
+                          <th className="py-2 pr-3 text-right">24h</th>
+                          <th className="py-2 text-left">Conf.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {livePools.map((pool, i) => {
+                          const isSpam = !pool.pool_is_legitimate
+                          const confColor = pool.pool_confidence === 'high' ? 'text-emerald-400'
+                            : pool.pool_confidence === 'medium' ? 'text-yellow-400'
+                            : 'text-orange-400'
+                          const pChange = formatChange(pool.price_change_24h)
+                          return (
+                            <tr
+                              key={pool.pair_address}
+                              className={`border-b border-white/5 ${isSpam ? 'opacity-40' : 'hover:bg-white/5'}`}
+                              title={isSpam ? `Spam: ${pool.pool_spam_reason}` : undefined}
+                            >
+                              <td className="py-2 pr-2 text-gray-500">{i + 1}</td>
+                              <td className="py-2 pr-3 text-gray-300">{formatDexName(pool.dex_id)}</td>
+                              <td className="py-2 pr-3">
+                                {pool.dx_url ? (
+                                  <a href={pool.dx_url} target="_blank" rel="noopener noreferrer" className="text-[#00D4FF] hover:underline">
+                                    {pool.base_token_symbol}/{pool.quote_token_symbol}
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-300">{pool.base_token_symbol}/{pool.quote_token_symbol}</span>
+                                )}
+                              </td>
+                              <td className="py-2 pr-3 text-right text-white">{formatPrice(pool.price_usd)}</td>
+                              <td className="py-2 pr-3 text-right text-gray-300">{pool.liquidity_usd != null ? formatUsd(pool.liquidity_usd) : '--'}</td>
+                              <td className="py-2 pr-3 text-right text-gray-300">{pool.volume_24h_usd != null ? formatUsd(pool.volume_24h_usd) : '--'}</td>
+                              <td className="py-2 pr-3 text-right text-gray-300">{pool.buys_24h?.toLocaleString() ?? '--'}</td>
+                              <td className="py-2 pr-3 text-right text-gray-300">{pool.sells_24h?.toLocaleString() ?? '--'}</td>
+                              <td className={`py-2 pr-3 text-right ${pChange.className}`}>{pChange.text}</td>
+                              <td className={`py-2 whitespace-nowrap ${confColor}`}>
+                                {isSpam ? '\u26A0' : '\u25CF'} {pool.pool_confidence ?? '--'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="py-6 text-center text-gray-500 text-sm">No pool data available for this token</p>
                 )}
               </div>
 
