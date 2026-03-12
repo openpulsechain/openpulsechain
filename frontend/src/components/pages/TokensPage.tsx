@@ -19,15 +19,16 @@ function toChecksumAddress(address: string): string {
   return checksummed
 }
 
-function TokenLogo({ address }: { address: string }) {
+function TokenLogo({ address, size = 'sm' }: { address: string; size?: 'sm' | 'lg' }) {
   const [error, setError] = useState(false)
   if (error) return null
   const checksummed = toChecksumAddress(address)
+  const sizeClass = size === 'lg' ? 'h-9 w-9' : 'h-6 w-6'
   return (
     <img
       src={`https://tokens.app.pulsex.com/images/tokens/${checksummed}.png`}
       alt=""
-      className="h-6 w-6 rounded-full bg-gray-800 border border-white/10 shrink-0"
+      className={`${sizeClass} rounded-full bg-gray-800 border border-white/10 shrink-0`}
       onError={() => setError(true)}
     />
   )
@@ -1003,7 +1004,7 @@ export function TokensPage() {
               {/* Token Header */}
               <div className="flex items-center justify-between flex-wrap gap-4 pr-8">
                 <div className="flex items-center gap-3">
-                  <TokenLogo address={selectedToken.address} />
+                  <TokenLogo address={selectedToken.address} size="lg" />
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-2xl font-bold text-white">{selectedToken.symbol}</h2>
