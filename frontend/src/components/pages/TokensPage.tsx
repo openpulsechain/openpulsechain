@@ -139,7 +139,7 @@ interface PriceHistory {
 type SortField = 'volume' | 'market_cap' | 'price' | 'change_24h' | 'change_7d' | 'liquidity'
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
-  { value: 'volume', label: 'Volume (all-time)' },
+  { value: 'volume', label: 'Volume (24h)' },
   { value: 'market_cap', label: 'Market Cap' },
   { value: 'price', label: 'Price' },
   { value: 'change_24h', label: 'Change 24h' },
@@ -335,6 +335,18 @@ export function TokensPage() {
         }
       }
 
+      // Overlay with DexScreener live data when available (more accurate: all DEXes, not just PulseX subgraph)
+      let liveMap: Record<string, { price_usd: number | null; price_change_24h: number | null; total_volume_24h_usd: number | null; total_liquidity_usd: number | null; market_cap_usd: number | null }> = {}
+      if (addresses.length > 0) {
+        const { data: liveRows } = await supabase
+          .from('token_live_summary')
+          .select('token_address, price_usd, price_change_24h, total_volume_24h_usd, total_liquidity_usd, market_cap_usd')
+          .in('token_address', addresses)
+        for (const r of (liveRows || [])) {
+          liveMap[r.token_address] = r
+        }
+      }
+
       // Fetch 7d price history for change calculation + sparklines
       let change7dMap: Record<string, number> = {}
       let sparkMap: Record<string, number[]> = {}
@@ -375,14 +387,16 @@ export function TokensPage() {
 
       let enriched: TokenWithPrice[] = tokenList.map(t => {
         const addr = t.address.toLowerCase()
-        const price = pricesMap[addr]?.price_usd ?? null
+        const live = liveMap[addr]
+        const price = live?.price_usd ?? pricesMap[addr]?.price_usd ?? null
         return {
           ...t,
           price_usd: price,
-          price_change_24h_pct: pricesMap[addr]?.price_change_24h_pct ?? null,
+          price_change_24h_pct: live?.price_change_24h ?? pricesMap[addr]?.price_change_24h_pct ?? null,
           price_change_7d_pct: change7dMap[addr] ?? null,
-          volume_24h_usd: pricesMap[addr]?.volume_24h_usd ?? null,
-          market_cap_usd: pricesMap[addr]?.market_cap_usd ?? null,
+          volume_24h_usd: live?.total_volume_24h_usd ?? pricesMap[addr]?.volume_24h_usd ?? null,
+          market_cap_usd: live?.market_cap_usd ?? pricesMap[addr]?.market_cap_usd ?? null,
+          total_liquidity_usd: live?.total_liquidity_usd ?? t.total_liquidity_usd,
           category: getTokenCategory(t.address, t.symbol, price),
         }
       })
@@ -486,7 +500,7 @@ export function TokensPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Token Explorer</h1>
+          <h1 className="text-2xl font-bold text-white">PulseCoin Explorer</h1>
           <p className="text-gray-400 mt-1">
             Browse {total.toLocaleString()} PulseChain tokens with prices, volume, and liquidity. Click any token to view its price history.
           </p>
@@ -759,12 +773,11 @@ export function TokensPage() {
         {showNote && (
           <div className="px-4 pb-4 space-y-4 text-sm text-gray-400">
             <div className="rounded bg-gray-800/50 border border-white/5 p-3">
-              <p className="text-gray-300 font-medium mb-1">What is the Token Explorer?</p>
+              <p className="text-gray-300 font-medium mb-1">What is the PulseCoin Explorer?</p>
               <p>
-                The Token Explorer lists all tokens discovered on PulseChain via the PulseX V1 subgraph.
-                It shows real-time prices (derivedUSD), 24h and 7d price changes calculated from historical snapshots,
-                market capitalization estimated from on-chain total supply, daily trading volume from tokenDayDatas,
-                and liquidity computed from pool reserves. All data is 100% on-chain — no third-party price feeds.
+                The PulseCoin Explorer lists all tokens discovered on PulseChain via PulseX V1+V2 subgraphs.
+                Prices, volume, liquidity, and market cap are enriched with DexScreener data when available (aggregating all DEXes: PulseX, 9mm, etc.).
+                7d price changes are calculated from historical on-chain snapshots.
               </p>
             </div>
 
@@ -781,28 +794,33 @@ export function TokensPage() {
                 <tbody className="text-gray-400">
                   <tr className="border-b border-white/5">
                     <td className="py-1.5">Price</td>
-                    <td className="py-1.5">PulseX V1 Subgraph</td>
-                    <td className="py-1.5">derivedUSD — refreshed every 15 min</td>
+                    <td className="py-1.5">DexScreener → PulseX V1+V2</td>
+                    <td className="py-1.5">DexScreener preferred (all DEXes), fallback to subgraph derivedUSD</td>
                   </tr>
                   <tr className="border-b border-white/5">
-                    <td className="py-1.5">Change 24h / 7d</td>
+                    <td className="py-1.5">Change 24h</td>
+                    <td className="py-1.5">DexScreener → snapshots</td>
+                    <td className="py-1.5">DexScreener 24h rolling window, fallback to historical snapshots</td>
+                  </tr>
+                  <tr className="border-b border-white/5">
+                    <td className="py-1.5">Change 7d</td>
                     <td className="py-1.5">token_price_history</td>
-                    <td className="py-1.5">Calculated from historical snapshots vs current price</td>
+                    <td className="py-1.5">Calculated from on-chain price snapshots (8 days ago vs now)</td>
                   </tr>
                   <tr className="border-b border-white/5">
                     <td className="py-1.5">Market Cap</td>
-                    <td className="py-1.5">PulseX V1 Subgraph</td>
-                    <td className="py-1.5">totalSupply / 10^decimals x derivedUSD — estimated, no vesting data</td>
+                    <td className="py-1.5">DexScreener → PulseX V1+V2</td>
+                    <td className="py-1.5">Uses total supply (not circulating). May be inflated for locked supply.</td>
                   </tr>
                   <tr className="border-b border-white/5">
                     <td className="py-1.5">Volume (24h)</td>
-                    <td className="py-1.5">tokenDayDatas</td>
-                    <td className="py-1.5">Real daily swap volume from PulseX V1 (not all-time cumulative)</td>
+                    <td className="py-1.5">DexScreener → tokenDayDatas</td>
+                    <td className="py-1.5">DexScreener aggregates all DEXes (PulseX, 9mm, etc.), fallback to subgraph</td>
                   </tr>
                   <tr className="border-b border-white/5">
                     <td className="py-1.5">Liquidity</td>
-                    <td className="py-1.5">PulseX V1 Subgraph</td>
-                    <td className="py-1.5">totalLiquidity (token units) x derivedUSD = approximate USD value</td>
+                    <td className="py-1.5">DexScreener → PulseX V1+V2</td>
+                    <td className="py-1.5">DexScreener all-DEX total, fallback to subgraph totalLiquidity × price</td>
                   </tr>
                   <tr className="border-b border-white/5">
                     <td className="py-1.5">Holders</td>
@@ -823,7 +841,7 @@ export function TokensPage() {
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li><span className="text-orange-400">ETH fork tokens</span> — Ethereum fork copies (DAI, USDC, USDT, WBTC) trade at large discounts vs native bridged versions. Marked with <span className="text-orange-400">Fork</span> badge.</li>
                 <li><span className="text-gray-300">Market cap</span> — Uses total supply (not circulating). May be inflated for tokens with locked/burned supply.</li>
-                <li><span className="text-gray-300">V1 + V2</span> — Both PulseX V1 and V2 pools are indexed. Volume and liquidity are combined from both subgraphs.</li>
+                <li><span className="text-gray-300">DexScreener enrichment</span> — Top tokens are enriched with DexScreener data (all DEXes). Others fall back to PulseX V1+V2 subgraph data only.</li>
                 <li><span className="text-gray-300">Categories</span> — Auto-detection is approximate. Some tokens may be miscategorized.</li>
                 <li><span className="text-gray-300">Holders</span> — Updated daily for top 50 tokens only. Other tokens show no holder count.</li>
               </ul>
@@ -868,7 +886,7 @@ export function TokensPage() {
       </div>
 
       <div className="text-xs text-gray-600 text-center space-y-1">
-        <p>Source: PulseX Subgraph (graph.pulsechain.com) + PulseChain Scan API — 100% on-chain, sovereign data</p>
+        <p>Source: PulseX Subgraph + DexScreener + PulseChain Scan — cross-validated on-chain data</p>
         <p>This is not investment advice. Data is provided for educational and informational purposes only.</p>
       </div>
 
@@ -1036,7 +1054,7 @@ export function TokensPage() {
 
               {/* Source */}
               <div className="text-xs text-gray-600 text-center">
-                Source: PulseX Subgraph + PulseChain Scan — 100% on-chain data
+                Source: PulseX Subgraph + DexScreener + PulseChain Scan
               </div>
             </div>
           </div>

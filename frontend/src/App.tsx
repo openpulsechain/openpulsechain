@@ -58,7 +58,7 @@ const ROUTE_TO_PAGE: Record<string, string> = {
 const PAGE_SEO: Record<string, { title: string; description: string }> = {
   overview: { title: 'PulseChain Analytics', description: 'Real-time PulseChain network stats: TVL, gas prices, token prices, DEX volume. Free open-source analytics.' },
   dex: { title: 'DEX Analytics', description: 'PulseX DEX analytics: daily volume, top trading pairs, liquidity depth. Real-time PulseChain DEX data.' },
-  tokens: { title: 'Token Explorer', description: 'Browse 2500+ PulseChain tokens: prices, volume, liquidity. Search and filter the full PulseChain token list.' },
+  tokens: { title: 'PulseCoin Explorer', description: 'Browse 5000+ PulseChain tokens: prices, volume, liquidity. Search and filter the full PulseChain token list.' },
   bridge: { title: 'Bridge Monitor', description: 'PulseChain bridge analytics: track cross-chain flows, bridge volume, and asset transfers between Ethereum and PulseChain.' },
   whales: { title: 'Whale Tracker', description: 'Track PulseChain whale wallets: large transfers, top holders, whale accumulation and distribution patterns.' },
   intelligence: { title: 'Market Intelligence', description: 'PulseChain market intelligence: on-chain signals, trend analysis, and network activity insights.' },
