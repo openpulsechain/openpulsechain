@@ -1198,18 +1198,19 @@ export function TokensPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs table-fixed">
                       <colgroup>
-                        <col style={{ width: '3%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '9%' }} />
-                        <col style={{ width: '15%' }} />
-                        <col style={{ width: '9%' }} />
-                        <col style={{ width: '9%' }} />
-                        <col style={{ width: '11%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '2.5%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '12%' }} />
                         <col style={{ width: '8%' }} />
                         <col style={{ width: '8%' }} />
+                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '5%' }} />
+                        <col style={{ width: '3.5%' }} />
                       </colgroup>
                       <thead>
                         <tr className="border-b border-white/10 text-gray-500">
@@ -1225,6 +1226,7 @@ export function TokensPage() {
                           <th className="py-2 text-center">24h</th>
                           <th className="py-2 text-center">Conf.</th>
                           <th className="py-2 text-center">Tier</th>
+                          <th className="py-2 text-center">DX</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1276,6 +1278,17 @@ export function TokensPage() {
                                 {isSpam ? '\u26A0' : '\u25CF'} {pool.pool_confidence ?? '--'}
                               </td>
                               <td className={`py-2 text-center ${tierColor}`}>{pool.tier}</td>
+                              <td className="py-2 text-center">
+                                <a
+                                  href={pool.dx_url || `https://dexscreener.com/pulsechain/${pool.pair_address}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-gray-500 hover:text-[#00D4FF] transition-colors"
+                                  title="View on DexScreener"
+                                >
+                                  <ExternalLink className="h-3 w-3 inline" />
+                                </a>
+                              </td>
                             </tr>
                           )
                         })}
