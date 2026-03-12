@@ -239,6 +239,41 @@ function formatDexName(dex: string | null): string {
   return DEX_NAMES[dex] || dex.charAt(0).toUpperCase() + dex.slice(1)
 }
 
+const COLUMN_DESCRIPTIONS: Record<string, string> = {
+  '#': 'Row number — pools are ranked by liquidity (highest first).',
+  'DEX': 'The decentralized exchange where this liquidity pool is deployed (PulseX, 9mm, 9inch, etc.).',
+  'Pair': 'The trading pair for this pool (e.g. HEX/WPLS). Click to open on DexScreener.',
+  'Contract': 'The on-chain smart contract address of the liquidity pool. Click to view on PulseChain Explorer.',
+  'Price': 'Current token price in USD as reported by this specific pool.',
+  'Liquidity': 'Total value locked (TVL) in this pool in USD — sum of both sides of the pair.',
+  'Volume 24h': 'Total trading volume through this pool in the last 24 hours in USD.',
+  'Buys': 'Number of buy transactions in this pool over the last 24 hours.',
+  'Sells': 'Number of sell transactions in this pool over the last 24 hours.',
+  'Price Change 24h': 'Percentage price change over the last 24 hours. Green = up, red = down.',
+  'Confidence': 'Pool legitimacy confidence level. High = verified legitimate pool. Medium = likely legitimate. Low = unverified. ⚠ = suspected spam.',
+  'Tier': 'Data freshness tier. Hot = updated every 30s. Warm = every 5 min. Cold = every 1 hour.',
+  'DexScreener': 'External link to view this pool on DexScreener for detailed charts and analytics.',
+}
+
+function ClickableHeader({ label, className }: { label: string; className?: string }) {
+  const [open, setOpen] = useState(false)
+  const desc = COLUMN_DESCRIPTIONS[label]
+  return (
+    <th
+      className={`py-2 text-center relative select-none ${desc ? 'cursor-pointer hover:text-gray-300' : ''} ${className || ''}`}
+      onClick={() => desc && setOpen(v => !v)}
+    >
+      {label}
+      {open && desc && (
+        <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 w-56 rounded-lg bg-gray-900 border border-white/10 p-3 text-left text-[11px] text-gray-300 font-normal leading-relaxed shadow-xl whitespace-normal">
+          {desc}
+          <div className="mt-1.5 text-[10px] text-gray-500 italic">Click header to dismiss</div>
+        </div>
+      )}
+    </th>
+  )
+}
+
 export function TokensPage() {
   const [tokens, setTokens] = useState<TokenWithPrice[]>([])
   const [total, setTotal] = useState(0)
@@ -1197,32 +1232,32 @@ export function TokensPage() {
                         <col style={{ width: '2.5%' }} />
                         <col style={{ width: '6%' }} />
                         <col style={{ width: '8%' }} />
-                        <col style={{ width: '12%' }} />
-                        <col style={{ width: '8%' }} />
-                        <col style={{ width: '8%' }} />
-                        <col style={{ width: '9%' }} />
-                        <col style={{ width: '6%' }} />
-                        <col style={{ width: '6%' }} />
-                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '11%' }} />
                         <col style={{ width: '7%' }} />
+                        <col style={{ width: '7.5%' }} />
+                        <col style={{ width: '8%' }} />
                         <col style={{ width: '5%' }} />
-                        <col style={{ width: '3.5%' }} />
+                        <col style={{ width: '5%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '8.5%' }} />
+                        <col style={{ width: '5%' }} />
+                        <col style={{ width: '7%' }} />
                       </colgroup>
                       <thead>
                         <tr className="border-b border-white/10 text-gray-500">
-                          <th className="py-2 text-center">#</th>
-                          <th className="py-2 text-center">DEX</th>
-                          <th className="py-2 text-center">Pair</th>
-                          <th className="py-2 text-center">Contract</th>
-                          <th className="py-2 text-center">Price</th>
-                          <th className="py-2 text-center">Liquidity</th>
-                          <th className="py-2 text-center">Volume 24h</th>
-                          <th className="py-2 text-center">Buys</th>
-                          <th className="py-2 text-center">Sells</th>
-                          <th className="py-2 text-center">24h</th>
-                          <th className="py-2 text-center">Conf.</th>
-                          <th className="py-2 text-center">Tier</th>
-                          <th className="py-2 text-center">DX</th>
+                          <ClickableHeader label="#" />
+                          <ClickableHeader label="DEX" />
+                          <ClickableHeader label="Pair" />
+                          <ClickableHeader label="Contract" />
+                          <ClickableHeader label="Price" />
+                          <ClickableHeader label="Liquidity" />
+                          <ClickableHeader label="Volume 24h" />
+                          <ClickableHeader label="Buys" />
+                          <ClickableHeader label="Sells" />
+                          <ClickableHeader label="Price Change 24h" />
+                          <ClickableHeader label="Confidence" />
+                          <ClickableHeader label="Tier" />
+                          <ClickableHeader label="DexScreener" />
                         </tr>
                       </thead>
                       <tbody>
