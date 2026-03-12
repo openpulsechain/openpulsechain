@@ -1010,8 +1010,8 @@ export function TokensPage() {
                 </div>
               </div>
 
-              {/* Live Metrics — Row 1 */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 pt-4 border-t border-white/5">
+              {/* Live Metrics — single row */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-12 gap-x-4 gap-y-3 pt-4 border-t border-white/5">
                 <div>
                   <div className="text-xs text-gray-500">Market Cap</div>
                   <div className="text-sm font-medium text-white">
@@ -1027,7 +1027,7 @@ export function TokensPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Volume (24h)</div>
+                  <div className="text-xs text-gray-500">Volume 24h</div>
                   <div className="text-sm font-medium text-white">
                     {(liveSummary?.total_volume_24h_usd ?? selectedToken.volume_24h_usd) != null
                       ? formatUsd((liveSummary?.total_volume_24h_usd ?? selectedToken.volume_24h_usd)!)
@@ -1043,7 +1043,7 @@ export function TokensPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Buys / Sells (24h)</div>
+                  <div className="text-xs text-gray-500">Buys / Sells</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary?.total_buys_24h != null
                       ? `${liveSummary.total_buys_24h.toLocaleString()} / ${(liveSummary.total_sells_24h ?? 0).toLocaleString()}`
@@ -1051,17 +1051,13 @@ export function TokensPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Pools / DEXes</div>
+                  <div className="text-xs text-gray-500">Pools</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary
-                      ? `${liveSummary.pool_count_legitimate} pools · ${liveSummary.dex_count} DEXes`
+                      ? `${liveSummary.pool_count_legitimate} · ${liveSummary.dex_count} DEX`
                       : '--'}
                   </div>
                 </div>
-              </div>
-
-              {/* Live Metrics — Row 2 */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div>
                   <div className="text-xs text-gray-500">Holders</div>
                   <div className="text-sm font-medium text-white flex items-center gap-1">
@@ -1078,13 +1074,13 @@ export function TokensPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Price Median</div>
+                  <div className="text-xs text-gray-500">Median</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary?.price_median != null ? formatPrice(liveSummary.price_median) : '--'}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Price Spread</div>
+                  <div className="text-xs text-gray-500">Spread</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary?.price_min != null && liveSummary?.price_max != null && liveSummary?.price_median
                       ? `${(((liveSummary.price_max - liveSummary.price_min) / liveSummary.price_median) * 100).toFixed(2)}%`
@@ -1096,14 +1092,14 @@ export function TokensPage() {
                   <div className="text-sm font-medium text-white">{selectedToken.decimals}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Data Freshness</div>
+                  <div className="text-xs text-gray-500">Freshness</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary?.data_age_seconds != null
                       ? liveSummary.data_age_seconds < 60
-                        ? `${liveSummary.data_age_seconds}s ago`
+                        ? `${liveSummary.data_age_seconds}s`
                         : liveSummary.data_age_seconds < 3600
-                          ? `${Math.round(liveSummary.data_age_seconds / 60)}min ago`
-                          : `${Math.round(liveSummary.data_age_seconds / 3600)}h ago`
+                          ? `${Math.round(liveSummary.data_age_seconds / 60)}min`
+                          : `${Math.round(liveSummary.data_age_seconds / 3600)}h`
                       : '--'}
                   </div>
                 </div>
