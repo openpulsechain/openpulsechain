@@ -7,14 +7,43 @@ import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { formatUsd } from '../../lib/format'
 import { Sparkline } from '../ui/Sparkline'
 
+function TokenLogo({ address }: { address: string }) {
+  const [error, setError] = useState(false)
+  if (error) return null
+  return (
+    <img
+      src={`https://tokens.app.pulsex.com/images/tokens/${address}.png`}
+      alt=""
+      className="h-6 w-6 rounded-full bg-gray-800 border border-white/10 shrink-0"
+      onError={() => setError(true)}
+    />
+  )
+}
+
 // Ethereum fork copies on PulseChain — these have same symbol as native bridged versions
 // but trade at massive discounts. Show a visual indicator to avoid confusion.
 const ETH_FORK_ADDRESSES = new Set([
-  '0x6b175474e89094c44da98b954eedeac495271d0f', // DAI (Ethereum fork)
-  '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', // USDC (Ethereum fork)
-  '0xdac17f958d2ee523a2206206994597c13d831ec7', // USDT (Ethereum fork)
-  '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', // WBTC (Ethereum fork, low price)
-  '0x5b218ed1428cfc1e488b777bdd473cf2647d30e3', // PLSX v2 (spam/old)
+  // Stablecoins (Ethereum fork copies — NOT the real bridged versions)
+  '0x6b175474e89094c44da98b954eedeac495271d0f', // DAI
+  '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', // USDC
+  '0xdac17f958d2ee523a2206206994597c13d831ec7', // USDT
+  // DeFi majors
+  '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', // WBTC
+  '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9', // AAVE
+  '0x514910771af9ca656af840dff83e8264ecf986ca', // LINK
+  '0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2', // MKR
+  '0xc00e94cb662c3520282e6f5717214004a7f26888', // COMP
+  '0xc011a747ee81f4a9b44e00b193a5ddf4b7d84ed0', // SNX
+  '0xd533a949740bb3306d119cc777fa900ba034cd52', // CRV
+  '0x5a98fcbea516cf06857215779fd812ca3bef1b32', // LDO
+  '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', // UNI
+  '0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0', // MATIC
+  '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', // SUSHI
+  // Memes
+  '0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce', // SHIB
+  '0x6386704cd6f7a584ea9d23ccca66af7eba5a727e', // DOGE
+  // Spam/old
+  '0x5b218ed1428cfc1e488b777bdd473cf2647d30e3', // PLSX v2
 ])
 
 // --- Token categories ---
@@ -620,6 +649,9 @@ export function TokensPage() {
                       >
                         <td className="py-2.5 pr-4 text-gray-500">{page * PAGE_SIZE + i + 1}</td>
                         <td className="py-2.5 pr-4">
+                          <div className="flex items-center gap-2">
+                            <TokenLogo address={token.address} />
+                            <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-medium text-white">{token.symbol}</span>
                             <span className={`text-[10px] px-1 py-0.5 rounded border ${catColor}`}>{token.category}</span>
@@ -634,6 +666,8 @@ export function TokensPage() {
                                 <Users className="h-2.5 w-2.5" />{formatCompact(token.holder_count)}
                               </span>
                             )}
+                          </div>
+                            </div>
                           </div>
                         </td>
                         <td className="py-2.5 pr-4 text-right text-white">{formatPrice(token.price_usd)}</td>

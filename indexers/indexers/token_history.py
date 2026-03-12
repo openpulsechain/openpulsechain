@@ -26,7 +26,7 @@ PAGE_SIZE = 1000
 MAX_RUNTIME_SECONDS = 5 * 60
 
 # Max tokens per cron run (incremental updates only — bulk done locally)
-MAX_TOKENS_PER_RUN = 50
+MAX_TOKENS_PER_RUN = 200
 
 
 def _query_subgraph(query: str, endpoint: str = None) -> dict:
