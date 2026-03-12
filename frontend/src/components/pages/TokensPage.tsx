@@ -249,7 +249,7 @@ export function TokensPage() {
       let totalCount = 0
 
       if (priceBasedSort && !search.trim()) {
-        // Query token_prices first, sorted by the requested field
+        // Get ordered addresses from token_prices, then fetch only the page slice from pulsechain_tokens
         const priceOrderCol = sortField === 'market_cap' ? 'market_cap_usd'
           : sortField === 'price' ? 'price_usd'
           : 'price_change_24h_pct'
@@ -257,40 +257,51 @@ export function TokensPage() {
         const { data: priceRows } = await supabase
           .from('token_prices')
           .select('id')
-          .eq('source', 'pulsex_subgraph')
+          .eq('source', 'pulsex_subgraph_v1v2')
           .not(priceOrderCol, 'is', null)
           .order(priceOrderCol, { ascending: false })
 
         const priceAddresses = (priceRows || []).map(r => r.id)
 
-        const { data: allTokens, count } = await supabase
+        // Get total count
+        const { count } = await supabase
           .from('pulsechain_tokens')
-          .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, total_liquidity_usd, is_active, holder_count', { count: 'exact' })
+          .select('address', { count: 'exact', head: true })
           .eq('is_active', true)
-
         totalCount = count || 0
-        const tokenMap = new Map<string, Token>()
-        for (const t of (allTokens || [])) {
-          tokenMap.set(t.address.toLowerCase(), t as Token)
-        }
 
-        const ordered: Token[] = []
-        const usedAddrs = new Set<string>()
+        // Slice to current page — tokens with prices come first, rest after
+        const pageAddrs = priceAddresses.slice(from, to + 1)
+        const needMore = PAGE_SIZE - pageAddrs.length
 
-        for (const addr of priceAddresses) {
-          const t = tokenMap.get(addr)
-          if (t) {
-            ordered.push(t)
-            usedAddrs.add(addr)
+        if (pageAddrs.length > 0) {
+          const { data: pageTokens } = await supabase
+            .from('pulsechain_tokens')
+            .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, total_liquidity_usd, is_active, holder_count')
+            .in('address', pageAddrs)
+          const tokByAddr = new Map<string, Token>()
+          for (const t of (pageTokens || [])) {
+            tokByAddr.set(t.address.toLowerCase(), t as Token)
+          }
+          // Maintain price-based ordering
+          for (const addr of pageAddrs) {
+            const t = tokByAddr.get(addr)
+            if (t) tokenList.push(t)
           }
         }
 
-        const remaining = Array.from(tokenMap.values())
-          .filter(t => !usedAddrs.has(t.address.toLowerCase()))
-          .sort((a, b) => (b.total_volume_usd || 0) - (a.total_volume_usd || 0))
-
-        ordered.push(...remaining)
-        tokenList = ordered.slice(from, to + 1)
+        // If page extends beyond priced tokens, fill with remaining tokens sorted by volume
+        if (needMore > 0) {
+          const skipNonPriced = Math.max(0, from - priceAddresses.length)
+          const { data: rest } = await supabase
+            .from('pulsechain_tokens')
+            .select('address, symbol, name, decimals, total_volume_usd, total_liquidity, total_liquidity_usd, is_active, holder_count')
+            .eq('is_active', true)
+            .not('address', 'in', `(${priceAddresses.join(',')})`)
+            .order('total_volume_usd', { ascending: false })
+            .range(skipNonPriced, skipNonPriced + needMore - 1)
+          tokenList.push(...((rest || []) as Token[]))
+        }
       } else {
         let query = supabase
           .from('pulsechain_tokens')
@@ -376,7 +387,7 @@ export function TokensPage() {
         }
 
         for (const addr of Object.keys(oldestPrice)) {
-          const currentPrice = pricesMap[addr]?.price_usd
+          const currentPrice = liveMap[addr]?.price_usd ?? pricesMap[addr]?.price_usd
           const old = oldestPrice[addr]
           if (old > 0 && currentPrice && currentPrice > 0) {
             change7dMap[addr] = ((currentPrice - old) / old) * 100
@@ -401,10 +412,16 @@ export function TokensPage() {
         }
       })
 
-      // Client-side sort for change_7d
-      if (sortField === 'change_7d') {
-        enriched.sort((a, b) => (b.price_change_7d_pct ?? -Infinity) - (a.price_change_7d_pct ?? -Infinity))
+      // Client-side re-sort after DexScreener enrichment to ensure displayed order matches displayed values
+      const sortFns: Record<SortField, (a: TokenWithPrice, b: TokenWithPrice) => number> = {
+        market_cap: (a, b) => (b.market_cap_usd ?? -1) - (a.market_cap_usd ?? -1),
+        price: (a, b) => (b.price_usd ?? -1) - (a.price_usd ?? -1),
+        change_24h: (a, b) => (b.price_change_24h_pct ?? -Infinity) - (a.price_change_24h_pct ?? -Infinity),
+        change_7d: (a, b) => (b.price_change_7d_pct ?? -Infinity) - (a.price_change_7d_pct ?? -Infinity),
+        volume: (a, b) => (b.volume_24h_usd ?? -1) - (a.volume_24h_usd ?? -1),
+        liquidity: (a, b) => (b.total_liquidity_usd ?? -1) - (a.total_liquidity_usd ?? -1),
       }
+      enriched.sort(sortFns[sortField])
 
       // Apply client-side filters
       enriched = enriched.filter(t => {
@@ -848,38 +865,12 @@ export function TokensPage() {
             </div>
 
             <div>
-              <p className="text-gray-300 font-medium mb-2">Cross-source verification (sample)</p>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-white/10 text-gray-500">
-                    <th className="py-1.5 text-left">Token</th>
-                    <th className="py-1.5 text-left">OpenPulsechain</th>
-                    <th className="py-1.5 text-left">DexScreener</th>
-                    <th className="py-1.5 text-left">Deviation</th>
-                  </tr>
-                </thead>
-                <tbody className="text-gray-400">
-                  <tr className="border-b border-white/5">
-                    <td className="py-1.5">WPLS</td>
-                    <td className="py-1.5">$0.00001054</td>
-                    <td className="py-1.5">$0.00001050</td>
-                    <td className="py-1.5 text-emerald-400">-0.4%</td>
-                  </tr>
-                  <tr className="border-b border-white/5">
-                    <td className="py-1.5">HEX</td>
-                    <td className="py-1.5">$0.001983</td>
-                    <td className="py-1.5">$0.001980</td>
-                    <td className="py-1.5 text-emerald-400">-0.15%</td>
-                  </tr>
-                  <tr className="border-b border-white/5">
-                    <td className="py-1.5">PLSX</td>
-                    <td className="py-1.5">$0.000007570</td>
-                    <td className="py-1.5">$0.000007565</td>
-                    <td className="py-1.5 text-emerald-400">-0.07%</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p className="text-xs text-gray-500 mt-1">Prices verified on 11/03/2026. All within 0.5% — expected due to 15-min refresh delay.</p>
+              <p className="text-gray-300 font-medium mb-2">Data freshness</p>
+              <p className="text-xs text-gray-400">
+                Top 500+ tokens are enriched with live DexScreener data (price, volume, liquidity, market cap, 24h change) aggregated across all PulseChain DEXes.
+                Data refreshes every 30 seconds for hot tokens, 5 minutes for warm, and 1 hour for cold.
+                Remaining tokens fall back to PulseX V1+V2 subgraph data, refreshed every 15 minutes.
+              </p>
             </div>
           </div>
         )}
