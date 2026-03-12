@@ -1010,56 +1010,56 @@ export function TokensPage() {
                 </div>
               </div>
 
-              {/* Live Metrics — single row */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-12 gap-x-4 gap-y-3 pt-4 border-t border-white/5">
-                <div>
-                  <div className="text-xs text-gray-500">Market Cap</div>
+              {/* Live Metrics */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Market Cap</div>
                   <div className="text-sm font-medium text-white">
                     {(liveSummary?.market_cap_usd ?? selectedToken.market_cap_usd) != null
                       ? formatUsd((liveSummary?.market_cap_usd ?? selectedToken.market_cap_usd)!)
                       : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">FDV</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">FDV</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary?.fdv != null ? formatUsd(liveSummary.fdv) : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Volume 24h</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Volume 24h</div>
                   <div className="text-sm font-medium text-white">
                     {(liveSummary?.total_volume_24h_usd ?? selectedToken.volume_24h_usd) != null
                       ? formatUsd((liveSummary?.total_volume_24h_usd ?? selectedToken.volume_24h_usd)!)
                       : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Liquidity</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Liquidity</div>
                   <div className="text-sm font-medium text-white">
                     {(liveSummary?.total_liquidity_usd ?? selectedToken.total_liquidity_usd) != null
                       ? formatUsd((liveSummary?.total_liquidity_usd ?? selectedToken.total_liquidity_usd)!)
                       : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Buys / Sells</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Buys / Sells</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary?.total_buys_24h != null
                       ? `${liveSummary.total_buys_24h.toLocaleString()} / ${(liveSummary.total_sells_24h ?? 0).toLocaleString()}`
                       : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Pools</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Pools</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary
                       ? `${liveSummary.pool_count_legitimate} · ${liveSummary.dex_count} DEX`
                       : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Holders</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Holders</div>
                   <div className="text-sm font-medium text-white flex items-center gap-1">
                     <Users className="h-3 w-3 text-gray-500" />
                     {selectedToken.holder_count != null && selectedToken.holder_count > 0
@@ -1067,32 +1067,32 @@ export function TokensPage() {
                       : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Supply</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Supply</div>
                   <div className="text-sm font-medium text-white">
                     {selectedSupply != null ? formatCompact(selectedSupply) : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Median</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Median</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary?.price_median != null ? formatPrice(liveSummary.price_median) : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Spread</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Spread</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary?.price_min != null && liveSummary?.price_max != null && liveSummary?.price_median
                       ? `${(((liveSummary.price_max - liveSummary.price_min) / liveSummary.price_median) * 100).toFixed(2)}%`
                       : '--'}
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Decimals</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Decimals</div>
                   <div className="text-sm font-medium text-white">{selectedToken.decimals}</div>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500">Freshness</div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <div className="text-xs text-gray-400 mb-1">Freshness</div>
                   <div className="text-sm font-medium text-white">
                     {liveSummary?.data_age_seconds != null
                       ? liveSummary.data_age_seconds < 60
