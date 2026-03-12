@@ -187,10 +187,30 @@ const ALL_CATEGORIES: TokenCategory[] = ['Native', 'DEX', 'DeFi', 'Stablecoin', 
 
 const PAGE_SIZE = 50
 
+// Unicode subscript digits for DexScreener-style zero compression
+const SUBSCRIPT_DIGITS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
+function toSubscript(n: number): string {
+  return String(n).split('').map(d => SUBSCRIPT_DIGITS[parseInt(d)]).join('')
+}
+
 function formatPrice(price: number | null): string {
   if (price == null) return '--'
-  if (price < 0.01) return `$${price.toFixed(6)}`
-  return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+  if (price >= 0.01) return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+  if (price === 0) return '$0'
+  // Count leading zeros after "0." — e.g. 0.00001456 has 4 leading zeros
+  const str = price.toFixed(20)
+  const afterDot = str.split('.')[1] || ''
+  let zeros = 0
+  for (const c of afterDot) {
+    if (c === '0') zeros++
+    else break
+  }
+  if (zeros >= 3) {
+    // DexScreener style: $0.0₁₀1456
+    const significant = afterDot.slice(zeros, zeros + 4).replace(/0+$/, '')
+    return `$0.0${toSubscript(zeros)}${significant || '0'}`
+  }
+  return `$${price.toFixed(6)}`
 }
 
 function formatChange(pct: number | null): { text: string; className: string } {
