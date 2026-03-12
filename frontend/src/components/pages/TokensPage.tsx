@@ -6,13 +6,25 @@ import { Spinner } from '../ui/Spinner'
 import { TimeRangeSelector } from '../ui/TimeRangeSelector'
 import { formatUsd } from '../../lib/format'
 import { Sparkline } from '../ui/Sparkline'
+import { keccak256 } from 'js-sha3'
+
+function toChecksumAddress(address: string): string {
+  const addr = address.toLowerCase().replace('0x', '')
+  const hash = keccak256(addr)
+  let checksummed = '0x'
+  for (let i = 0; i < 40; i++) {
+    checksummed += parseInt(hash[i], 16) >= 8 ? addr[i].toUpperCase() : addr[i]
+  }
+  return checksummed
+}
 
 function TokenLogo({ address }: { address: string }) {
   const [error, setError] = useState(false)
   if (error) return null
+  const checksummed = toChecksumAddress(address)
   return (
     <img
-      src={`https://tokens.app.pulsex.com/images/tokens/${address}.png`}
+      src={`https://tokens.app.pulsex.com/images/tokens/${checksummed}.png`}
       alt=""
       className="h-6 w-6 rounded-full bg-gray-800 border border-white/10 shrink-0"
       onError={() => setError(true)}
@@ -149,7 +161,7 @@ const DEFAULT_FILTERS: Filters = {
   minMcap: null,
   positiveChange: false,
   hideEthForks: false,
-  hasPriceOnly: false,
+  hasPriceOnly: true,
   category: null,
 }
 
