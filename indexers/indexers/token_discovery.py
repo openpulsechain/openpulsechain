@@ -11,11 +11,11 @@ from datetime import datetime, timezone
 import requests
 
 from db import supabase
-from config import SUBGRAPH_PAGE_SIZE
+from config import SUBGRAPH_PAGE_SIZE, PULSEX_SUBGRAPH_V1, PULSEX_SUBGRAPH_V2
 
 logger = logging.getLogger(__name__)
 
-PULSEX_SUBGRAPH = "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex"
+PULSEX_SUBGRAPH = PULSEX_SUBGRAPH_V1
 
 # Minimum thresholds to filter spam tokens
 MIN_VOLUME_USD = 10_000  # $10K lifetime volume
@@ -115,8 +115,63 @@ def _is_valid_token(token: dict) -> bool:
     return True
 
 
+def _fetch_all_tokens_v2() -> list[dict]:
+    """Paginate through V2 tokens with meaningful volume."""
+    all_tokens = []
+    last_id = ""
+
+    for _ in range(20):
+        where = f'tradeVolumeUSD_gt: "{MIN_VOLUME_USD}"'
+        if last_id:
+            where += f', id_gt: "{last_id}"'
+
+        query = f"""{{
+            tokens(
+                first: {SUBGRAPH_PAGE_SIZE},
+                where: {{{where}}},
+                orderBy: id,
+                orderDirection: asc
+            ) {{
+                id
+                symbol
+                name
+                decimals
+                tradeVolumeUSD
+                totalLiquidity
+                derivedUSD
+            }}
+        }}"""
+
+        try:
+            resp = requests.post(
+                PULSEX_SUBGRAPH_V2,
+                json={"query": query},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if "errors" in data:
+                break
+            tokens = data.get("data", {}).get("tokens", [])
+        except Exception as e:
+            logger.warning(f"V2 token fetch failed: {e}")
+            break
+
+        if not tokens:
+            break
+
+        all_tokens.extend(tokens)
+        last_id = tokens[-1]["id"]
+
+        if len(tokens) < SUBGRAPH_PAGE_SIZE:
+            break
+        time.sleep(0.5)
+
+    return all_tokens
+
+
 def run():
-    logger.info("Discovering PulseChain tokens from PulseX subgraph...")
+    logger.info("Discovering PulseChain tokens from PulseX V1+V2 subgraphs...")
 
     supabase.table("sync_status").upsert({
         "indexer_name": "token_discovery",
@@ -124,27 +179,79 @@ def run():
     }, on_conflict="indexer_name").execute()
 
     try:
-        raw_tokens = _fetch_all_tokens()
-        logger.info(f"Found {len(raw_tokens)} tokens with >${MIN_VOLUME_USD:,} volume")
+        # Fetch from V1
+        raw_tokens_v1 = _fetch_all_tokens()
+        logger.info(f"V1: {len(raw_tokens_v1)} tokens with >${MIN_VOLUME_USD:,} volume")
 
-        # Filter spam
-        valid_tokens = [t for t in raw_tokens if _is_valid_token(t)]
-        logger.info(f"After filtering: {len(valid_tokens)} valid tokens")
+        # Fetch from V2
+        raw_tokens_v2 = _fetch_all_tokens_v2()
+        logger.info(f"V2: {len(raw_tokens_v2)} tokens with >${MIN_VOLUME_USD:,} volume")
 
-        now = datetime.now(timezone.utc).isoformat()
-        rows = []
-        for t in valid_tokens:
+        # Combine: merge by address, sum volumes and liquidity
+        token_map: dict[str, dict] = {}
+
+        for t in raw_tokens_v1:
+            if not _is_valid_token(t):
+                continue
+            addr = t["id"].lower()
             total_liq = float(t.get("totalLiquidity", 0))
             derived_usd = float(t.get("derivedUSD", 0))
-            # Compute USD liquidity: totalLiquidity (token units) × derivedUSD (price)
-            total_liq_usd = total_liq * derived_usd if total_liq > 0 and derived_usd > 0 else None
-
-            rows.append({
-                "address": t["id"].lower(),
+            token_map[addr] = {
+                "address": addr,
                 "symbol": t["symbol"],
                 "name": t["name"],
                 "decimals": int(t["decimals"]),
                 "total_volume_usd": float(t["tradeVolumeUSD"]),
+                "total_liquidity": total_liq,
+                "derived_usd": derived_usd,
+            }
+
+        for t in raw_tokens_v2:
+            if not _is_valid_token(t):
+                continue
+            addr = t["id"].lower()
+            total_liq = float(t.get("totalLiquidity", 0))
+            derived_usd = float(t.get("derivedUSD", 0))
+            v2_volume = float(t["tradeVolumeUSD"])
+
+            if addr in token_map:
+                # Merge: sum volume and liquidity, keep V1 price (or V2 if V1=0)
+                token_map[addr]["total_volume_usd"] += v2_volume
+                token_map[addr]["total_liquidity"] += total_liq
+                if token_map[addr]["derived_usd"] <= 0 and derived_usd > 0:
+                    token_map[addr]["derived_usd"] = derived_usd
+            else:
+                token_map[addr] = {
+                    "address": addr,
+                    "symbol": t["symbol"],
+                    "name": t["name"],
+                    "decimals": int(t["decimals"]),
+                    "total_volume_usd": v2_volume,
+                    "total_liquidity": total_liq,
+                    "derived_usd": derived_usd,
+                }
+
+        logger.info(f"After V1+V2 merge and filtering: {len(token_map)} valid tokens")
+
+        now = datetime.now(timezone.utc).isoformat()
+        rows = []
+        # Cap: subgraph totalLiquidity × derivedUSD is unreliable for spam tokens.
+        # Real liquidity is computed by lp_analyzer with bilateral filtering.
+        # This cap prevents absurd values (e.g., SQP at $1.7 quadrillion).
+        MAX_LIQUIDITY_USD = 50_000_000  # $50M cap — no PulseChain token has more
+        for t in token_map.values():
+            total_liq = t["total_liquidity"]
+            derived_usd = t["derived_usd"]
+            total_liq_usd = total_liq * derived_usd if total_liq > 0 and derived_usd > 0 else None
+            if total_liq_usd is not None and total_liq_usd > MAX_LIQUIDITY_USD:
+                total_liq_usd = None  # Mark as unreliable — lp_analyzer provides the real value
+
+            rows.append({
+                "address": t["address"],
+                "symbol": t["symbol"],
+                "name": t["name"],
+                "decimals": t["decimals"],
+                "total_volume_usd": t["total_volume_usd"],
                 "total_liquidity": total_liq,
                 "total_liquidity_usd": total_liq_usd,
                 "is_active": True,
@@ -166,7 +273,7 @@ def run():
             "error_message": None,
         }, on_conflict="indexer_name").execute()
 
-        logger.info(f"Synced {len(rows)} tokens to pulsechain_tokens")
+        logger.info(f"Synced {len(rows)} tokens to pulsechain_tokens (V1+V2)")
 
     except Exception as e:
         supabase.table("sync_status").upsert({

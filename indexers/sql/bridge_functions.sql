@@ -43,7 +43,8 @@ $$;
 
 -- 2. get_bridge_daily_stats
 -- Aggregates bridge_transfers by date for daily stats
-CREATE OR REPLACE FUNCTION public.get_bridge_daily_stats()
+-- Accepts since_date parameter to avoid PostgREST 1000-row truncation
+CREATE OR REPLACE FUNCTION public.get_bridge_daily_stats(since_date date DEFAULT '2020-01-01')
 RETURNS TABLE(
   date date,
   deposit_count bigint,
@@ -65,6 +66,7 @@ AS $$
     COUNT(DISTINCT bt.user_address) AS unique_users
   FROM bridge_transfers bt
   WHERE bt.block_timestamp IS NOT NULL
+    AND (bt.block_timestamp AT TIME ZONE 'UTC')::date >= since_date
   GROUP BY (bt.block_timestamp AT TIME ZONE 'UTC')::date
   ORDER BY date;
 $$;

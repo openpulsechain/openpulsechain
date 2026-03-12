@@ -1,7 +1,7 @@
 """Bridge aggregator — computes daily stats and token stats from bridge_transfers."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from db import supabase
 
@@ -17,36 +17,69 @@ def _set_status(status, error=None):
 
 
 def _aggregate_daily():
-    """Compute bridge_daily_stats from bridge_transfers using Supabase RPC."""
-    result = supabase.rpc("get_bridge_daily_stats", {}).execute()
+    """Compute bridge_daily_stats from bridge_transfers.
+    Aggregates last 90 days directly to avoid PostgREST 1000-row RPC truncation (bug #13)."""
+    from collections import defaultdict
 
-    if hasattr(result, "data") and result.data:
-        rows = result.data
+    since = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+    daily = defaultdict(lambda: {"dep_c": 0, "wdr_c": 0, "dep_v": 0.0, "wdr_v": 0.0, "users": set()})
+
+    offset = 0
+    page_size = 1000
+    total = 0
+
+    while True:
+        result = (supabase.table("bridge_transfers")
+                  .select("direction,amount_usd,user_address,block_timestamp")
+                  .gte("block_timestamp", since)
+                  .order("block_timestamp")
+                  .range(offset, offset + page_size - 1)
+                  .execute())
+        rows = result.data if hasattr(result, "data") and result.data else []
+        if not rows:
+            break
+        total += len(rows)
+        for r in rows:
+            ts = (r.get("block_timestamp") or "")[:10]
+            if not ts:
+                continue
+            d = daily[ts]
+            if r["direction"] == "deposit":
+                d["dep_c"] += 1
+                d["dep_v"] += float(r.get("amount_usd") or 0)
+            else:
+                d["wdr_c"] += 1
+                d["wdr_v"] += float(r.get("amount_usd") or 0)
+            if r.get("user_address"):
+                d["users"].add(r["user_address"])
+        if len(rows) < page_size:
+            break
+        offset += page_size
+
+    if daily:
         now = datetime.now(timezone.utc).isoformat()
-        # Cap: individual daily volume above $10M is likely inflated subgraph data
         MAX_DAILY_VOLUME_USD = 10_000_000
         upsert_rows = []
-        for row in rows:
-            dep_vol = min(row["deposit_volume_usd"] or 0, MAX_DAILY_VOLUME_USD)
-            wdr_vol = min(row["withdrawal_volume_usd"] or 0, MAX_DAILY_VOLUME_USD)
+        for date, d in sorted(daily.items()):
+            dep_vol = min(d["dep_v"], MAX_DAILY_VOLUME_USD)
+            wdr_vol = min(d["wdr_v"], MAX_DAILY_VOLUME_USD)
             upsert_rows.append({
-                "date": row["date"],
-                "deposit_count": row["deposit_count"],
-                "withdrawal_count": row["withdrawal_count"],
-                "deposit_volume_usd": dep_vol,
-                "withdrawal_volume_usd": wdr_vol,
-                "net_flow_usd": dep_vol - wdr_vol,
-                "unique_users": row["unique_users"],
+                "date": date,
+                "deposit_count": d["dep_c"],
+                "withdrawal_count": d["wdr_c"],
+                "deposit_volume_usd": round(dep_vol, 2),
+                "withdrawal_volume_usd": round(wdr_vol, 2),
+                "net_flow_usd": round(dep_vol - wdr_vol, 2),
+                "unique_users": len(d["users"]),
                 "updated_at": now,
             })
-        # Batch upsert (500 at a time)
         for i in range(0, len(upsert_rows), 500):
             supabase.table("bridge_daily_stats").upsert(
                 upsert_rows[i:i + 500], on_conflict="date"
             ).execute()
-        logger.info(f"Aggregated {len(rows)} daily stats rows")
+        logger.info(f"Aggregated {len(upsert_rows)} daily stats from {total} transfers (last 90 days)")
     else:
-        logger.info("No daily stats to aggregate (RPC not yet created, skipping)")
+        logger.info("No bridge transfers found for aggregation")
 
 
 def _aggregate_tokens():
