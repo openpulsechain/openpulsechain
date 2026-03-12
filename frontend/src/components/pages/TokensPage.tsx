@@ -1196,19 +1196,35 @@ export function TokensPage() {
                   <Spinner />
                 ) : livePools.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
+                    <table className="w-full text-xs table-fixed">
+                      <colgroup>
+                        <col style={{ width: '3%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '11%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '8%' }} />
+                      </colgroup>
                       <thead>
                         <tr className="border-b border-white/10 text-gray-500">
-                          <th className="py-2 pr-2 text-left">#</th>
-                          <th className="py-2 pr-3 text-left">DEX</th>
-                          <th className="py-2 pr-3 text-left">Pair</th>
-                          <th className="py-2 pr-3 text-right">Price</th>
-                          <th className="py-2 pr-3 text-right">Liquidity</th>
-                          <th className="py-2 pr-3 text-right">Volume 24h</th>
-                          <th className="py-2 pr-3 text-right">Buys</th>
-                          <th className="py-2 pr-3 text-right">Sells</th>
-                          <th className="py-2 pr-3 text-right">24h</th>
-                          <th className="py-2 text-left">Conf.</th>
+                          <th className="py-2 text-center">#</th>
+                          <th className="py-2 text-center">DEX</th>
+                          <th className="py-2 text-center">Pair</th>
+                          <th className="py-2 text-center">Contract</th>
+                          <th className="py-2 text-center">Price</th>
+                          <th className="py-2 text-center">Liquidity</th>
+                          <th className="py-2 text-center">Volume 24h</th>
+                          <th className="py-2 text-center">Buys</th>
+                          <th className="py-2 text-center">Sells</th>
+                          <th className="py-2 text-center">24h</th>
+                          <th className="py-2 text-center">Conf.</th>
+                          <th className="py-2 text-center">Tier</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1217,16 +1233,20 @@ export function TokensPage() {
                           const confColor = pool.pool_confidence === 'high' ? 'text-emerald-400'
                             : pool.pool_confidence === 'medium' ? 'text-yellow-400'
                             : 'text-orange-400'
+                          const tierColor = pool.tier === 'hot' ? 'text-red-400'
+                            : pool.tier === 'warm' ? 'text-yellow-400'
+                            : 'text-gray-500'
                           const pChange = formatChange(pool.price_change_24h)
+                          const shortAddr = `${pool.pair_address.slice(0, 6)}...${pool.pair_address.slice(-4)}`
                           return (
                             <tr
                               key={pool.pair_address}
                               className={`border-b border-white/5 ${isSpam ? 'opacity-40' : 'hover:bg-white/5'}`}
                               title={isSpam ? `Spam: ${pool.pool_spam_reason}` : undefined}
                             >
-                              <td className="py-2 pr-2 text-gray-500">{i + 1}</td>
-                              <td className="py-2 pr-3 text-gray-300">{formatDexName(pool.dex_id)}</td>
-                              <td className="py-2 pr-3">
+                              <td className="py-2 text-center text-gray-500">{i + 1}</td>
+                              <td className="py-2 text-center text-gray-300">{formatDexName(pool.dex_id)}</td>
+                              <td className="py-2 text-center">
                                 {pool.dx_url ? (
                                   <a href={pool.dx_url} target="_blank" rel="noopener noreferrer" className="text-[#00D4FF] hover:underline">
                                     {pool.base_token_symbol}/{pool.quote_token_symbol}
@@ -1235,15 +1255,27 @@ export function TokensPage() {
                                   <span className="text-gray-300">{pool.base_token_symbol}/{pool.quote_token_symbol}</span>
                                 )}
                               </td>
-                              <td className="py-2 pr-3 text-right text-white">{formatPrice(pool.price_usd)}</td>
-                              <td className="py-2 pr-3 text-right text-gray-300">{pool.liquidity_usd != null ? formatUsd(pool.liquidity_usd) : '--'}</td>
-                              <td className="py-2 pr-3 text-right text-gray-300">{pool.volume_24h_usd != null ? formatUsd(pool.volume_24h_usd) : '--'}</td>
-                              <td className="py-2 pr-3 text-right text-gray-300">{pool.buys_24h?.toLocaleString() ?? '--'}</td>
-                              <td className="py-2 pr-3 text-right text-gray-300">{pool.sells_24h?.toLocaleString() ?? '--'}</td>
-                              <td className={`py-2 pr-3 text-right ${pChange.className}`}>{pChange.text}</td>
-                              <td className={`py-2 whitespace-nowrap ${confColor}`}>
+                              <td className="py-2 text-center">
+                                <a
+                                  href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${pool.pair_address}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-gray-500 hover:text-[#00D4FF] transition-colors font-mono"
+                                  title={pool.pair_address}
+                                >
+                                  {shortAddr}
+                                </a>
+                              </td>
+                              <td className="py-2 text-center text-white">{formatPrice(pool.price_usd)}</td>
+                              <td className="py-2 text-center text-gray-300">{pool.liquidity_usd != null ? formatUsd(pool.liquidity_usd) : '--'}</td>
+                              <td className="py-2 text-center text-gray-300">{pool.volume_24h_usd != null ? formatUsd(pool.volume_24h_usd) : '--'}</td>
+                              <td className="py-2 text-center text-gray-300">{pool.buys_24h?.toLocaleString() ?? '--'}</td>
+                              <td className="py-2 text-center text-gray-300">{pool.sells_24h?.toLocaleString() ?? '--'}</td>
+                              <td className={`py-2 text-center ${pChange.className}`}>{pChange.text}</td>
+                              <td className={`py-2 text-center whitespace-nowrap ${confColor}`}>
                                 {isSpam ? '\u26A0' : '\u25CF'} {pool.pool_confidence ?? '--'}
                               </td>
+                              <td className={`py-2 text-center ${tierColor}`}>{pool.tier}</td>
                             </tr>
                           )
                         })}
