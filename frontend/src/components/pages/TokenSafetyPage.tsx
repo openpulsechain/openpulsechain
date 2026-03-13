@@ -457,6 +457,9 @@ export function TokenSafetyPage() {
   const [confidenceEvents, setConfidenceEvents] = useState<{ pair_address: string; event_summary: string; prev_confidence: string; new_confidence: string; created_at: string }[]>([])
   const [historyExpanded, setHistoryExpanded] = useState(false)
 
+  // P0-C: Safety API health check
+  const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
+
   // Legacy: Safety API pair list (anchored/capped analysis)
   const [pairs, setPairs] = useState<LiquidityPair[]>([])
   const [pairsExpanded, setPairsExpanded] = useState(false)
@@ -475,6 +478,16 @@ export function TokenSafetyPage() {
       .catch(() => setPairsLoading(false))
   }
 
+  // P0-C: Health check on mount — detect if Safety API is available
+  useEffect(() => {
+    if (!SAFETY_API) { setApiAvailable(false); return }
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 5000)
+    fetch(`${SAFETY_API}/health`, { signal: ctrl.signal })
+      .then(r => { clearTimeout(t); setApiAvailable(r.ok) })
+      .catch(() => { clearTimeout(t); setApiAvailable(false) })
+  }, [])
+
   useEffect(() => {
     if (!address) return
     const addr = address.toLowerCase()
@@ -489,7 +502,7 @@ export function TokenSafetyPage() {
         if (data && !err) {
           setSafety(data)
           setLoading(false)
-        } else if (SAFETY_API) {
+        } else if (SAFETY_API && apiAvailable !== false) {
           setAnalyzing(true)
           setLoading(false)
           const controller = new AbortController()
@@ -509,9 +522,11 @@ export function TokenSafetyPage() {
                 setAnalyzing(false)
               }
             })
-            .catch(() => { setError('Safety API unavailable. Try again later.'); setAnalyzing(false) })
+            .catch(() => { setError('Safety API unavailable. Try again later.'); setApiAvailable(false); setAnalyzing(false) })
         } else {
-          setError('No safety score available yet for this token.')
+          setError(apiAvailable === false
+            ? 'Safety analysis temporarily unavailable. The token has not been analyzed yet.'
+            : 'No safety score available yet for this token.')
           setLoading(false)
         }
       })
@@ -644,10 +659,17 @@ export function TokenSafetyPage() {
       <div className="text-center py-20">
         <Shield className="h-16 w-16 text-gray-600 mx-auto mb-4" />
         <h2 className="text-xl font-semibold text-gray-300 mb-2">No Safety Score</h2>
-        <p className="text-gray-500 mb-6">{error || 'Token not analyzed yet.'}</p>
-        <Link to="/safety" className="inline-flex items-center gap-2 text-[#00D4FF] hover:underline">
-          <ArrowLeft className="h-4 w-4" /> Back to Safety Dashboard
-        </Link>
+        <p className="text-gray-500 mb-4">{error || 'Token not analyzed yet.'}</p>
+        {apiAvailable === false && (
+          <div className="inline-block rounded-lg bg-orange-500/10 border border-orange-500/20 px-4 py-2 mb-4">
+            <p className="text-orange-400 text-sm">Safety analysis service is currently unavailable. Cached scores are still displayed where available.</p>
+          </div>
+        )}
+        <div>
+          <Link to="/safety" className="inline-flex items-center gap-2 text-[#00D4FF] hover:underline">
+            <ArrowLeft className="h-4 w-4" /> Back to Safety Dashboard
+          </Link>
+        </div>
       </div>
     )
   }
@@ -1048,11 +1070,17 @@ export function TokenSafetyPage() {
         {/* Anchor analysis from Safety API (legacy, optional) */}
         {safety.has_lp && (
           <button
-            onClick={loadPairs}
-            className="w-full flex items-center justify-center gap-2 text-[11px] text-gray-500 hover:text-gray-300 rounded-lg border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] py-2 transition-colors"
+            onClick={apiAvailable === false ? undefined : loadPairs}
+            disabled={apiAvailable === false}
+            className={`w-full flex items-center justify-center gap-2 text-[11px] rounded-lg border border-white/5 py-2 transition-colors ${
+              apiAvailable === false
+                ? 'text-gray-600 cursor-not-allowed opacity-50'
+                : 'text-gray-500 hover:text-gray-300 bg-white/[0.01] hover:bg-white/[0.03]'
+            }`}
+            title={apiAvailable === false ? 'Safety API temporarily unavailable' : undefined}
           >
             {pairsExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            {pairsExpanded ? 'Hide anchor analysis' : 'Anchor analysis (Safety API)'}
+            {apiAvailable === false ? 'Anchor analysis (API unavailable)' : pairsExpanded ? 'Hide anchor analysis' : 'Anchor analysis (Safety API)'}
           </button>
         )}
 
