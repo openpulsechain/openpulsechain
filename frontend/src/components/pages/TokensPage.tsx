@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react'
-import { X, Search, ChevronLeft, ChevronRight, ExternalLink, Info, ChevronDown, ChevronUp, ArrowUpDown, Filter, Users, Shield } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { X, Search, ChevronLeft, ChevronRight, ExternalLink, Info, ChevronDown, ChevronUp, ArrowUpDown, Filter, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
@@ -298,324 +298,6 @@ const CONFIDENCE_INFO: Record<string, { label: string; color: string; explanatio
   suspect: { label: 'Suspect', color: 'text-red-400', explanation: 'At least one token in this pair is not recognized in our database. This pool may involve an unverified or potentially fraudulent token. Do your own research before interacting.' },
 }
 
-// Translate raw spam reason codes into human-readable explanations
-// P0-D fix: accept optional token symbols to replace generic "Token 0/1"
-function formatSpamReason(raw: string | null, baseSymbol?: string | null, quoteSymbol?: string | null): { code: string; explanation: string }[] {
-  if (!raw) return []
-  const t0 = baseSymbol || 'Base token'
-  const t1 = quoteSymbol || 'Quote token'
-  return raw.split('; ').map(part => {
-    const [code, val] = part.split(':')
-    const key = code.trim()
-    if (key.startsWith('low_reserve')) {
-      return { code: part, explanation: `Pool reserves are extremely low ($${val ?? '< 100'} USD). Legitimate pools typically have significantly higher reserves.` }
-    }
-    const map: Record<string, string> = {
-      unknown_token0: `${t0} is not recognized in our token database.`,
-      unknown_token1: `${t1} is not recognized in our token database.`,
-      low_volume_token0: `${t0} has very low all-time trading volume (< $1,000), indicating an inactive or fake token.`,
-      low_volume_token1: `${t1} has very low all-time trading volume (< $1,000), indicating an inactive or fake token.`,
-      spam_name: `One of the token names contains a spam keyword (e.g. "airdrop", "free", "claim", "test").`,
-      no_liquidity_token0: `${t0} has zero or near-zero liquidity in this pool.`,
-      no_liquidity_token1: `${t1} has zero or near-zero liquidity in this pool.`,
-    }
-    return { code: part, explanation: map[key] ?? `Flagged: ${part}` }
-  })
-}
-
-interface MonitoringSnapshot {
-  snapshot_at: string
-  pool_confidence: string
-  pool_is_legitimate: boolean
-  pool_spam_reason: string | null
-  reserve_usd: number | null
-  volume_24h_usd: number | null
-  token0_symbol: string | null
-  token1_symbol: string | null
-  token0_is_known: boolean
-  token0_is_core: boolean
-  token1_is_known: boolean
-  token1_is_core: boolean
-}
-
-interface VerifiedToken { address: string; symbol: string; name: string | null }
-
-function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => void }) {
-  const [history, setHistory] = useState<MonitoringSnapshot[]>([])
-  const [verifiedTokens, setVerifiedTokens] = useState<Record<string, VerifiedToken[]>>({})
-  const [loading, setLoading] = useState(true)
-  const popupRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    ;(async () => {
-      try {
-        // Fetch monitoring history
-        const historyPromise = supabase
-          .from('token_monitoring_pools')
-          .select('snapshot_at, pool_confidence, pool_is_legitimate, pool_spam_reason, reserve_usd, volume_24h_usd, token0_symbol, token1_symbol, token0_is_known, token0_is_core, token1_is_known, token1_is_core')
-          .eq('pair_address', pool.pair_address)
-          .order('snapshot_at', { ascending: false })
-          .limit(50)
-
-        // Fetch verified tokens matching base/quote symbols
-        const symbols = [pool.base_token_symbol, pool.quote_token_symbol].filter(Boolean) as string[]
-        const verifiedPromise = symbols.length > 0
-          ? supabase
-              .from('pulsechain_tokens')
-              .select('address, symbol, name')
-              .in('symbol', symbols)
-              .gt('total_volume_usd', 0)
-              .order('total_liquidity_usd', { ascending: false, nullsFirst: false })
-          : Promise.resolve({ data: [] })
-
-        const [histResult, verifiedResult] = await Promise.all([historyPromise, verifiedPromise])
-        setHistory((histResult.data ?? []) as MonitoringSnapshot[])
-
-        // Group verified tokens by symbol
-        const grouped: Record<string, VerifiedToken[]> = {}
-        for (const t of (verifiedResult.data ?? []) as VerifiedToken[]) {
-          if (!grouped[t.symbol]) grouped[t.symbol] = []
-          grouped[t.symbol].push(t)
-        }
-        setVerifiedTokens(grouped)
-      } catch (e) {
-        console.error('Failed to load monitoring history:', e)
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [pool.pair_address, pool.base_token_symbol, pool.quote_token_symbol])
-
-  // Close on click outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) onClose()
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
-
-  const conf = CONFIDENCE_INFO[pool.pool_confidence ?? ''] ?? CONFIDENCE_INFO.suspect
-  const isSpam = !pool.pool_is_legitimate
-  const lastSnapshot = history.length > 0 ? history[0] : null
-  const hasTransition = lastSnapshot && lastSnapshot.pool_confidence !== pool.pool_confidence
-
-  return (
-    <div className="fixed inset-0 z-[60] backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        ref={popupRef}
-        className="relative w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-2xl border border-white/10 bg-gray-900 shadow-2xl p-6 space-y-5"
-        onClick={e => e.stopPropagation()}
-      >
-        <button onClick={onClose} className="absolute top-3 right-3 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
-          <X className="h-4 w-4" />
-        </button>
-
-        {/* Header */}
-        <div>
-          <h3 className="text-lg font-bold text-white">Pool Confidence Analysis</h3>
-          <div className="flex items-center gap-3 mt-1">
-            <p className="text-base font-semibold text-cyan-400">{pool.base_token_symbol}/{pool.quote_token_symbol} on {formatDexName(pool.dex_id)}</p>
-            <a href={`/token/${pool.token_address}`} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors text-xs font-medium" title={`Full Token Safety analysis for ${pool.base_token_symbol}`}>
-              <Shield className="h-3.5 w-3.5" />
-              Token Safety
-            </a>
-          </div>
-          <p className="text-xs text-gray-500 font-mono mt-0.5">{pool.pair_address}</p>
-        </div>
-
-        {/* Current Confidence */}
-        <div className="rounded-lg bg-white/5 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-gray-400">Current Confidence</span>
-            <span className={`text-sm font-bold ${conf.color}`}>{conf.label}</span>
-            {isSpam && <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 font-bold">NOT LEGITIMATE</span>}
-          </div>
-          <p className="text-sm text-gray-300 leading-relaxed">{conf.explanation}</p>
-          {hasTransition && lastSnapshot && (
-            <div className="mt-2 rounded bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 flex items-start gap-2">
-              <span className="text-yellow-400 text-xs mt-0.5">↑</span>
-              <div className="text-xs text-yellow-300">
-                <span className="font-bold">Recent transition:</span>{' '}
-                <span className={CONFIDENCE_INFO[lastSnapshot.pool_confidence]?.color ?? 'text-gray-400'}>
-                  {(CONFIDENCE_INFO[lastSnapshot.pool_confidence]?.label ?? lastSnapshot.pool_confidence)}
-                </span>
-                {' → '}
-                <span className={conf.color}>{conf.label}</span>
-                <span className="text-yellow-400/60 ml-1">— The monitoring history below still shows the previous state. The next indexer run (every 6h) will record this transition.</span>
-              </div>
-            </div>
-          )}
-          {pool.pool_spam_reason && (
-            <div className="mt-3 space-y-2">
-              <div className="text-xs text-red-400 font-bold">Flagged reasons:</div>
-              {formatSpamReason(pool.pool_spam_reason, pool.base_token_symbol, pool.quote_token_symbol).map((r, i) => (
-                <div key={i} className="rounded bg-red-500/10 border border-red-500/20 px-3 py-2">
-                  <div className="text-xs text-red-300 font-mono">{r.code}</div>
-                  <div className="text-xs text-gray-300 mt-1">{r.explanation}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Token Address Comparison */}
-        {(pool.base_token_address || pool.quote_token_address) && (
-          <div className="rounded-lg bg-white/5 p-4">
-            <div className="text-xs text-gray-400 mb-3 font-medium">Token Address Comparison</div>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-white/10 text-gray-500">
-                  <th className="py-1.5 text-left">Role</th>
-                  <th className="py-1.5 text-left">Symbol</th>
-                  <th className="py-1.5 text-left">Address in this Pool</th>
-                  <th className="py-1.5 text-center">Status</th>
-                  <th className="py-1.5 text-center">Safety</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { role: 'Base (token 0)', symbol: pool.base_token_symbol, address: pool.base_token_address },
-                  { role: 'Quote (token 1)', symbol: pool.quote_token_symbol, address: pool.quote_token_address },
-                ].map((t, idx) => {
-                  const verified = t.symbol ? verifiedTokens[t.symbol] : undefined
-                  const matchesVerified = verified?.some(v => v.address.toLowerCase() === t.address?.toLowerCase())
-                  return (
-                    <Fragment key={idx}>
-                      <tr className="border-b border-white/5">
-                        <td className="py-1.5 text-gray-400">{t.role}</td>
-                        <td className="py-1.5 text-white font-medium">{t.symbol ?? '--'}</td>
-                        <td className="py-1.5 font-mono text-gray-300">
-                          {t.address ? (
-                            <a href={`https://scan.pulsechain.com/address/${t.address}`} target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400 transition-colors">
-                              {t.address.slice(0, 10)}...{t.address.slice(-8)}
-                            </a>
-                          ) : '--'}
-                        </td>
-                        <td className="py-1.5 text-center">
-                          {!t.address ? <span className="text-gray-600">--</span>
-                            : matchesVerified ? <span className="text-cyan-400 font-bold">Known</span>
-                            : verified && verified.length > 0 ? <span className="text-red-400 font-bold">Mismatch</span>
-                            : <span className="text-yellow-400">Unknown</span>}
-                        </td>
-                        <td className="py-1.5 text-center">
-                          {t.address && (
-                            <a href={`/token/${t.address}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors" title={`Token Safety analysis for ${t.symbol}`}>
-                              <Shield className="h-3 w-3" />
-                              <span className="text-[10px] font-medium">Analyze</span>
-                            </a>
-                          )}
-                        </td>
-                      </tr>
-                      {/* Show the real verified address if mismatch */}
-                      {verified && verified.length > 0 && !matchesVerified && (
-                        <tr className="border-b border-white/5 bg-red-500/5">
-                          <td className="py-1 text-gray-600 pl-4">↳ Real {t.symbol}</td>
-                          <td className="py-1 text-emerald-400 font-medium">{t.symbol}</td>
-                          <td className="py-1 font-mono text-emerald-400/80">
-                            <a href={`https://scan.pulsechain.com/address/${verified[0].address}`} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-300 transition-colors">
-                              {verified[0].address.slice(0, 10)}...{verified[0].address.slice(-8)}
-                            </a>
-                          </td>
-                          <td className="py-1 text-center text-cyan-400 font-bold">Known</td>
-                          <td className="py-1 text-center">
-                            <a href={`/token/${verified[0].address}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors" title={`Token Safety analysis for real ${t.symbol}`}>
-                              <Shield className="h-3 w-3" />
-                              <span className="text-[10px] font-medium">Analyze</span>
-                            </a>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-            {Object.values(verifiedTokens).some(arr => arr.length > 0) && (
-              <p className="text-[10px] text-gray-600 mt-2">"Known" means the token has been found trading on PulseX. It does NOT mean it has been audited or verified as safe. A mismatch means this pool uses a different contract than the established token.</p>
-            )}
-          </div>
-        )}
-
-        {/* Confidence Levels Legend */}
-        <div className="rounded-lg bg-white/5 p-4">
-          <div className="text-xs text-gray-400 mb-2 font-medium">Confidence Scale</div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            {Object.entries(CONFIDENCE_INFO).map(([key, info]) => (
-              <div key={key} className={`flex items-start gap-2 ${key === (pool.pool_confidence ?? '') ? 'bg-white/5 rounded p-1.5 -m-1.5' : ''}`}>
-                <span className={`${info.color} font-bold shrink-0`}>{info.label}</span>
-                <span className="text-gray-400">{key === 'high' ? '2 core tokens' : key === 'medium' ? '1 core + 1 known' : key === 'low' ? '2 known, no core' : '1+ unknown token'}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Monitoring History */}
-        <div>
-          <h4 className="text-sm font-bold text-white mb-3">Monitoring History</h4>
-          {loading ? (
-            <div className="flex items-center justify-center py-6"><Spinner /></div>
-          ) : history.length === 0 ? (
-            <p className="text-sm text-gray-500 py-4 text-center">No monitoring history available yet for this pool.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-white/10 text-gray-500">
-                    <th className="py-2 text-center">Date</th>
-                    <th className="py-2 text-center">Confidence</th>
-                    <th className="py-2 text-center">Legitimate</th>
-                    <th className="py-2 text-center">Reserve USD</th>
-                    <th className="py-2 text-center">Volume 24h</th>
-                    <th className="py-2 text-center">Spam Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((snap, i) => {
-                    const sConf = CONFIDENCE_INFO[snap.pool_confidence] ?? CONFIDENCE_INFO.suspect
-                    const prevSnap = history[i + 1]
-                    const changed = prevSnap && (prevSnap.pool_confidence !== snap.pool_confidence || prevSnap.pool_is_legitimate !== snap.pool_is_legitimate)
-                    return (
-                      <tr key={i} className={`border-b border-white/5 ${changed ? 'bg-yellow-500/5' : ''}`}>
-                        <td className="py-1.5 text-center text-gray-400 whitespace-nowrap">
-                          {new Date(snap.snapshot_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          {changed && <span className="ml-1 text-yellow-400" title="Status changed">*</span>}
-                        </td>
-                        <td className={`py-1.5 text-center font-medium ${sConf.color}`}>{sConf.label}</td>
-                        <td className={`py-1.5 text-center ${snap.pool_is_legitimate ? 'text-emerald-400' : 'text-red-400 font-bold'}`}>
-                          {snap.pool_is_legitimate ? 'Yes' : 'No'}
-                        </td>
-                        <td className="py-1.5 text-center text-gray-300">{snap.reserve_usd != null ? formatUsd(snap.reserve_usd) : '--'}</td>
-                        <td className="py-1.5 text-center text-gray-300">{snap.volume_24h_usd != null ? formatUsd(snap.volume_24h_usd) : '--'}</td>
-                        <td className="py-1.5 text-center text-red-400/70 max-w-[250px]">
-                          {snap.pool_spam_reason
-                            ? formatSpamReason(snap.pool_spam_reason, snap.token0_symbol, snap.token1_symbol).map(r => r.explanation).join(' ')
-                            : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Source */}
-        <div className="text-[10px] text-gray-600 text-center">
-          Analysis by token_monitoring indexer (runs every 6 hours). Not real-time. Not investment advice.
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function ClickableHeader({ label, className }: { label: string; className?: string }) {
   const [open, setOpen] = useState(false)
@@ -672,7 +354,6 @@ export function TokensPage() {
   const [liveSummary, setLiveSummary] = useState<LivePoolSummary | null>(null)
   const [livePools, setLivePools] = useState<PoolRow[]>([])
   const [liveLoading, setLiveLoading] = useState(false)
-  const [confidencePool, setConfidencePool] = useState<PoolRow | null>(null)
   const [safetyScores, setSafetyScores] = useState<Record<string, { score: number; grade: string }>>({})
   const poolCacheRef = useRef<Map<string, { summary: LivePoolSummary | null; pools: PoolRow[] }>>(new Map())
 
@@ -1786,12 +1467,15 @@ export function TokensPage() {
                               <td className={`py-2 text-center text-gray-300 ${isSpam ? 'opacity-40' : ''}`}>{pool.buys_24h?.toLocaleString() ?? '--'}</td>
                               <td className={`py-2 text-center text-gray-300 ${isSpam ? 'opacity-40' : ''}`}>{pool.sells_24h?.toLocaleString() ?? '--'}</td>
                               <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''} ${pChange.className}`}>{pChange.text}</td>
-                              <td
-                                className={`py-2 text-center whitespace-nowrap cursor-pointer hover:underline ${confColor}`}
-                                onClick={() => setConfidencePool(pool)}
-                                title="Click for confidence analysis details"
-                              >
-                                {isSpam ? '\u26A0' : '\u25CF'} {pool.pool_confidence ?? '--'}
+                              <td className={`py-2 text-center whitespace-nowrap ${confColor}`}>
+                                <a
+                                  href={`/token/${pool.token_address}#liquidity`}
+                                  className="inline-flex items-center gap-1 hover:underline"
+                                  title={CONFIDENCE_INFO[pool.pool_confidence ?? '']?.explanation ?? CONFIDENCE_INFO.suspect.explanation}
+                                >
+                                  {isSpam ? '\u26A0' : '\u25CF'} {CONFIDENCE_INFO[pool.pool_confidence ?? '']?.label ?? 'Suspect'}
+                                  <ExternalLink className="h-2.5 w-2.5 opacity-40" />
+                                </a>
                               </td>
                               <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''} ${tierColor}`}>{pool.tier}</td>
                               <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''}`}>
@@ -1825,10 +1509,6 @@ export function TokensPage() {
         </div>
       )}
 
-      {/* Confidence Detail Popup */}
-      {confidencePool && (
-        <PoolConfidencePopup pool={confidencePool} onClose={() => setConfidencePool(null)} />
-      )}
     </div>
   )
 }
