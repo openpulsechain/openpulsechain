@@ -380,8 +380,8 @@ export function OverviewPage() {
       })
     }
 
-    // Sort by market cap desc
-    result.sort((a, b) => (b.market_cap_usd ?? 0) - (a.market_cap_usd ?? 0))
+    // Sort by volume 24h desc
+    result.sort((a, b) => (b.volume_24h_usd ?? 0) - (a.volume_24h_usd ?? 0))
     return result
   }, [liveTokens.data, prices.data])
 

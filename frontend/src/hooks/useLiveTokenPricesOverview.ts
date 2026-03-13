@@ -31,7 +31,7 @@ export function useLiveTokenPricesOverview(limit = 50) {
           .select('token_address, token_symbol, price_usd, price_change_24h, market_cap_usd, total_volume_24h_usd, total_liquidity_usd, last_updated')
           .not('price_usd', 'is', null)
           .gt('market_cap_usd', 0)
-          .order('market_cap_usd', { ascending: false, nullsFirst: false })
+          .order('total_volume_24h_usd', { ascending: false, nullsFirst: false })
           .limit(limit)
 
         if (!cancelled && !error && rows) {
