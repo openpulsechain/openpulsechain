@@ -334,7 +334,7 @@ export function TokensPage() {
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [sortField, setSortField] = useState<SortField>('liquidity')
+  const [sortField, setSortField] = useState<SortField>('volume_24h')
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [showFilters, setShowFilters] = useState(false)
   const [selectedToken, setSelectedToken] = useState<TokenWithPrice | null>(null)
