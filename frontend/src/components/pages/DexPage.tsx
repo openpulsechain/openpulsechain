@@ -971,10 +971,10 @@ export function DexPage() {
                 <tr className="border-b border-white/10 text-gray-400">
                   <th className="py-3 text-left">#</th>
                   <th className="py-3 text-left">Pair</th>
-                  <th className="py-3 text-right">Volume (24h)</th>
-                  <th className="py-3 text-right">Volume (All Time)</th>
-                  <th className="py-3 text-right">Liquidity</th>
-                  <th className="py-3 text-right">Transactions</th>
+                  <th className="py-3 text-center">Volume (24h)</th>
+                  <th className="py-3 text-center">Volume (All Time)</th>
+                  <th className="py-3 text-center">Liquidity</th>
+                  <th className="py-3 text-center">Transactions</th>
                 </tr>
               </thead>
               <tbody>
@@ -998,10 +998,10 @@ export function DexPage() {
                         <span className="text-gray-300">{pair.token1_symbol}</span>
                         <ChevronDown className={`inline-block ml-1.5 h-3 w-3 text-gray-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                       </td>
-                      <td className="py-2.5 text-right text-gray-300 whitespace-nowrap">{pair.daily_volume_usd ? formatUsd(pair.daily_volume_usd) : <span className="text-gray-600">--</span>}</td>
-                      <td className="py-2.5 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.volume_usd)}</td>
-                      <td className="py-2.5 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.reserve_usd)}</td>
-                      <td className="py-2.5 text-right text-gray-400 whitespace-nowrap">{formatNumber(pair.total_transactions)}</td>
+                      <td className="py-2.5 text-center text-gray-300 whitespace-nowrap">{pair.daily_volume_usd ? formatUsd(pair.daily_volume_usd) : <span className="text-gray-600">--</span>}</td>
+                      <td className="py-2.5 text-center text-gray-300 whitespace-nowrap">{formatUsd(pair.volume_usd)}</td>
+                      <td className="py-2.5 text-center text-gray-300 whitespace-nowrap">{formatUsd(pair.reserve_usd)}</td>
+                      <td className="py-2.5 text-center text-gray-400 whitespace-nowrap">{formatNumber(pair.total_transactions)}</td>
                     </tr>
 
                     {/* Expanded details */}
