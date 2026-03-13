@@ -281,7 +281,10 @@ function BoolBadge({ value, trueLabel, falseLabel }: { value: boolean | null; tr
 function ConfidenceBadge({ level }: { level: string | null }) {
   const conf = CONFIDENCE_INFO[level ?? ''] ?? CONFIDENCE_INFO.suspect
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${conf.bg} ${conf.color}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${conf.bg} ${conf.color} cursor-help`}
+      title={conf.explanation}
+    >
       {conf.label}
     </span>
   )
@@ -490,6 +493,19 @@ export function TokenSafetyPage() {
       return acc
     }, {} as Record<string, typeof poolTokenEntries[0]>)
   )
+
+  // Detect transitions: live pool confidence vs last monitoring snapshot
+  const poolTransitions: Record<string, { from: string; to: string }> = {}
+  for (const pool of livePools) {
+    const lastSnap = monitoringHistory.find(s => s.pair_address === pool.pair_address)
+    if (lastSnap && lastSnap.pool_confidence !== (pool.pool_confidence ?? 'suspect')) {
+      poolTransitions[pool.pair_address] = {
+        from: lastSnap.pool_confidence,
+        to: pool.pool_confidence ?? 'suspect',
+      }
+    }
+  }
+  const hasAnyTransition = Object.keys(poolTransitions).length > 0
 
   return (
     <div className="space-y-6">
@@ -752,14 +768,22 @@ export function TokenSafetyPage() {
                   <tbody>
                     {livePools.map((pool, i) => {
                       const spamReasons = formatSpamReason(pool.pool_spam_reason, pool.base_token_symbol, pool.quote_token_symbol)
+                      const transition = poolTransitions[pool.pair_address]
                       return (
                         <Fragment key={pool.pair_address}>
                           <tr className={`border-b border-white/5 ${!pool.pool_is_legitimate ? 'opacity-60' : ''}`}>
                             <td className="py-2 text-gray-600">{i + 1}</td>
                             <td className="py-2">
-                              <span className="text-white font-medium">
-                                {pool.base_token_symbol}/{pool.quote_token_symbol}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-white font-medium">
+                                  {pool.base_token_symbol}/{pool.quote_token_symbol}
+                                </span>
+                                {!pool.pool_is_legitimate && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20 font-bold whitespace-nowrap">
+                                    NOT LEGITIMATE
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-2 text-gray-400">{formatDexName(pool.dex_id)}</td>
                             <td className="py-2 text-right text-gray-300">
@@ -769,7 +793,14 @@ export function TokenSafetyPage() {
                               {pool.volume_24h_usd != null ? formatUsdCompact(pool.volume_24h_usd) : '--'}
                             </td>
                             <td className="py-2 text-center">
-                              <ConfidenceBadge level={pool.pool_confidence} />
+                              <div className="flex items-center justify-center gap-1">
+                                <ConfidenceBadge level={pool.pool_confidence} />
+                                {transition && (
+                                  <span className="text-yellow-400 text-[9px]" title={`Recent transition: ${CONFIDENCE_INFO[transition.from]?.label ?? transition.from} → ${CONFIDENCE_INFO[transition.to]?.label ?? transition.to}`}>
+                                    ↑
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-2 text-center">
                               {pool.dx_url ? (
@@ -1077,6 +1108,33 @@ export function TokenSafetyPage() {
             <span className="text-gray-300">{new Date(safety.analyzed_at).toLocaleString()}</span>
           </div>
         </div>
+
+        {/* Transition banners — migrated from PoolConfidencePopup */}
+        {hasAnyTransition && (
+          <div className="space-y-2">
+            {Object.entries(poolTransitions).map(([pairAddr, t]) => {
+              const pool = livePools.find(p => p.pair_address === pairAddr)
+              const fromConf = CONFIDENCE_INFO[t.from] ?? CONFIDENCE_INFO.suspect
+              const toConf = CONFIDENCE_INFO[t.to] ?? CONFIDENCE_INFO.suspect
+              return (
+                <div key={pairAddr} className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 flex items-start gap-2">
+                  <span className="text-yellow-400 text-xs mt-0.5">↑</span>
+                  <div className="text-xs text-yellow-300">
+                    <span className="font-bold">Recent transition</span>
+                    {pool && <span className="text-yellow-400/70"> ({pool.base_token_symbol}/{pool.quote_token_symbol})</span>}
+                    {': '}
+                    <span className={fromConf.color}>{fromConf.label}</span>
+                    {' → '}
+                    <span className={toConf.color}>{toConf.label}</span>
+                    <span className="text-yellow-400/60 ml-1">
+                      — The monitoring history below still shows the previous state. The next indexer run (every 6h) will record this transition.
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* Pool Monitoring History — migrated from PoolConfidencePopup */}
         {monitoringHistory.length > 0 && (

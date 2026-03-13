@@ -299,26 +299,27 @@ const CONFIDENCE_INFO: Record<string, { label: string; color: string; explanatio
 }
 
 // Translate raw spam reason codes into human-readable explanations
-const SPAM_REASON_MAP: Record<string, string> = {
-  unknown_token0: 'Token 0 (first token in the pair) is not recognized in our verified token database.',
-  unknown_token1: 'Token 1 (second token in the pair) is not recognized in our verified token database.',
-  low_volume_token0: 'Token 0 has very low all-time trading volume (< $1,000), which is a sign of an inactive or fake token.',
-  low_volume_token1: 'Token 1 has very low all-time trading volume (< $1,000), which is a sign of an inactive or fake token.',
-  spam_name: 'One of the token names contains a spam keyword (e.g. "airdrop", "free", "claim", "test").',
-  no_liquidity_token0: 'Token 0 has zero or near-zero liquidity in this pool.',
-  no_liquidity_token1: 'Token 1 has zero or near-zero liquidity in this pool.',
-}
-
-function formatSpamReason(raw: string | null): { code: string; explanation: string }[] {
+// P0-D fix: accept optional token symbols to replace generic "Token 0/1"
+function formatSpamReason(raw: string | null, baseSymbol?: string | null, quoteSymbol?: string | null): { code: string; explanation: string }[] {
   if (!raw) return []
+  const t0 = baseSymbol || 'Base token'
+  const t1 = quoteSymbol || 'Quote token'
   return raw.split('; ').map(part => {
-    // Handle "low_reserve:4" → low_reserve with value
     const [code, val] = part.split(':')
     const key = code.trim()
     if (key.startsWith('low_reserve')) {
       return { code: part, explanation: `Pool reserves are extremely low ($${val ?? '< 100'} USD). Legitimate pools typically have significantly higher reserves.` }
     }
-    return { code: part, explanation: SPAM_REASON_MAP[key] ?? `Flagged: ${part}` }
+    const map: Record<string, string> = {
+      unknown_token0: `${t0} is not recognized in our token database.`,
+      unknown_token1: `${t1} is not recognized in our token database.`,
+      low_volume_token0: `${t0} has very low all-time trading volume (< $1,000), indicating an inactive or fake token.`,
+      low_volume_token1: `${t1} has very low all-time trading volume (< $1,000), indicating an inactive or fake token.`,
+      spam_name: `One of the token names contains a spam keyword (e.g. "airdrop", "free", "claim", "test").`,
+      no_liquidity_token0: `${t0} has zero or near-zero liquidity in this pool.`,
+      no_liquidity_token1: `${t1} has zero or near-zero liquidity in this pool.`,
+    }
+    return { code: part, explanation: map[key] ?? `Flagged: ${part}` }
   })
 }
 
@@ -455,7 +456,7 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
           {pool.pool_spam_reason && (
             <div className="mt-3 space-y-2">
               <div className="text-xs text-red-400 font-bold">Flagged reasons:</div>
-              {formatSpamReason(pool.pool_spam_reason).map((r, i) => (
+              {formatSpamReason(pool.pool_spam_reason, pool.base_token_symbol, pool.quote_token_symbol).map((r, i) => (
                 <div key={i} className="rounded bg-red-500/10 border border-red-500/20 px-3 py-2">
                   <div className="text-xs text-red-300 font-mono">{r.code}</div>
                   <div className="text-xs text-gray-300 mt-1">{r.explanation}</div>
@@ -500,7 +501,7 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
                         </td>
                         <td className="py-1.5 text-center">
                           {!t.address ? <span className="text-gray-600">--</span>
-                            : matchesVerified ? <span className="text-emerald-400 font-bold">Verified</span>
+                            : matchesVerified ? <span className="text-cyan-400 font-bold">Known</span>
                             : verified && verified.length > 0 ? <span className="text-red-400 font-bold">Mismatch</span>
                             : <span className="text-yellow-400">Unknown</span>}
                         </td>
@@ -523,7 +524,7 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
                               {verified[0].address.slice(0, 10)}...{verified[0].address.slice(-8)}
                             </a>
                           </td>
-                          <td className="py-1 text-center text-emerald-400 font-bold">Verified</td>
+                          <td className="py-1 text-center text-cyan-400 font-bold">Known</td>
                           <td className="py-1 text-center">
                             <a href={`/token/${verified[0].address}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors" title={`Token Safety analysis for real ${t.symbol}`}>
                               <Shield className="h-3 w-3" />
@@ -538,7 +539,7 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
               </tbody>
             </table>
             {Object.values(verifiedTokens).some(arr => arr.length > 0) && (
-              <p className="text-[10px] text-gray-600 mt-2">Verified addresses come from PulseChain token registry (by trading volume). A mismatch means this pool uses a different contract than the established token.</p>
+              <p className="text-[10px] text-gray-600 mt-2">"Known" means the token has been found trading on PulseX. It does NOT mean it has been audited or verified as safe. A mismatch means this pool uses a different contract than the established token.</p>
             )}
           </div>
         )}
@@ -595,7 +596,7 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
                         <td className="py-1.5 text-center text-gray-300">{snap.volume_24h_usd != null ? formatUsd(snap.volume_24h_usd) : '--'}</td>
                         <td className="py-1.5 text-center text-red-400/70 max-w-[250px]">
                           {snap.pool_spam_reason
-                            ? formatSpamReason(snap.pool_spam_reason).map(r => r.explanation).join(' ')
+                            ? formatSpamReason(snap.pool_spam_reason, snap.token0_symbol, snap.token1_symbol).map(r => r.explanation).join(' ')
                             : '—'}
                         </td>
                       </tr>
@@ -1740,11 +1741,12 @@ export function TokensPage() {
                       <tbody>
                         {livePools.map((pool, i) => {
                           const isSpam = !pool.pool_is_legitimate
-                          const isSuspect = pool.pool_confidence === 'suspect' || pool.pool_confidence === 'low'
-                          const confColor = isSpam || isSuspect ? 'text-red-400 font-bold'
+                          // P0-B fix: Low=orange (distinct from Suspect=red)
+                          const confColor = isSpam || pool.pool_confidence === 'suspect' ? 'text-red-400 font-bold'
                             : pool.pool_confidence === 'high' ? 'text-emerald-400'
                             : pool.pool_confidence === 'medium' ? 'text-yellow-400'
-                            : 'text-orange-400'
+                            : pool.pool_confidence === 'low' ? 'text-orange-400'
+                            : 'text-gray-400'
                           const tierColor = pool.tier === 'hot' ? 'text-red-400'
                             : pool.tier === 'warm' ? 'text-yellow-400'
                             : 'text-gray-500'
