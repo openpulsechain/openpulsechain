@@ -340,7 +340,7 @@ function PopupPanel({ open, onClose, title, children }: { open: boolean; onClose
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="relative w-full max-w-2xl max-h-[85vh] mx-4 rounded-2xl border border-white/10 bg-gray-950/95 backdrop-blur-xl shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="relative w-full max-w-4xl max-h-[85vh] mx-4 rounded-2xl border border-white/10 bg-gray-950/95 backdrop-blur-xl shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
           <h3 className="text-sm font-semibold text-white">{title}</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors text-lg leading-none">&times;</button>
@@ -1086,7 +1086,7 @@ export function TokenSafetyPage() {
                               <td></td>
                               <td colSpan={7} className="py-1.5 pb-2.5">
                                 {spamReasons.map((r, j) => (
-                                  <div key={j} className="text-[10px] text-red-400/80 leading-relaxed">
+                                  <div key={j} className="text-xs text-red-400/80 leading-relaxed">
                                     <span className="font-mono text-red-400/50 mr-1">{r.code}</span>
                                     {r.explanation}
                                     {r.action && <span className="text-orange-400/80 ml-1">→ {r.action}</span>}
