@@ -21,8 +21,6 @@ const OVERVIEW_TOKENS = [
   '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d', // INC (Incentive)
 ]
 
-const DEXSCREENER_API = `https://api.dexscreener.com/latest/dex/tokens/${OVERVIEW_TOKENS.join(',')}`
-
 interface DexPair {
   chainId: string
   pairAddress: string
@@ -39,6 +37,7 @@ interface DexPair {
 
 /**
  * Fetch core PulseChain token prices directly from DexScreener API.
+ * One API call per token (parallel) to avoid the 30-pair batch limit.
  * Polls every 5 seconds for near-real-time data.
  * Only picks pairs where the target token is the BASE token so that:
  *   - priceUsd is correct for our token
@@ -52,63 +51,59 @@ export function useLiveTokenPricesOverview() {
   useEffect(() => {
     let cancelled = false
 
-    const fetchData = async () => {
+    const fetchToken = async (addr: string): Promise<LiveTokenPrice | null> => {
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${addr}`)
+      if (!res.ok) return null
+      const json = await res.json()
+      const pairs: DexPair[] = json.pairs || []
+
+      const addrLower = addr.toLowerCase()
+
+      // PulseChain pairs where our token is the BASE token
+      const basePairs = pairs.filter(
+        (p) => p.chainId === 'pulsechain' && p.baseToken.address.toLowerCase() === addrLower
+      )
+
+      // Sort: prefer pairs with volume > 0, then by liquidity desc
+      basePairs.sort((a, b) => {
+        const aVol = a.volume?.h24 ?? 0
+        const bVol = b.volume?.h24 ?? 0
+        if (aVol > 0 && bVol === 0) return -1
+        if (bVol > 0 && aVol === 0) return 1
+        return (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
+      })
+
+      const best = basePairs[0]
+      if (!best) return null
+
+      // Aggregate volume & liquidity across all base pairs
+      const totalVolume = basePairs.reduce((s, p) => s + (p.volume?.h24 ?? 0), 0)
+      const totalLiquidity = basePairs.reduce((s, p) => s + (p.liquidity?.usd ?? 0), 0)
+
+      return {
+        token_address: addr,
+        token_symbol: best.baseToken.symbol,
+        price_usd: best.priceUsd ? parseFloat(best.priceUsd) : null,
+        price_change_24h: best.priceChange?.h24 ?? null,
+        market_cap_usd: best.marketCap ?? best.fdv ?? null,
+        total_volume_24h_usd: totalVolume,
+        total_liquidity_usd: totalLiquidity,
+        last_updated: new Date().toISOString(),
+        top_pool_dx_url: best.url,
+        top_pool_pair_address: best.pairAddress,
+      }
+    }
+
+    const fetchAll = async () => {
       try {
-        const res = await fetch(DEXSCREENER_API)
-        if (!res.ok) throw new Error(`DexScreener ${res.status}`)
-        const json = await res.json()
-        const pairs: DexPair[] = json.pairs || []
+        // 4 parallel calls — well within DexScreener rate limit (300/min)
+        const results = await Promise.all(OVERVIEW_TOKENS.map(fetchToken))
 
-        // Only PulseChain pairs
-        const pcPairs = pairs.filter((p) => p.chainId === 'pulsechain')
-
-        const tokenMap = new Map<string, LiveTokenPrice>()
-
-        for (const addr of OVERVIEW_TOKENS) {
-          const addrLower = addr.toLowerCase()
-
-          // Only pairs where our token is the BASE token
-          // This ensures priceUsd = our token's price and DexScreener URL shows its price chart
-          const basePairs = pcPairs.filter(
-            (p) => p.baseToken.address.toLowerCase() === addrLower
-          )
-
-          // Sort: prefer pairs with volume > 0, then by liquidity desc
-          basePairs.sort((a, b) => {
-            const aVol = a.volume?.h24 ?? 0
-            const bVol = b.volume?.h24 ?? 0
-            if (aVol > 0 && bVol === 0) return -1
-            if (bVol > 0 && aVol === 0) return 1
-            return (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
-          })
-
-          const best = basePairs[0]
-          if (!best) continue
-
-          // Aggregate volume & liquidity across all base pairs
-          const totalVolume = basePairs.reduce((s, p) => s + (p.volume?.h24 ?? 0), 0)
-          const totalLiquidity = basePairs.reduce((s, p) => s + (p.liquidity?.usd ?? 0), 0)
-
-          tokenMap.set(addr, {
-            token_address: addr,
-            token_symbol: best.baseToken.symbol,
-            price_usd: best.priceUsd ? parseFloat(best.priceUsd) : null,
-            price_change_24h: best.priceChange?.h24 ?? null,
-            market_cap_usd: best.marketCap ?? best.fdv ?? null,
-            total_volume_24h_usd: totalVolume,
-            total_liquidity_usd: totalLiquidity,
-            last_updated: new Date().toISOString(),
-            top_pool_dx_url: best.url,
-            top_pool_pair_address: best.pairAddress,
-          })
-        }
-
-        if (!cancelled && tokenMap.size > 0) {
-          const results = OVERVIEW_TOKENS
-            .map((addr) => tokenMap.get(addr))
+        if (!cancelled) {
+          const valid = results
             .filter((t): t is LiveTokenPrice => t != null)
             .sort((a, b) => (b.total_volume_24h_usd ?? 0) - (a.total_volume_24h_usd ?? 0))
-          setData(results)
+          if (valid.length > 0) setData(valid)
         }
       } catch {
         // Silently fail — keep previous data
@@ -117,8 +112,8 @@ export function useLiveTokenPricesOverview() {
       }
     }
 
-    fetchData()
-    intervalRef.current = setInterval(fetchData, 5_000)
+    fetchAll()
+    intervalRef.current = setInterval(fetchAll, 5_000)
 
     return () => {
       cancelled = true
