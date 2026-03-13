@@ -420,7 +420,13 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
         {/* Header */}
         <div>
           <h3 className="text-lg font-bold text-white">Pool Confidence Analysis</h3>
-          <p className="text-base font-semibold text-cyan-400 mt-1">{pool.base_token_symbol}/{pool.quote_token_symbol} on {formatDexName(pool.dex_id)}</p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-base font-semibold text-cyan-400">{pool.base_token_symbol}/{pool.quote_token_symbol} on {formatDexName(pool.dex_id)}</p>
+            <a href={`/token/${pool.token_address}`} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors text-xs font-medium" title={`Full Token Safety analysis for ${pool.base_token_symbol}`}>
+              <Shield className="h-3.5 w-3.5" />
+              Token Safety
+            </a>
+          </div>
           <p className="text-xs text-gray-500 font-mono mt-0.5">{pool.pair_address}</p>
         </div>
 

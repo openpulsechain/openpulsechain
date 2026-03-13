@@ -221,8 +221,10 @@ export function TokenSafetyPage() {
           // 2. Not in cache — call Token Safety API for live analysis
           setAnalyzing(true)
           setLoading(false)
-          fetch(`${SAFETY_API}/api/v1/token/${addr}/safety?fresh=true`)
-            .then(r => r.json())
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 30000)
+          fetch(`${SAFETY_API}/api/v1/token/${addr}/safety?fresh=true`, { signal: controller.signal })
+            .then(r => { clearTimeout(timeout); return r.json() })
             .then(json => {
               if (json.data) {
                 // Re-fetch from Supabase to get the saved result
