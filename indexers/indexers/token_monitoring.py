@@ -566,15 +566,18 @@ def _fetch_pool_daily_volumes(pair_addresses: list[str], endpoint: str) -> dict[
                     orderBy: date,
                     orderDirection: desc
                 ) {{
-                    pairAddress
+                    id
                     dailyVolumeUSD
                 }}
             }}"""
             data = _query_subgraph(query, endpoint)
             for dd in data.get("pairDayDatas", []):
-                addr = dd["pairAddress"].lower()
-                if addr not in volumes:
-                    volumes[addr] = float(dd.get("dailyVolumeUSD", 0))
+                # id format: "{pairAddress}-{dayNumber}"
+                raw_id = dd.get("id", "")
+                addr = raw_id.rsplit("-", 1)[0].lower() if "-" in raw_id else raw_id.lower()
+                if not addr or addr in volumes:
+                    continue
+                volumes[addr] = float(dd.get("dailyVolumeUSD", 0))
         except Exception:
             pass
         time.sleep(0.2)

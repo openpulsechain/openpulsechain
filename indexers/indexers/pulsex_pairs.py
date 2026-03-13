@@ -48,7 +48,7 @@ def _fetch_daily_volumes(endpoint: str, pair_addresses: list[str]) -> dict[str, 
             orderBy: date,
             orderDirection: desc
           ) {{
-            pairAddress
+            id
             date
             dailyVolumeUSD
           }}
@@ -57,8 +57,10 @@ def _fetch_daily_volumes(endpoint: str, pair_addresses: list[str]) -> dict[str, 
         try:
             data = query_subgraph(endpoint, query)
             for dd in data.get("pairDayDatas", []):
-                addr = dd["pairAddress"]
-                if addr in volumes:
+                # id format: "{pairAddress}-{dayNumber}"
+                raw_id = dd.get("id", "")
+                addr = raw_id.rsplit("-", 1)[0] if "-" in raw_id else raw_id
+                if not addr or addr in volumes:
                     continue  # Keep most recent
                 vol = float(dd.get("dailyVolumeUSD", 0))
                 if vol >= 0:
