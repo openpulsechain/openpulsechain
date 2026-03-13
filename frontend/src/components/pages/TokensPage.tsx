@@ -20,16 +20,27 @@ function toChecksumAddress(address: string): string {
 }
 
 function TokenLogo({ address, size = 'sm' }: { address: string; size?: 'sm' | 'lg' }) {
-  const [error, setError] = useState(false)
-  if (error) return null
+  const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
   const checksummed = toChecksumAddress(address)
   const sizeClass = size === 'lg' ? 'h-9 w-9' : 'h-6 w-6'
+
+  // Primary: PulseX, Fallback: DexScreener
+  const primaryUrl = `https://tokens.app.pulsex.com/images/tokens/${checksummed}.png`
+  const fallbackUrl = `https://dd.dexscreener.com/ds-data/tokens/pulsechain/${address.toLowerCase()}.png`
+
+  if (!src && !failed) setSrc(primaryUrl)
+  if (failed) return null
+
   return (
     <img
-      src={`https://tokens.app.pulsex.com/images/tokens/${checksummed}.png`}
+      src={src!}
       alt=""
       className={`${sizeClass} rounded-full bg-gray-800 border border-white/10 shrink-0`}
-      onError={() => setError(true)}
+      onError={() => {
+        if (src === primaryUrl) setSrc(fallbackUrl)
+        else setFailed(true)
+      }}
     />
   )
 }
@@ -1150,54 +1161,54 @@ export function TokensPage() {
               {/* Live Metrics */}
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-12">
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Market Cap</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Market Cap</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {(liveSummary?.market_cap_usd ?? selectedToken.market_cap_usd) != null
                       ? formatUsd((liveSummary?.market_cap_usd ?? selectedToken.market_cap_usd)!)
                       : '--'}
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">FDV</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">FDV</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {liveSummary?.fdv != null ? formatUsd(liveSummary.fdv) : '--'}
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Volume 24h</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Volume 24h</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {(liveSummary?.total_volume_24h_usd ?? selectedToken.volume_24h_usd) != null
                       ? formatUsd((liveSummary?.total_volume_24h_usd ?? selectedToken.volume_24h_usd)!)
                       : '--'}
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Liquidity</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Liquidity</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {(liveSummary?.total_liquidity_usd ?? selectedToken.total_liquidity_usd) != null
                       ? formatUsd((liveSummary?.total_liquidity_usd ?? selectedToken.total_liquidity_usd)!)
                       : '--'}
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Buys / Sells</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Buys / Sells</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {liveSummary?.total_buys_24h != null
                       ? `${liveSummary.total_buys_24h.toLocaleString()} / ${(liveSummary.total_sells_24h ?? 0).toLocaleString()}`
                       : '--'}
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Pools</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Pools</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {liveSummary
                       ? `${liveSummary.pool_count_legitimate} · ${liveSummary.dex_count} DEX`
                       : '--'}
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Holders</div>
-                  <div className="text-xs font-medium text-white truncate flex items-center gap-1">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Holders</div>
+                  <div className="text-sm font-medium text-white truncate flex items-center gap-1">
                     <Users className="h-3 w-3 text-gray-500 shrink-0" />
                     {selectedToken.holder_count != null && selectedToken.holder_count > 0
                       ? selectedToken.holder_count.toLocaleString()
@@ -1205,32 +1216,32 @@ export function TokensPage() {
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Supply</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Supply</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {selectedSupply != null ? formatCompact(selectedSupply) : '--'}
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Median</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Median</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {liveSummary?.price_median != null ? formatPrice(liveSummary.price_median) : '--'}
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Spread</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Spread</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {liveSummary?.price_min != null && liveSummary?.price_max != null && liveSummary?.price_median
                       ? `${(((liveSummary.price_max - liveSummary.price_min) / liveSummary.price_median) * 100).toFixed(2)}%`
                       : '--'}
                   </div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Decimals</div>
-                  <div className="text-xs font-medium text-white truncate">{selectedToken.decimals}</div>
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Decimals</div>
+                  <div className="text-sm font-medium text-white truncate">{selectedToken.decimals}</div>
                 </div>
                 <div className="rounded-lg bg-white/5 px-2 py-2">
-                  <div className="text-[10px] text-gray-400 mb-0.5 truncate">Freshness</div>
-                  <div className="text-xs font-medium text-white truncate">
+                  <div className="text-xs text-gray-400 mb-0.5 truncate">Freshness</div>
+                  <div className="text-sm font-medium text-white truncate">
                     {liveSummary?.data_age_seconds != null
                       ? liveSummary.data_age_seconds < 60
                         ? `${liveSummary.data_age_seconds}s`
