@@ -387,6 +387,116 @@ export function OverviewPage() {
         />
       </div>
 
+      {/* Token Prices Table */}
+      <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
+        <div className="flex items-baseline justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">Token Prices</h2>
+          <span className="text-[11px] text-gray-500 flex items-center gap-1.5">
+            {liveTokens.data.length > 0 && (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                </span>
+                <span>Live · Refreshes every 60s</span>
+              </>
+            )}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-white/10 text-gray-400">
+                <th className="py-3 pr-4">Token</th>
+                <th className="py-3 pr-4 text-right">Price</th>
+                <th className="py-3 pr-4 text-right">24h Change</th>
+                <th className="py-3 pr-4 text-right" title="Fully Diluted Valuation = Total Supply × Price">
+                  <span className="hidden sm:inline">Market Cap</span>
+                  <span className="sm:hidden">MCap</span>
+                  <span className="text-xs text-gray-500 ml-1" title="Fully Diluted Valuation for PulseChain tokens, Circulating for CoinGecko tokens">*</span>
+                </th>
+                <th className="py-3 text-right" title="24h trading volume from PulseX tokenDayDatas">Volume (24h)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedPrices.map((token) => (
+                <tr key={token.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                  <td className="py-2.5 pr-4">
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={`/tokens/${{ WPLS: 'pls', HEX: 'phex', PLSX: 'plsx', INC: 'inc' }[token.symbol] || token.symbol.toLowerCase()}.png`}
+                        alt={token.symbol}
+                        className="h-7 w-7 rounded-full bg-gray-800 border border-white/10 shrink-0"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                      <div>
+                        <span className="font-medium text-white">{token.symbol}</span>
+                        <span className="text-gray-500 ml-1.5">{token.name}</span>
+                      </div>
+                    </div>
+                    {token.address && (
+                      <a
+                        href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${token.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-gray-600 hover:text-[#00D4FF] font-mono truncate max-w-[200px] sm:max-w-[300px] block transition-colors"
+                      >
+                        {token.address}
+                      </a>
+                    )}
+                  </td>
+                  <td className="py-2.5 pr-4 text-right text-white">
+                    {token.price_usd != null
+                      ? token.price_usd < 0.01
+                        ? `$${token.price_usd.toFixed(6)}`
+                        : `$${token.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '--'}
+                  </td>
+                  <td className={`py-2.5 pr-4 text-right ${
+                    (token.price_change_24h_pct ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
+                  }`}>
+                    {token.price_change_24h_pct != null
+                      ? `${token.price_change_24h_pct >= 0 ? '+' : ''}${token.price_change_24h_pct.toFixed(2)}%`
+                      : '--'}
+                  </td>
+                  <td className="py-2.5 pr-4 text-right text-gray-300">
+                    {token.market_cap_usd != null ? formatUsd(token.market_cap_usd) : '--'}
+                  </td>
+                  <td className="py-2.5 text-right text-gray-300">
+                    {(token.volume_24h_usd ?? 0) > 0 ? formatUsd(token.volume_24h_usd!) : <span className="text-gray-600">--</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <details className="mt-4 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-500">
+          <summary className="px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors text-gray-400 font-medium flex items-center gap-1.5">
+            <Info className="h-3.5 w-3.5" />
+            About these tokens & data methodology
+          </summary>
+          <div className="px-4 pb-4 space-y-2">
+            <div className="rounded bg-gray-800/50 border border-white/5 p-3">
+              <p className="text-xs text-gray-400">
+                These four tokens — <strong className="text-gray-300">PLS</strong> (Wrapped Pulse), <strong className="text-gray-300">HEX</strong>, <strong className="text-gray-300">PLSX</strong> (PulseX), and <strong className="text-gray-300">INC</strong> (Incentive) — are the core tokens created by <strong className="text-gray-300">Richard Heart</strong>, the founder of PulseChain.
+                Beyond these, thousands of other tokens have been created on PulseChain by independent developers and communities. Browse all of them on the <a href="/tokens" className="text-[#00D4FF]/70 hover:text-[#00D4FF] transition-colors">Tokens</a> page.
+              </p>
+            </div>
+            <p className="font-medium text-gray-400">Data Methodology</p>
+            <ul className="space-y-1 list-disc list-inside">
+              <li><strong className="text-gray-400">Prices:</strong> Live prices aggregated across all PulseChain DEXes (DexScreener). Refreshes every 60 seconds.</li>
+              <li><strong className="text-gray-400">Market Cap*:</strong> Fully Diluted Valuation (FDV) = Total Supply × Price. No reliable circulating supply exists on-chain for PulseChain.</li>
+              <li><strong className="text-gray-400">Volume (24h):</strong> Live 24h trading volume aggregated across all DEXes.</li>
+              <li><strong className="text-gray-400">24h Change:</strong> Price change over the last 24 hours.</li>
+            </ul>
+            <p className="text-gray-600 pt-1">
+              Contract addresses link to <a href="https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/" target="_blank" rel="noopener noreferrer" className="text-[#00D4FF]/50 hover:text-[#00D4FF] transition-colors">PulseChain Explorer</a> for verification.
+              This is not investment advice. Data is for educational and informational purposes only.
+            </p>
+          </div>
+        </details>
+      </div>
+
       {/* TVL Chart */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -464,118 +574,6 @@ export function OverviewPage() {
         </div>
       )}
 
-      {/* Token Prices Table */}
-      <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-        <div className="flex items-baseline justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Token Prices</h2>
-          <span className="text-[11px] text-gray-500 flex items-center gap-1.5">
-            {liveTokens.data.length > 0 && (
-              <>
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-                </span>
-                <span>Live · Refreshes every 60s</span>
-              </>
-            )}
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-white/10 text-gray-400">
-                <th className="py-3 pr-4">Token</th>
-                <th className="py-3 pr-4 text-right">Price</th>
-                <th className="py-3 pr-4 text-right">24h Change</th>
-                <th className="py-3 pr-4 text-right" title="Fully Diluted Valuation = Total Supply × Price">
-                  <span className="hidden sm:inline">Market Cap</span>
-                  <span className="sm:hidden">MCap</span>
-                  <span className="text-xs text-gray-500 ml-1" title="Fully Diluted Valuation for PulseChain tokens, Circulating for CoinGecko tokens">*</span>
-                </th>
-                <th className="py-3 text-right" title="24h trading volume from PulseX tokenDayDatas">Volume (24h)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedPrices.map((token) => (
-                <tr key={token.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                  <td className="py-2.5 pr-4">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={`/tokens/${token.symbol === 'HEX' ? 'phex' : token.symbol.toLowerCase()}.png`}
-                        alt={token.symbol}
-                        className="h-7 w-7 rounded-full bg-gray-800 border border-white/10 shrink-0"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                      />
-                      <div>
-                        <span className="font-medium text-white">{token.symbol}</span>
-                        <span className="text-gray-500 ml-1.5">{token.name}</span>
-                      </div>
-                    </div>
-                    {token.address && (
-                      <a
-                        href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${token.address}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-gray-600 hover:text-[#00D4FF] font-mono truncate max-w-[200px] sm:max-w-[300px] block transition-colors"
-                      >
-                        {token.address}
-                      </a>
-                    )}
-                  </td>
-                  <td className="py-2.5 pr-4 text-right text-white">
-                    {token.price_usd != null
-                      ? token.price_usd < 0.01
-                        ? `$${token.price_usd.toFixed(6)}`
-                        : `$${token.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      : '--'}
-                  </td>
-                  <td className={`py-2.5 pr-4 text-right ${
-                    (token.price_change_24h_pct ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
-                  }`}>
-                    {token.price_change_24h_pct != null
-                      ? `${token.price_change_24h_pct >= 0 ? '+' : ''}${token.price_change_24h_pct.toFixed(2)}%`
-                      : '--'}
-                  </td>
-                  <td className="py-2.5 pr-4 text-right text-gray-300">
-                    {token.market_cap_usd != null ? formatUsd(token.market_cap_usd) : '--'}
-                  </td>
-                  <td className="py-2.5 text-right text-gray-300">
-                    {(token.volume_24h_usd ?? 0) > 0 ? formatUsd(token.volume_24h_usd!) : <span className="text-gray-600">--</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="mt-4 rounded-lg bg-white/5 border border-white/10 p-4 text-xs text-gray-500 space-y-2">
-          <div className="rounded bg-gray-800/50 border border-white/5 p-3 mb-2">
-            <p className="text-gray-300 font-medium text-xs mb-1">About these tokens</p>
-            <p className="text-xs text-gray-400">
-              These four tokens — <strong className="text-gray-300">PLS</strong> (Wrapped Pulse), <strong className="text-gray-300">HEX</strong>, <strong className="text-gray-300">PLSX</strong> (PulseX), and <strong className="text-gray-300">INC</strong> (Incentive) — are the core tokens created by <strong className="text-gray-300">Richard Heart</strong>, the founder of PulseChain.
-              Beyond these, thousands of other tokens have been created on PulseChain by independent developers and communities. Browse all of them on the <a href="/tokens" className="text-[#00D4FF]/70 hover:text-[#00D4FF] transition-colors">Tokens</a> page.
-            </p>
-          </div>
-          <p className="font-medium text-gray-400">Data Methodology</p>
-          <ul className="space-y-1 list-disc list-inside">
-            <li>
-              <strong className="text-gray-400">Prices:</strong> Live prices aggregated across all PulseChain DEXes (DexScreener). Refreshes every 60 seconds.
-            </li>
-            <li>
-              <strong className="text-gray-400">Market Cap*:</strong> <span className="text-gray-400">Fully Diluted Valuation (FDV)</span> = Total Supply × Price. No reliable circulating supply data exists on-chain for PulseChain — this is a known ecosystem limitation.
-            </li>
-            <li>
-              <strong className="text-gray-400">Volume (24h):</strong> Live 24h trading volume aggregated across all DEXes.
-            </li>
-            <li>
-              <strong className="text-gray-400">24h Change:</strong> Price change over the last 24 hours.
-            </li>
-          </ul>
-          <p className="text-gray-600 pt-1">
-            Contract addresses link to <a href="https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/" target="_blank" rel="noopener noreferrer" className="text-[#00D4FF]/50 hover:text-[#00D4FF] transition-colors">PulseChain Explorer</a> for independent verification.
-            This is not investment advice. Data is provided for educational and informational purposes only.
-          </p>
-        </div>
-      </div>
     </div>
   )
 }
