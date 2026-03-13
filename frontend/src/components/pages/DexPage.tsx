@@ -1050,6 +1050,11 @@ export function DexPage() {
                                   <span className="text-[10px] text-gray-600 ml-1.5">
                                     {volLiqRatio > 100 ? '(very active)' : volLiqRatio > 10 ? '(active)' : '(low activity)'}
                                   </span>
+                                  {pair.updated_at && (
+                                    <span className="text-[10px] text-gray-600 ml-2">
+                                      — {new Date(pair.updated_at).toLocaleString()}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[10px] text-gray-600">
                                   Source: PulseX V1 Subgraph — All-time data
