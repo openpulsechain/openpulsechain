@@ -672,8 +672,7 @@ export function TokensPage() {
   const [livePools, setLivePools] = useState<PoolRow[]>([])
   const [liveLoading, setLiveLoading] = useState(false)
   const [confidencePool, setConfidencePool] = useState<PoolRow | null>(null)
-
-  // Async LP cache — preloaded for all tokens on the current page
+  const [safetyScores, setSafetyScores] = useState<Record<string, { score: number; grade: string }>>({})
   const poolCacheRef = useRef<Map<string, { summary: LivePoolSummary | null; pools: PoolRow[] }>>(new Map())
 
   const activeFilterCount = useMemo(() => {
@@ -846,6 +845,21 @@ export function TokensPage() {
         }
       }
       setSparkData(sparkMap)
+
+      // Fetch safety scores for badge display
+      if (addresses.length > 0) {
+        supabase
+          .from('token_safety_scores')
+          .select('token_address, score, grade')
+          .in('token_address', addresses)
+          .then(({ data: safetyRows }) => {
+            if (safetyRows && safetyRows.length > 0) {
+              const map: Record<string, { score: number; grade: string }> = {}
+              for (const r of safetyRows) map[r.token_address] = { score: r.score, grade: r.grade }
+              setSafetyScores(prev => ({ ...prev, ...map }))
+            }
+          })
+      }
 
       let enriched: TokenWithPrice[] = tokenList.map(t => {
         const addr = t.address.toLowerCase()
@@ -1220,6 +1234,7 @@ export function TokensPage() {
                     <th className="py-3 pr-4 text-right">Market Cap</th>
                     <th className="py-3 pr-4 text-right">Volume (24h)</th>
                     <th className="py-3 pr-4 text-right">Liquidity</th>
+                    <th className="py-3 pr-2 text-center" title="Token Safety score">Risk</th>
                     <th className="py-3 text-right">7d Chart</th>
                   </tr>
                 </thead>
@@ -1272,6 +1287,26 @@ export function TokensPage() {
                             : (token.price_usd != null && token.total_liquidity > 0)
                               ? formatUsd(token.total_liquidity * token.price_usd)
                               : '--'}
+                        </td>
+                        <td className="py-2.5 pr-2 text-center">
+                          {(() => {
+                            const s = safetyScores[token.address.toLowerCase()]
+                            if (!s) return (
+                              <a href={`/token/${token.address}`} onClick={e => e.stopPropagation()} className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/5 border border-white/10 text-gray-600 hover:border-white/20 hover:text-gray-400 transition-colors" title="Not yet analyzed — click to scan">
+                                <span className="text-[10px] font-medium">?</span>
+                              </a>
+                            )
+                            const gc = s.grade === 'A' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                              : s.grade === 'B' ? 'bg-green-500/15 border-green-500/30 text-green-400'
+                              : s.grade === 'C' ? 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400'
+                              : s.grade === 'D' ? 'bg-orange-500/15 border-orange-500/30 text-orange-400'
+                              : 'bg-red-500/15 border-red-500/30 text-red-400'
+                            return (
+                              <a href={`/token/${token.address}`} onClick={e => e.stopPropagation()} className={`inline-flex items-center justify-center w-7 h-7 rounded-full border font-bold text-xs ${gc} hover:brightness-125 transition-all`} title={`Safety score: ${s.score}/100 (${s.grade})`}>
+                                {s.grade}
+                              </a>
+                            )
+                          })()}
                         </td>
                         <td className="py-2.5 text-right">
                           <Sparkline data={sparkData[token.address.toLowerCase()] || []} />
