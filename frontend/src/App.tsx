@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route, useLocation, useNavigate, Link } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom'
 import { SEO } from './components/SEO'
 import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
@@ -15,7 +15,7 @@ const WhalesPage = lazy(() => import('./components/pages/WhalesPage').then(m => 
 const IntelligencePage = lazy(() => import('./components/pages/IntelligencePage').then(m => ({ default: m.IntelligencePage })))
 const TokenSafetyPage = lazy(() => import('./components/pages/TokenSafetyPage').then(m => ({ default: m.TokenSafetyPage })))
 const SafetyDashboardPage = lazy(() => import('./components/pages/SafetyDashboardPage').then(m => ({ default: m.SafetyDashboardPage })))
-const AlertsPage = lazy(() => import('./components/pages/AlertsPage').then(m => ({ default: m.AlertsPage })))
+// AlertsPage merged into SafetyDashboardPage — /alerts redirects to /safety?tab=alerts
 const SmartMoneyPage = lazy(() => import('./components/pages/SmartMoneyPage').then(m => ({ default: m.SmartMoneyPage })))
 const WalletProfilePage = lazy(() => import('./components/pages/WalletProfilePage').then(m => ({ default: m.WalletProfilePage })))
 const LeaguesPage = lazy(() => import('./components/pages/LeaguesPage').then(m => ({ default: m.LeaguesPage })))
@@ -50,7 +50,6 @@ const ROUTE_TO_PAGE: Record<string, string> = {
   '/intelligence': 'intelligence',
   '/api': 'api',
   '/safety': 'safety',
-  '/alerts': 'alerts',
   '/smart-money': 'smart-money',
   '/leagues': 'leagues',
 }
@@ -140,7 +139,7 @@ export default function App() {
               <Route path="/intelligence" element={<IntelligencePage />} />
               <Route path="/api" element={<ApiPage />} />
               <Route path="/safety" element={<SafetyDashboardPage />} />
-              <Route path="/alerts" element={<AlertsPage />} />
+              <Route path="/alerts" element={<Navigate to="/safety?tab=alerts" replace />} />
               <Route path="/smart-money" element={<SmartMoneyPage />} />
               <Route path="/leagues" element={<LeaguesPage />} />
               <Route path="/wallet/:address" element={<WalletProfilePage />} />

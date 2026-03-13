@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Github, Menu, X, Shield, AlertTriangle, TrendingUp, Crown, Search, Loader2 } from 'lucide-react'
+import { Github, Menu, X, Shield, TrendingUp, Crown, Search, Loader2 } from 'lucide-react'
 import { RpcStatusIndicator } from '../ui/RpcStatusIndicator'
 import { Component, type ReactNode, type ErrorInfo } from 'react'
 
@@ -23,7 +23,6 @@ const PAGES = [
   { id: 'dex', label: 'DEX', path: '/dex' },
   { id: 'tokens', label: 'Tokens', path: '/tokens' },
   { id: 'safety', label: 'Safety', path: '/safety', icon: Shield },
-  { id: 'alerts', label: 'Alerts', path: '/alerts', icon: AlertTriangle },
   { id: 'smart-money', label: 'Smart $', path: '/smart-money', icon: TrendingUp },
   { id: 'bridge', label: 'Bridge', path: '/bridge' },
   { id: 'whales', label: 'Whales', path: '/whales' },
