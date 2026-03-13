@@ -101,9 +101,9 @@ export function useLiveTokenPricesOverview() {
     const fetchPrices = async () => {
       try {
         // Single POST to TradingView Scanner for all 4 tokens
+        // Use text/plain to avoid CORS preflight (Scanner accepts it)
         const res = await fetch(SCANNER_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             symbols: {
               tickers: TOKEN_CONFIG.map((t) => t.tvTicker),
