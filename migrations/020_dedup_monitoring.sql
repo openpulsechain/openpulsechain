@@ -11,6 +11,8 @@ WHERE a.id > b.id
 
 -- Step 2: Add UNIQUE constraint to prevent future duplicates
 -- Note: UPSERT is already used in token_monitoring.py, but this adds DB-level protection
+-- Note: PostgreSQL does not support IF NOT EXISTS for ADD CONSTRAINT
+-- Check pg_constraint before running if re-applying
 ALTER TABLE token_monitoring_pools
-  ADD CONSTRAINT IF NOT EXISTS uq_monitoring_pool_snapshot
+  ADD CONSTRAINT uq_monitoring_pool_snapshot
   UNIQUE (token_address, pair_address, snapshot_at);
