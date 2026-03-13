@@ -956,7 +956,14 @@ export function DexPage() {
       {/* Top Pairs */}
       {topPairs.data.length > 0 && (
         <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-          <h2 className="mb-4 text-lg font-semibold text-white">Top Pairs by Volume</h2>
+          <div className="flex items-baseline justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white">Top Pairs by Volume</h2>
+            {topPairs.data[0]?.updated_at && (
+              <span className="text-[11px] text-gray-500">
+                Updated {new Date(topPairs.data[0].updated_at).toLocaleString()}
+              </span>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
               <colgroup>
@@ -1050,11 +1057,6 @@ export function DexPage() {
                                   <span className="text-[10px] text-gray-600 ml-1.5">
                                     {volLiqRatio > 100 ? '(very active)' : volLiqRatio > 10 ? '(active)' : '(low activity)'}
                                   </span>
-                                  {pair.updated_at && (
-                                    <span className="text-[10px] text-gray-600 ml-2">
-                                      — {new Date(pair.updated_at).toLocaleString()}
-                                    </span>
-                                  )}
                                 </div>
                                 <div className="text-[10px] text-gray-600">
                                   Source: PulseX V1 Subgraph — All-time data
