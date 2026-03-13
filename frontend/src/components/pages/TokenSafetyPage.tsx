@@ -233,6 +233,15 @@ const TIER_COLORS: Record<string, string> = {
   turtle: 'text-gray-400 bg-gray-500/10 border-gray-500/20',
 }
 
+const TIER_EMOJI: Record<string, string> = {
+  poseidon: '\u{1F30A}',
+  whale: '\u{1F40B}',
+  shark: '\u{1F988}',
+  dolphin: '\u{1F42C}',
+  squid: '\u{1F991}',
+  turtle: '\u{1F422}',
+}
+
 const TIER_THRESHOLDS: Record<string, string> = {
   poseidon: '10%+ of supply',
   whale: '1%+ of supply',
@@ -1265,7 +1274,7 @@ export function TokenSafetyPage() {
                 ['turtle', leagueSummary.turtle_count],
               ] as [string, number][]).map(([tier, count]) => (
                 <div key={tier} className={`rounded-lg border px-2.5 py-1.5 ${TIER_COLORS[tier]}`} title={TIER_THRESHOLDS[tier]}>
-                  <div className="text-[10px] uppercase tracking-wider opacity-70">{tier}</div>
+                  <div className="text-[10px] uppercase tracking-wider opacity-70 flex items-center gap-1"><span>{TIER_EMOJI[tier]}</span>{tier}</div>
                   <div className="text-sm font-bold">{count.toLocaleString()}</div>
                 </div>
               ))}
@@ -1310,8 +1319,8 @@ export function TokenSafetyPage() {
                                     </a>
                                   </td>
                                   <td className="py-1.5 text-center">
-                                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${TIER_COLORS[h.tier] || 'text-gray-400'}`}>
-                                      {h.tier}
+                                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${TIER_COLORS[h.tier] || 'text-gray-400'}`}>
+                                      {TIER_EMOJI[h.tier]}{h.tier}
                                     </span>
                                   </td>
                                   <td className={`py-1.5 text-right font-medium ${h.balance_pct > 5 ? 'text-red-400' : h.balance_pct > 1 ? 'text-orange-400' : ''}`}>
@@ -1356,7 +1365,7 @@ export function TokenSafetyPage() {
                               </div>
                               <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
                                 <span>{f.daughter_count} daughter{f.daughter_count !== 1 ? 's' : ''}</span>
-                                <span className={`px-1.5 py-0.5 rounded border ${TIER_COLORS[f.combined_tier] || 'text-gray-400'}`}>{f.combined_tier}</span>
+                                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border ${TIER_COLORS[f.combined_tier] || 'text-gray-400'}`}>{TIER_EMOJI[f.combined_tier]}{f.combined_tier}</span>
                                 {f.link_types.map((lt, j) => (
                                   <span key={j} className="text-purple-400/60">{lt.replace(/_/g, ' ')}</span>
                                 ))}
