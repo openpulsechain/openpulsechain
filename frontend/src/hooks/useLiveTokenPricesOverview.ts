@@ -12,34 +12,36 @@ export interface LiveTokenPrice {
   chart_url: string
 }
 
-// Token config: address, TradingView ticker, chart link
-// Chart link = DexScreener (stablecoin-quoted pairs → Price chart) or TradingView (when only non-stable pairs exist)
+// Token config: address, TradingView ticker, TradingView chart link
 const TOKEN_CONFIG = [
   {
     address: '0xa1077a294dde1b09bb078844df40758a5d0f9a27',
     symbol: 'WPLS',
     tvTicker: 'PULSEX:WPLSUSDT_322DF7.USD',
-    chartUrl: 'https://dexscreener.com/pulsechain/0x322df7921f28f1146cdf62afdac0d6bc0ab80711', // WPLS/USDT — stablecoin → Price chart
+    chartUrl: 'https://www.tradingview.com/chart/?symbol=PULSEX%3AWPLSUSDT_322DF7.USD',
   },
   {
     address: '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39',
     symbol: 'HEX',
     tvTicker: 'PULSEX:HEXWPLS_F1F4EE.USD',
-    chartUrl: 'https://www.tradingview.com/chart/?symbol=PULSEX%3AHEXWPLS_F1F4EE.USD', // HEX/WPLS — no stablecoin pair with good liq → TradingView
+    chartUrl: 'https://www.tradingview.com/chart/?symbol=PULSEX%3AHEXWPLS_F1F4EE.USD',
   },
   {
     address: '0x95b303987a60c71504d99aa1b13b4da07b0790ab',
     symbol: 'PLSX',
     tvTicker: 'PULSEX:PLSXDAI_B2893C.USD',
-    chartUrl: 'https://dexscreener.com/pulsechain/0xb2893cea8080bf43b7b60b589edaab5211d98f23', // PLSX/DAI — stablecoin → Price chart
+    chartUrl: 'https://www.tradingview.com/chart/?symbol=PULSEX%3APLSXDAI_B2893C.USD',
   },
   {
     address: '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d',
     symbol: 'INC',
     tvTicker: 'PULSEX:INCWPLS_F808BB.USD',
-    chartUrl: 'https://www.tradingview.com/chart/?symbol=PULSEX%3AINCWPLS_F808BB.USD', // INC/WPLS — no stablecoin pair with good liq → TradingView
+    chartUrl: 'https://www.tradingview.com/chart/?symbol=PULSEX%3AINCWPLS_F808BB.USD',
   },
 ]
+
+const PULSEX_V2_SUBGRAPH = 'https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2'
+const WPLS_ADDRESS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27'
 
 const SCANNER_URL = 'https://scanner.tradingview.com/global/scan'
 
@@ -98,24 +100,42 @@ export function useLiveTokenPricesOverview() {
       }
     }
 
+    // Fetch WPLS price from PulseX V2 subgraph (same source as KPI "PLS Price")
+    const fetchWplsSubgraph = async (): Promise<number | null> => {
+      try {
+        const res = await fetch(PULSEX_V2_SUBGRAPH, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: `{ token(id: "${WPLS_ADDRESS}") { derivedUSD } }` }),
+        })
+        const json = await res.json()
+        const val = json?.data?.token?.derivedUSD
+        return val ? parseFloat(val) : null
+      } catch {
+        return null
+      }
+    }
+
     const fetchPrices = async () => {
       try {
-        // Single POST to TradingView Scanner for all 4 tokens
-        // no Content-Type header → simple request (no CORS preflight)
-        // cache: no-store → bypass browser & CDN cache for fresh prices
-        const res = await fetch(SCANNER_URL, {
-          method: 'POST',
-          cache: 'no-store',
-          body: JSON.stringify({
-            symbols: {
-              tickers: TOKEN_CONFIG.map((t) => t.tvTicker),
-              query: { types: [] },
-            },
-            columns: ['close', 'change', 'volume'],
+        // Fetch Scanner (HEX, PLSX, INC) + subgraph (WPLS) in parallel
+        const [scannerRes, wplsPrice] = await Promise.all([
+          fetch(SCANNER_URL, {
+            method: 'POST',
+            cache: 'no-store',
+            body: JSON.stringify({
+              symbols: {
+                tickers: TOKEN_CONFIG.map((t) => t.tvTicker),
+                query: { types: [] },
+              },
+              columns: ['close', 'change', 'volume'],
+            }),
           }),
-        })
-        if (!res.ok) throw new Error(`Scanner ${res.status}`)
-        const json = await res.json()
+          fetchWplsSubgraph(),
+        ])
+
+        if (!scannerRes.ok) throw new Error(`Scanner ${scannerRes.status}`)
+        const json = await scannerRes.json()
 
         if (!cancelled && json.data?.length > 0) {
           const results: LiveTokenPrice[] = []
@@ -128,10 +148,13 @@ export function useLiveTokenPricesOverview() {
             const [close, change, volume] = item.d as [number | null, number | null, number | null]
             const cached = mcapCache.current.get(config.address)
 
+            // For WPLS: use subgraph price (identical to KPI) instead of Scanner
+            const price = config.symbol === 'WPLS' && wplsPrice != null ? wplsPrice : close
+
             results.push({
               token_address: config.address,
               token_symbol: config.symbol,
-              price_usd: close,
+              price_usd: price,
               price_change_24h: change,
               market_cap_usd: cached?.mcap ?? null,
               total_volume_24h_usd: cached?.volume ?? (volume ?? null),
