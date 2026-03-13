@@ -959,6 +959,14 @@ export function DexPage() {
           <h2 className="mb-4 text-lg font-semibold text-white">Top Pairs by Volume</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
+              <colgroup>
+                <col style={{ width: '5%' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '17%' }} />
+                <col style={{ width: '15%' }} />
+              </colgroup>
               <thead>
                 <tr className="border-b border-white/10 text-gray-400">
                   <th className="py-3 pr-4">#</th>
@@ -982,19 +990,20 @@ export function DexPage() {
                         {/* Main row */}
                         <button
                           onClick={() => setExpandedPair(isExpanded ? null : pair.pair_address)}
-                          className="w-full flex items-center hover:bg-white/5 transition-colors text-left"
+                          className="w-full hover:bg-white/5 transition-colors text-left"
+                          style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}
                         >
-                          <span className="py-2.5 pr-4 pl-0 text-gray-500 w-12 shrink-0">{i + 1}</span>
-                          <span className="py-2.5 pr-4 flex-1 min-w-0">
+                          <span style={{ display: 'table-cell', width: '5%' }} className="py-2.5 pr-4 text-gray-500">{i + 1}</span>
+                          <span style={{ display: 'table-cell', width: '25%' }} className="py-2.5 pr-4">
                             <span className="font-medium text-white">{pair.token0_symbol}</span>
                             <span className="text-gray-500"> / </span>
                             <span className="text-gray-300">{pair.token1_symbol}</span>
                             <ChevronDown className={`inline-block ml-1.5 h-3 w-3 text-gray-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                           </span>
-                          <span className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{pair.daily_volume_usd != null ? formatUsd(pair.daily_volume_usd) : '--'}</span>
-                          <span className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.volume_usd)}</span>
-                          <span className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.reserve_usd)}</span>
-                          <span className="py-2.5 text-right text-gray-400 whitespace-nowrap">{formatNumber(pair.total_transactions)}</span>
+                          <span style={{ display: 'table-cell', width: '18%' }} className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{pair.daily_volume_usd ? formatUsd(pair.daily_volume_usd) : '--'}</span>
+                          <span style={{ display: 'table-cell', width: '20%' }} className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.volume_usd)}</span>
+                          <span style={{ display: 'table-cell', width: '17%' }} className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.reserve_usd)}</span>
+                          <span style={{ display: 'table-cell', width: '15%' }} className="py-2.5 text-right text-gray-400 whitespace-nowrap">{formatNumber(pair.total_transactions)}</span>
                         </button>
 
                         {/* Expanded details */}
