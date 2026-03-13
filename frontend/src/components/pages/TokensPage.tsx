@@ -293,7 +293,31 @@ const CONFIDENCE_INFO: Record<string, { label: string; color: string; explanatio
   high: { label: 'High', color: 'text-emerald-400', explanation: 'Both tokens in this pair are core PulseChain tokens (WPLS, HEX, PLSX, INC, WETH, DAI, USDC, USDT, WBTC, HEDRON, MAXI, eHEX). Highest trust level.' },
   medium: { label: 'Medium', color: 'text-yellow-400', explanation: 'One token is a core PulseChain token and the other is a known token listed in our database. Standard trust level for most legitimate pairs.' },
   low: { label: 'Low', color: 'text-orange-400', explanation: 'Both tokens are known (listed in our database) but neither is a core token. Exercise caution — verify the token contracts independently.' },
-  suspect: { label: 'Suspect', color: 'text-red-500', explanation: 'At least one token in this pair is not recognized in our database. This pool may involve an unverified or potentially fraudulent token. Do your own research before interacting.' },
+  suspect: { label: 'Suspect', color: 'text-red-400', explanation: 'At least one token in this pair is not recognized in our database. This pool may involve an unverified or potentially fraudulent token. Do your own research before interacting.' },
+}
+
+// Translate raw spam reason codes into human-readable explanations
+const SPAM_REASON_MAP: Record<string, string> = {
+  unknown_token0: 'Token 0 (first token in the pair) is not recognized in our verified token database.',
+  unknown_token1: 'Token 1 (second token in the pair) is not recognized in our verified token database.',
+  low_volume_token0: 'Token 0 has very low all-time trading volume (< $1,000), which is a sign of an inactive or fake token.',
+  low_volume_token1: 'Token 1 has very low all-time trading volume (< $1,000), which is a sign of an inactive or fake token.',
+  spam_name: 'One of the token names contains a spam keyword (e.g. "airdrop", "free", "claim", "test").',
+  no_liquidity_token0: 'Token 0 has zero or near-zero liquidity in this pool.',
+  no_liquidity_token1: 'Token 1 has zero or near-zero liquidity in this pool.',
+}
+
+function formatSpamReason(raw: string | null): { code: string; explanation: string }[] {
+  if (!raw) return []
+  return raw.split('; ').map(part => {
+    // Handle "low_reserve:4" → low_reserve with value
+    const [code, val] = part.split(':')
+    const key = code.trim()
+    if (key.startsWith('low_reserve')) {
+      return { code: part, explanation: `Pool reserves are extremely low ($${val ?? '< 100'} USD). Legitimate pools typically have significantly higher reserves.` }
+    }
+    return { code: part, explanation: SPAM_REASON_MAP[key] ?? `Flagged: ${part}` }
+  })
 }
 
 interface MonitoringSnapshot {
@@ -380,9 +404,14 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
           </div>
           <p className="text-sm text-gray-300 leading-relaxed">{conf.explanation}</p>
           {pool.pool_spam_reason && (
-            <div className="mt-3 rounded bg-red-500/10 border border-red-500/20 px-3 py-2">
-              <span className="text-xs text-red-400 font-bold">Spam reasons: </span>
-              <span className="text-xs text-red-300">{pool.pool_spam_reason}</span>
+            <div className="mt-3 space-y-2">
+              <div className="text-xs text-red-400 font-bold">Flagged reasons:</div>
+              {formatSpamReason(pool.pool_spam_reason).map((r, i) => (
+                <div key={i} className="rounded bg-red-500/10 border border-red-500/20 px-3 py-2">
+                  <div className="text-xs text-red-300 font-mono">{r.code}</div>
+                  <div className="text-xs text-gray-300 mt-1">{r.explanation}</div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -437,8 +466,10 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
                         </td>
                         <td className="py-1.5 text-right text-gray-300">{snap.reserve_usd != null ? formatUsd(snap.reserve_usd) : '--'}</td>
                         <td className="py-1.5 text-right text-gray-300">{snap.volume_24h_usd != null ? formatUsd(snap.volume_24h_usd) : '--'}</td>
-                        <td className="py-1.5 text-left text-red-400/70 truncate max-w-[200px]" title={snap.pool_spam_reason ?? ''}>
-                          {snap.pool_spam_reason ?? '—'}
+                        <td className="py-1.5 text-left text-red-400/70 max-w-[250px]">
+                          {snap.pool_spam_reason
+                            ? formatSpamReason(snap.pool_spam_reason).map(r => r.explanation).join(' ')
+                            : '—'}
                         </td>
                       </tr>
                     )
@@ -1548,7 +1579,7 @@ export function TokensPage() {
                         {livePools.map((pool, i) => {
                           const isSpam = !pool.pool_is_legitimate
                           const isSuspect = pool.pool_confidence === 'suspect' || pool.pool_confidence === 'low'
-                          const confColor = isSpam || isSuspect ? 'text-red-500 font-bold'
+                          const confColor = isSpam || isSuspect ? 'text-red-400 font-bold'
                             : pool.pool_confidence === 'high' ? 'text-emerald-400'
                             : pool.pool_confidence === 'medium' ? 'text-yellow-400'
                             : 'text-orange-400'
