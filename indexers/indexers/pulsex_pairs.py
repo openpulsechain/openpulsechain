@@ -56,7 +56,12 @@ def _fetch_daily_volumes(endpoint: str, pair_addresses: list[str]) -> dict[str, 
 
         try:
             data = query_subgraph(endpoint, query)
-            for dd in data.get("pairDayDatas", []):
+            day_datas = data.get("pairDayDatas", [])
+            if i == 0:
+                logger.info(f"  pairDayDatas batch 0: {len(day_datas)} entries, keys={list(day_datas[0].keys()) if day_datas else 'empty'}")
+                if day_datas:
+                    logger.info(f"  First entry: {day_datas[0]}")
+            for dd in day_datas:
                 # id format: "{pairAddress}-{dayNumber}"
                 raw_id = dd.get("id", "")
                 addr = raw_id.rsplit("-", 1)[0] if "-" in raw_id else raw_id
@@ -133,6 +138,13 @@ def run():
         # Fetch 24h volumes from pairDayDatas (V1 + V2)
         v1_daily = _fetch_daily_volumes(PULSEX_SUBGRAPH_V1, all_addrs)
         v2_daily = _fetch_daily_volumes(PULSEX_SUBGRAPH_V2, all_addrs)
+        logger.info(f"  Daily volumes found: V1={len(v1_daily)}, V2={len(v2_daily)} (out of {len(all_addrs)} pairs)")
+        if v1_daily:
+            sample = list(v1_daily.items())[:3]
+            logger.info(f"  V1 sample: {sample}")
+        if v2_daily:
+            sample = list(v2_daily.items())[:3]
+            logger.info(f"  V2 sample: {sample}")
 
         now = datetime.now(timezone.utc).isoformat()
         rows = []
