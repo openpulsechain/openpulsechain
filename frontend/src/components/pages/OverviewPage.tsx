@@ -8,6 +8,7 @@ import { useNetworkTvl, useNetworkDexVolume, useTokenPrices, useNetworkSnapshot,
 import { useLivePlsPrice } from '../../hooks/useLivePlsPrice'
 import { useLiveChainStats } from '../../hooks/useLiveChainStats'
 import { useLiveDefiLlama } from '../../hooks/useLiveDefiLlama'
+import { useLiveTokenPricesOverview } from '../../hooks/useLiveTokenPricesOverview'
 import { formatUsd, formatNumber, formatGwei } from '../../lib/format'
 
 type DataSource = 'all' | 'pulsex'
@@ -231,6 +232,8 @@ export function OverviewPage() {
   const liveChain = useLiveChainStats()
   const liveLL = useLiveDefiLlama()
 
+  const liveTokens = useLiveTokenPricesOverview(50)
+
   // PulseX DefiLlama historical data from Supabase (sovereign)
   const pulsexLLTvl = usePulsexDefillamaTvl()
   const pulsexLLVol = usePulsexDefillamaVolume()
@@ -315,61 +318,72 @@ export function OverviewPage() {
     '0x5b218ed1428cfc1e488b777bdd473cf2647d30e3', // PLSX v2 (spam/old)
   ]), [])
 
-  // Keep all tokens — no silent filtering. Show ETH forks with badge (same as Tokens page)
-  const cleanPrices = useMemo(() => {
-    return prices.data.filter((t) => {
-      const price = t.price_usd ?? 0
-      // Only filter truly invalid prices (zero/negative)
-      if (price <= 0) return false
-      return true
-    })
-  }, [prices.data])
+  // Merge: live data takes priority, fallback to token_prices for tokens not in live
+  const sortedPrices = useMemo(() => {
+    // Start with live tokens (already sorted by market_cap desc, already filtered)
+    const result: Array<{
+      id: string
+      symbol: string
+      name: string | null
+      price_usd: number | null
+      market_cap_usd: number | null
+      volume_24h_usd: number | null
+      price_change_24h_pct: number | null
+      address: string | null
+      source: string | null
+      last_updated: string | null
+      isLive: boolean
+    }> = []
 
-  // Deduplicate by symbol: prefer CoinGecko price/market cap but keep PulseChain address
-  const deduped = useMemo(() => {
-    const map = new Map<string, typeof prices.data[0]>()
-    // Track PulseChain addresses by symbol (from PulseX subgraph)
-    const addressMap = new Map<string, string>()
-    for (const token of cleanPrices) {
-      if (token.address && token.source === 'pulsex_subgraph') {
-        addressMap.set(token.symbol.toUpperCase(), token.address)
-      }
+    const seen = new Set<string>()
+
+    // Live tokens first
+    for (const t of liveTokens.data) {
+      const addr = t.token_address.toLowerCase()
+      seen.add(addr)
+      // Find matching token_prices entry for name/source info
+      const cached = prices.data.find(p => p.address?.toLowerCase() === addr || p.id?.toLowerCase() === addr)
+      result.push({
+        id: addr,
+        symbol: t.token_symbol || cached?.symbol || '???',
+        name: cached?.name || null,
+        price_usd: t.price_usd,
+        market_cap_usd: t.market_cap_usd,
+        volume_24h_usd: t.total_volume_24h_usd,
+        price_change_24h_pct: t.price_change_24h,
+        address: t.token_address,
+        source: 'live',
+        last_updated: t.last_updated,
+        isLive: true,
+      })
     }
 
-    for (const token of cleanPrices) {
-      const key = token.symbol.toUpperCase()
-      const existing = map.get(key)
-      if (!existing) {
-        map.set(key, token)
-      } else {
-        // Prefer CoinGecko for majors (more reliable market cap)
-        const existingIsCG = existing.source === 'coingecko'
-        const newIsCG = token.source === 'coingecko'
-        if (newIsCG && !existingIsCG) {
-          // Keep CoinGecko data but preserve PulseChain address
-          const pcAddress = addressMap.get(key)
-          map.set(key, pcAddress ? { ...token, address: pcAddress } : token)
-        } else if (!newIsCG && existingIsCG) {
-          // keep existing
-        } else if ((token.market_cap_usd ?? 0) > (existing.market_cap_usd ?? 0)) {
-          map.set(key, token)
-        }
-      }
+    // Add tokens from token_prices that aren't in live (CoinGecko majors, etc.)
+    for (const t of prices.data) {
+      const addr = (t.address || t.id || '').toLowerCase()
+      if (seen.has(addr) || !addr) continue
+      if ((t.price_usd ?? 0) <= 0 || (t.market_cap_usd ?? 0) <= 0) continue
+      if (!t.address) continue
+      seen.add(addr)
+      result.push({
+        id: t.id,
+        symbol: t.symbol,
+        name: t.name,
+        price_usd: t.price_usd,
+        market_cap_usd: t.market_cap_usd,
+        volume_24h_usd: t.volume_24h_usd,
+        price_change_24h_pct: t.price_change_24h_pct,
+        address: t.address,
+        source: t.source,
+        last_updated: t.last_updated,
+        isLive: false,
+      })
     }
-    return Array.from(map.values())
-  }, [cleanPrices])
 
-  // Only show tokens with a PulseChain address (this is a PulseChain analytics site)
-  const filtered = deduped.filter((t) => t.address && (t.price_usd ?? 0) >= 0.0000001 && (t.market_cap_usd ?? 0) > 0)
-
-  // Sort tokens by market cap
-  const sortedPrices = [...filtered].sort((a, b) => {
-    const aCap = a.market_cap_usd ?? 0
-    const bCap = b.market_cap_usd ?? 0
-    if (aCap > 0 && bCap === 0) return -1
-    if (aCap === 0 && bCap > 0) return 1
-    return bCap - aCap
-  })
+    // Sort by market cap desc
+    result.sort((a, b) => (b.market_cap_usd ?? 0) - (a.market_cap_usd ?? 0))
+    return result
+  }, [liveTokens.data, prices.data])
 
   if (tvl.loading && prices.loading) return <Spinner />
 
@@ -508,7 +522,20 @@ export function OverviewPage() {
 
       {/* Token Prices Table */}
       <div className="rounded-xl border border-white/5 bg-gray-900/40 backdrop-blur-sm p-5">
-        <h2 className="mb-4 text-lg font-semibold text-white">Token Prices</h2>
+        <div className="flex items-baseline justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">Token Prices</h2>
+          <span className="text-[11px] text-gray-500 flex items-center gap-1.5">
+            {liveTokens.data.length > 0 && (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                </span>
+                <span>Live · Refreshes every 60s</span>
+              </>
+            )}
+          </span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -567,7 +594,7 @@ export function OverviewPage() {
                     {token.market_cap_usd != null ? formatUsd(token.market_cap_usd) : '--'}
                   </td>
                   <td className="py-2.5 text-right text-gray-300">
-                    {token.volume_24h_usd != null ? formatUsd(token.volume_24h_usd) : '--'}
+                    {(token.volume_24h_usd ?? 0) > 0 ? formatUsd(token.volume_24h_usd!) : <span className="text-gray-600">--</span>}
                   </td>
                 </tr>
               ))}
@@ -592,7 +619,7 @@ export function OverviewPage() {
               <strong className="text-gray-400">Market Cap*:</strong> For PulseChain tokens, this is the <span className="text-gray-400">Fully Diluted Valuation (FDV)</span> = Total Supply × Price. No reliable circulating supply data exists on-chain for PulseChain — this is a known ecosystem limitation (PulseChain Scan also reports $0 circulating market cap). For CoinGecko tokens, this is the standard circulating market cap.
             </li>
             <li>
-              <strong className="text-gray-400">Volume (24h):</strong> Daily trading volume from PulseX <code className="text-[#00D4FF]/70">tokenDayDatas</code>. Updated every 15 minutes.
+              <strong className="text-gray-400">Volume (24h):</strong> Live 24h trading volume aggregated across all DEXes (DexScreener). Refreshes every 60 seconds.
             </li>
             <li>
               <strong className="text-gray-400">24h Change:</strong> Calculated from price history stored daily. Compares current price to the most recent historical price (1-3 days ago).
