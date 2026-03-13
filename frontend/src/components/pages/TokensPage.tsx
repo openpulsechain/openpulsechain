@@ -1591,12 +1591,12 @@ export function TokensPage() {
                           return (
                             <tr
                               key={pool.pair_address}
-                              className={`border-b border-white/5 ${isSpam ? 'opacity-40' : 'hover:bg-white/5'}`}
+                              className={`border-b border-white/5 ${isSpam ? '' : 'hover:bg-white/5'}`}
                               title={isSpam ? `Spam: ${pool.pool_spam_reason}` : undefined}
                             >
-                              <td className="py-2 text-center text-gray-500">{i + 1}</td>
-                              <td className="py-2 text-center text-gray-300">{formatDexName(pool.dex_id)}</td>
-                              <td className="py-2 text-center">
+                              <td className={`py-2 text-center text-gray-500 ${isSpam ? 'opacity-40' : ''}`}>{i + 1}</td>
+                              <td className={`py-2 text-center text-gray-300 ${isSpam ? 'opacity-40' : ''}`}>{formatDexName(pool.dex_id)}</td>
+                              <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''}`}>
                                 {pool.dx_url ? (
                                   <a href={pool.dx_url} target="_blank" rel="noopener noreferrer" className="text-[#00D4FF] hover:underline">
                                     {pool.base_token_symbol}/{pool.quote_token_symbol}
@@ -1605,7 +1605,7 @@ export function TokensPage() {
                                   <span className="text-gray-300">{pool.base_token_symbol}/{pool.quote_token_symbol}</span>
                                 )}
                               </td>
-                              <td className="py-2 text-center">
+                              <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''}`}>
                                 <a
                                   href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${pool.pair_address}`}
                                   target="_blank"
@@ -1616,12 +1616,12 @@ export function TokensPage() {
                                   {shortAddr}
                                 </a>
                               </td>
-                              <td className="py-2 text-center text-white">{formatPrice(pool.price_usd)}</td>
-                              <td className="py-2 text-center text-gray-300">{pool.liquidity_usd != null ? formatUsd(pool.liquidity_usd) : '--'}</td>
-                              <td className="py-2 text-center text-gray-300">{pool.volume_24h_usd != null ? formatUsd(pool.volume_24h_usd) : '--'}</td>
-                              <td className="py-2 text-center text-gray-300">{pool.buys_24h?.toLocaleString() ?? '--'}</td>
-                              <td className="py-2 text-center text-gray-300">{pool.sells_24h?.toLocaleString() ?? '--'}</td>
-                              <td className={`py-2 text-center ${pChange.className}`}>{pChange.text}</td>
+                              <td className={`py-2 text-center text-white ${isSpam ? 'opacity-40' : ''}`}>{formatPrice(pool.price_usd)}</td>
+                              <td className={`py-2 text-center text-gray-300 ${isSpam ? 'opacity-40' : ''}`}>{pool.liquidity_usd != null ? formatUsd(pool.liquidity_usd) : '--'}</td>
+                              <td className={`py-2 text-center text-gray-300 ${isSpam ? 'opacity-40' : ''}`}>{pool.volume_24h_usd != null ? formatUsd(pool.volume_24h_usd) : '--'}</td>
+                              <td className={`py-2 text-center text-gray-300 ${isSpam ? 'opacity-40' : ''}`}>{pool.buys_24h?.toLocaleString() ?? '--'}</td>
+                              <td className={`py-2 text-center text-gray-300 ${isSpam ? 'opacity-40' : ''}`}>{pool.sells_24h?.toLocaleString() ?? '--'}</td>
+                              <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''} ${pChange.className}`}>{pChange.text}</td>
                               <td
                                 className={`py-2 text-center whitespace-nowrap cursor-pointer hover:underline ${confColor}`}
                                 onClick={() => setConfidencePool(pool)}
@@ -1629,8 +1629,8 @@ export function TokensPage() {
                               >
                                 {isSpam ? '\u26A0' : '\u25CF'} {pool.pool_confidence ?? '--'}
                               </td>
-                              <td className={`py-2 text-center ${tierColor}`}>{pool.tier}</td>
-                              <td className="py-2 text-center">
+                              <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''} ${tierColor}`}>{pool.tier}</td>
+                              <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''}`}>
                                 <a
                                   href={pool.dx_url || `https://dexscreener.com/pulsechain/${pool.pair_address}`}
                                   target="_blank"
