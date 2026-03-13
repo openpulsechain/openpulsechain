@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, ChevronDown, ChevronRight, Clock, Users, FileCode, Droplets, Fingerprint, Activity } from 'lucide-react'
+import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity } from 'lucide-react'
 import { ShareButton } from '../ui/ShareButton'
 import { supabase } from '../../lib/supabase'
 
@@ -334,6 +334,23 @@ function formatSpamReason(raw: string | null, baseSymbol?: string | null, quoteS
   })
 }
 
+// ─── Popup Panel (modal overlay) ─────────────────────────────────────────────
+
+function PopupPanel({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="relative w-full max-w-2xl max-h-[85vh] mx-4 rounded-2xl border border-white/10 bg-gray-950/95 backdrop-blur-xl shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
+          <h3 className="text-sm font-semibold text-white">{title}</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors text-lg leading-none">&times;</button>
+        </div>
+        <div className="overflow-y-auto p-5 space-y-4">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Utility components ──────────────────────────────────────────────────────
 
 function TokenLogo({ address }: { address: string }) {
@@ -444,7 +461,7 @@ export function TokenSafetyPage() {
 
   // Section ④: LP pools from token_pools_live (replaces old Safety API /liquidity)
   const [livePools, setLivePools] = useState<PoolLive[]>([])
-  const [poolsExpanded, setPoolsExpanded] = useState(false)
+  const [poolsOpen, setPoolsOpen] = useState(false)
 
   // Section ③: Deployer reputation
   const [deployer, setDeployer] = useState<DeployerInfo | null>(null)
@@ -454,7 +471,7 @@ export function TokenSafetyPage() {
   const [leagueSummary, setLeagueSummary] = useState<LeagueSummary | null>(null)
   const [leagueHolders, setLeagueHolders] = useState<LeagueHolder[]>([])
   const [leagueFamilies, setLeagueFamilies] = useState<LeagueFamily[]>([])
-  const [leagueExpanded, setLeagueExpanded] = useState(false)
+  const [leagueOpen, setLeagueOpen] = useState(false)
 
   // Section ⑥: Token identity comparison
   const [verifiedTokens, setVerifiedTokens] = useState<Record<string, VerifiedToken[]>>({})
@@ -462,20 +479,20 @@ export function TokenSafetyPage() {
   // Section ⑦: Monitoring history + confidence events
   const [monitoringHistory, setMonitoringHistory] = useState<MonitoringSnapshot[]>([])
   const [confidenceEvents, setConfidenceEvents] = useState<{ pair_address: string; event_summary: string; prev_confidence: string; new_confidence: string; created_at: string }[]>([])
-  const [historyExpanded, setHistoryExpanded] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   // P0-C: Safety API health check
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
 
   // Legacy: Safety API pair list (anchored/capped analysis)
   const [pairs, setPairs] = useState<LiquidityPair[]>([])
-  const [pairsExpanded, setPairsExpanded] = useState(false)
+  const [pairsOpen, setPairsOpen] = useState(false)
   const [pairsLoading, setPairsLoading] = useState(false)
 
   const loadPairs = () => {
-    if (pairs.length > 0) { setPairsExpanded(!pairsExpanded); return }
+    if (pairs.length > 0) { setPairsOpen(true); return }
     if (!address) return
-    setPairsExpanded(true)
+    setPairsOpen(true)
     setPairsLoading(true)
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15000)
@@ -979,14 +996,13 @@ export function TokenSafetyPage() {
         {livePools.length > 0 && (
           <>
             <button
-              onClick={() => setPoolsExpanded(!poolsExpanded)}
+              onClick={() => setPoolsOpen(true)}
               className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2.5 transition-colors"
             >
-              {poolsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              {poolsExpanded ? 'Hide pool details' : `View all ${livePools.length} pools with confidence`}
+              {`View all ${livePools.length} pools with confidence`}
             </button>
 
-            {poolsExpanded && (
+            <PopupPanel open={poolsOpen} onClose={() => setPoolsOpen(false)} title={`All ${livePools.length} Pools — Confidence Analysis`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -1085,7 +1101,7 @@ export function TokenSafetyPage() {
                   </tbody>
                 </table>
               </div>
-            )}
+            </PopupPanel>
           </>
         )}
 
@@ -1116,12 +1132,11 @@ export function TokenSafetyPage() {
             }`}
             title={apiAvailable === false ? 'Safety API temporarily unavailable' : undefined}
           >
-            {pairsExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            {apiAvailable === false ? 'Anchor analysis (API unavailable)' : pairsExpanded ? 'Hide anchor analysis' : 'Anchor analysis (Safety API)'}
+            {apiAvailable === false ? 'Anchor analysis (API unavailable)' : 'Anchor analysis (Safety API)'}
           </button>
         )}
 
-        {pairsExpanded && (
+        <PopupPanel open={pairsOpen} onClose={() => setPairsOpen(false)} title="Anchor Analysis (Safety API)">
           <div className="space-y-2">
             {pairsLoading ? (
               <div className="flex justify-center py-4">
@@ -1177,7 +1192,7 @@ export function TokenSafetyPage() {
               <p className="text-xs text-gray-500 text-center py-2">Safety API unavailable — anchor analysis not loaded.</p>
             )}
           </div>
-        )}
+        </PopupPanel>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -1256,18 +1271,17 @@ export function TokenSafetyPage() {
               ))}
             </div>
 
-            {/* Top whales + family clusters (expandable) */}
+            {/* Top whales + family clusters (popup) */}
             {(leagueHolders.length > 0 || leagueFamilies.length > 0) && (
               <>
                 <button
-                  onClick={() => setLeagueExpanded(!leagueExpanded)}
+                  onClick={() => setLeagueOpen(true)}
                   className="w-full flex items-center justify-center gap-2 text-xs font-medium text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/20 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2 transition-colors"
                 >
-                  {leagueExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                  {leagueExpanded ? 'Hide whale details' : `View top holders & families (${leagueHolders.length} whales, ${leagueFamilies.length} clusters)`}
+                  {`View top holders & families (${leagueHolders.length} whales, ${leagueFamilies.length} clusters)`}
                 </button>
 
-                {leagueExpanded && (
+                <PopupPanel open={leagueOpen} onClose={() => setLeagueOpen(false)} title={`Top Holders & Whale Families (${leagueHolders.length} whales, ${leagueFamilies.length} clusters)`}>
                   <div className="space-y-4">
                     {/* Top holders table */}
                     {leagueHolders.length > 0 && (
@@ -1360,7 +1374,7 @@ export function TokenSafetyPage() {
                       View full Leagues page <ExternalLink className="h-3 w-3" />
                     </Link>
                   </div>
-                )}
+                </PopupPanel>
               </>
             )}
           </div>
@@ -1591,18 +1605,17 @@ export function TokenSafetyPage() {
           </div>
         )}
 
-        {/* Pool Monitoring History — migrated from PoolConfidencePopup */}
+        {/* Pool Monitoring History */}
         {monitoringHistory.length > 0 && (
           <>
             <button
-              onClick={() => setHistoryExpanded(!historyExpanded)}
+              onClick={() => setHistoryOpen(true)}
               className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2.5 transition-colors"
             >
-              {historyExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              {historyExpanded ? 'Hide monitoring history' : `View monitoring history (${monitoringHistory.length} snapshots)`}
+              {`View monitoring history (${monitoringHistory.length} snapshots)`}
             </button>
 
-            {historyExpanded && (
+            <PopupPanel open={historyOpen} onClose={() => setHistoryOpen(false)} title={`Monitoring History (${monitoringHistory.length} snapshots)`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -1652,7 +1665,7 @@ export function TokenSafetyPage() {
                   </tbody>
                 </table>
               </div>
-            )}
+            </PopupPanel>
           </>
         )}
 
