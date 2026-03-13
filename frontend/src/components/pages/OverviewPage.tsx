@@ -232,7 +232,7 @@ export function OverviewPage() {
   const liveChain = useLiveChainStats()
   const liveLL = useLiveDefiLlama()
 
-  const liveTokens = useLiveTokenPricesOverview(50)
+  const liveTokens = useLiveTokenPricesOverview()
 
   // PulseX DefiLlama historical data from Supabase (sovereign)
   const pulsexLLTvl = usePulsexDefillamaTvl()
@@ -309,42 +309,12 @@ export function OverviewPage() {
   // --- KPI TVL value: always show "All PulseChain" ---
   const kpiTvl = liveLL.tvlAll ?? (latestTvl ? latestTvl.tvl_usd : null)
 
-  // ETH fork addresses — same set as TokensPage for consistency
-  const ETH_FORK_ADDRESSES = useMemo(() => new Set([
-    '0x6b175474e89094c44da98b954eedeac495271d0f', // DAI (Ethereum fork)
-    '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', // USDC (Ethereum fork)
-    '0xdac17f958d2ee523a2206206994597c13d831ec7', // USDT (Ethereum fork)
-    '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', // WBTC (Ethereum fork)
-    '0x5b218ed1428cfc1e488b777bdd473cf2647d30e3', // PLSX v2 (spam/old)
-  ]), [])
-
-  // Merge: live data takes priority, fallback to token_prices for tokens not in live
+  // Map live token data for display (already sorted by volume 24h in hook)
   const sortedPrices = useMemo(() => {
-    // Start with live tokens (already sorted by market_cap desc, already filtered)
-    const result: Array<{
-      id: string
-      symbol: string
-      name: string | null
-      price_usd: number | null
-      market_cap_usd: number | null
-      volume_24h_usd: number | null
-      price_change_24h_pct: number | null
-      address: string | null
-      source: string | null
-      last_updated: string | null
-      isLive: boolean
-    }> = []
-
-    const seen = new Set<string>()
-
-    // Live tokens first
-    for (const t of liveTokens.data) {
-      const addr = t.token_address.toLowerCase()
-      seen.add(addr)
-      // Find matching token_prices entry for name/source info
-      const cached = prices.data.find(p => p.address?.toLowerCase() === addr || p.id?.toLowerCase() === addr)
-      result.push({
-        id: addr,
+    return liveTokens.data.map((t) => {
+      const cached = prices.data.find(p => p.address?.toLowerCase() === t.token_address.toLowerCase() || p.id?.toLowerCase() === t.token_address.toLowerCase())
+      return {
+        id: t.token_address,
         symbol: t.token_symbol || cached?.symbol || '???',
         name: cached?.name || null,
         price_usd: t.price_usd,
@@ -352,37 +322,11 @@ export function OverviewPage() {
         volume_24h_usd: t.total_volume_24h_usd,
         price_change_24h_pct: t.price_change_24h,
         address: t.token_address,
-        source: 'live',
+        source: 'live' as const,
         last_updated: t.last_updated,
         isLive: true,
-      })
-    }
-
-    // Add tokens from token_prices that aren't in live (CoinGecko majors, etc.)
-    for (const t of prices.data) {
-      const addr = (t.address || t.id || '').toLowerCase()
-      if (seen.has(addr) || !addr) continue
-      if ((t.price_usd ?? 0) <= 0 || (t.market_cap_usd ?? 0) <= 0) continue
-      if (!t.address) continue
-      seen.add(addr)
-      result.push({
-        id: t.id,
-        symbol: t.symbol,
-        name: t.name,
-        price_usd: t.price_usd,
-        market_cap_usd: t.market_cap_usd,
-        volume_24h_usd: t.volume_24h_usd,
-        price_change_24h_pct: t.price_change_24h_pct,
-        address: t.address,
-        source: t.source,
-        last_updated: t.last_updated,
-        isLive: false,
-      })
-    }
-
-    // Sort by volume 24h desc
-    result.sort((a, b) => (b.volume_24h_usd ?? 0) - (a.volume_24h_usd ?? 0))
-    return result
+      }
+    })
   }, [liveTokens.data, prices.data])
 
   if (tvl.loading && prices.loading) return <Spinner />
@@ -558,12 +502,6 @@ export function OverviewPage() {
                     <div className="flex items-center gap-1.5">
                       <span className="font-medium text-white">{token.symbol}</span>
                       <span className="text-gray-500">{token.name}</span>
-                      {token.address && ETH_FORK_ADDRESSES.has(token.address.toLowerCase()) && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20" title="Ethereum fork copy — not the native bridged version">Fork</span>
-                      )}
-                      {token.source === 'coingecko' && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20" title="Price from CoinGecko (reference)">Ref</span>
-                      )}
                     </div>
                     {token.address && (
                       <a
