@@ -10,6 +10,8 @@ export interface LiveTokenPrice {
   total_volume_24h_usd: number | null
   total_liquidity_usd: number | null
   last_updated: string
+  top_pool_dx_url: string | null
+  top_pool_pair_address: string | null
 }
 
 // Core PulseChain tokens to show on Overview
@@ -34,17 +36,42 @@ export function useLiveTokenPricesOverview() {
 
     const fetchData = async () => {
       try {
-        const { data: rows, error } = await supabase
-          .from('token_live_summary')
-          .select('token_address, token_symbol, price_usd, price_change_24h, market_cap_usd, total_volume_24h_usd, total_liquidity_usd, last_updated')
-          .in('token_address', OVERVIEW_TOKENS)
+        // Fetch token summaries + top pool per token in parallel
+        const [summaryRes, poolsRes] = await Promise.all([
+          supabase
+            .from('token_live_summary')
+            .select('token_address, token_symbol, price_usd, price_change_24h, market_cap_usd, total_volume_24h_usd, total_liquidity_usd, last_updated')
+            .in('token_address', OVERVIEW_TOKENS),
+          supabase
+            .from('token_pools_live')
+            .select('token_address, pair_address, dx_url, liquidity_usd')
+            .in('token_address', OVERVIEW_TOKENS)
+            .eq('pool_is_legitimate', true)
+            .order('liquidity_usd', { ascending: false, nullsFirst: false }),
+        ])
 
-        if (!cancelled && !error && rows) {
-          // Sort by volume 24h desc
-          const sorted = (rows as LiveTokenPrice[]).sort(
-            (a, b) => (b.total_volume_24h_usd ?? 0) - (a.total_volume_24h_usd ?? 0)
-          )
-          setData(sorted)
+        if (!cancelled && !summaryRes.error && summaryRes.data) {
+          // Build map: token_address → top pool (first = highest liquidity)
+          const topPoolMap = new Map<string, { dx_url: string | null; pair_address: string }>()
+          if (!poolsRes.error && poolsRes.data) {
+            for (const pool of poolsRes.data) {
+              if (!topPoolMap.has(pool.token_address)) {
+                topPoolMap.set(pool.token_address, { dx_url: pool.dx_url, pair_address: pool.pair_address })
+              }
+            }
+          }
+
+          // Merge and sort by volume 24h desc
+          const merged = (summaryRes.data as LiveTokenPrice[]).map((t) => {
+            const topPool = topPoolMap.get(t.token_address)
+            return {
+              ...t,
+              top_pool_dx_url: topPool?.dx_url ?? null,
+              top_pool_pair_address: topPool?.pair_address ?? null,
+            }
+          })
+          merged.sort((a, b) => (b.total_volume_24h_usd ?? 0) - (a.total_volume_24h_usd ?? 0))
+          setData(merged)
         }
       } catch {
         // Silently fail — keep previous data

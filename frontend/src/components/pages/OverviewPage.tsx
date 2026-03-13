@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { DollarSign, TrendingUp, Fuel, Box, ChevronDown, Info } from 'lucide-react'
+import { DollarSign, TrendingUp, Fuel, Box, ChevronDown, Info, ExternalLink } from 'lucide-react'
 import { KpiCard } from '../cards/KpiCard'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
@@ -325,6 +325,7 @@ export function OverviewPage() {
         source: 'live' as const,
         last_updated: t.last_updated,
         isLive: true,
+        dexscreener_url: t.top_pool_dx_url || (t.top_pool_pair_address ? `https://dexscreener.com/pulsechain/${t.top_pool_pair_address}` : null),
       }
     })
   }, [liveTokens.data, prices.data])
@@ -415,7 +416,8 @@ export function OverviewPage() {
                   <span className="sm:hidden">MCap</span>
                   <span className="text-xs text-gray-500 ml-1" title="Fully Diluted Valuation for PulseChain tokens, Circulating for CoinGecko tokens">*</span>
                 </th>
-                <th className="py-3 text-right" title="24h trading volume from PulseX tokenDayDatas">Volume (24h)</th>
+                <th className="py-3 pr-4 text-right" title="24h trading volume from PulseX tokenDayDatas">Volume (24h)</th>
+                <th className="py-3 text-center">DexScreener</th>
               </tr>
             </thead>
             <tbody>
@@ -448,7 +450,7 @@ export function OverviewPage() {
                   <td className="py-2.5 pr-4 text-right text-white">
                     {token.price_usd != null
                       ? token.price_usd < 0.01
-                        ? `$${token.price_usd.toFixed(6)}`
+                        ? `$${token.price_usd.toPrecision(6)}`
                         : `$${token.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : '--'}
                   </td>
@@ -462,8 +464,23 @@ export function OverviewPage() {
                   <td className="py-2.5 pr-4 text-right text-gray-300">
                     {token.market_cap_usd != null ? formatUsd(token.market_cap_usd) : '--'}
                   </td>
-                  <td className="py-2.5 text-right text-gray-300">
+                  <td className="py-2.5 pr-4 text-right text-gray-300">
                     {(token.volume_24h_usd ?? 0) > 0 ? formatUsd(token.volume_24h_usd!) : <span className="text-gray-600">--</span>}
+                  </td>
+                  <td className="py-2.5 text-center">
+                    {token.dexscreener_url ? (
+                      <a
+                        href={token.dexscreener_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-[#00D4FF]/70 hover:text-[#00D4FF] transition-colors"
+                      >
+                        <span>Top LP</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span className="text-gray-600">--</span>
+                    )}
                   </td>
                 </tr>
               ))}
