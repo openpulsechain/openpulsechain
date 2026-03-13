@@ -101,9 +101,11 @@ export function useLiveTokenPricesOverview() {
     const fetchPrices = async () => {
       try {
         // Single POST to TradingView Scanner for all 4 tokens
-        // Use text/plain to avoid CORS preflight (Scanner accepts it)
+        // no Content-Type header → simple request (no CORS preflight)
+        // cache: no-store → bypass browser & CDN cache for fresh prices
         const res = await fetch(SCANNER_URL, {
           method: 'POST',
+          cache: 'no-store',
           body: JSON.stringify({
             symbols: {
               tickers: TOKEN_CONFIG.map((t) => t.tvTicker),
@@ -152,16 +154,19 @@ export function useLiveTokenPricesOverview() {
     }
 
     const fetchAll = async () => {
-      await fetchMcap()
-      await fetchPrices()
+      // Run mcap (DexScreener, slow) and prices (TradingView, fast) in parallel
+      await Promise.all([fetchMcap(), fetchPrices()])
     }
 
     fetchAll()
-    intervalRef.current = setInterval(fetchAll, 5_000)
+    intervalRef.current = setInterval(fetchPrices, 5_000)
+    // DexScreener mcap refresh every 60s (separate timer)
+    const mcapTimer = setInterval(fetchMcap, 60_000)
 
     return () => {
       cancelled = true
       if (intervalRef.current) clearInterval(intervalRef.current)
+      clearInterval(mcapTimer)
     }
   }, [])
 
