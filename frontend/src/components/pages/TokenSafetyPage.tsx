@@ -769,6 +769,13 @@ export function TokenSafetyPage() {
           <FileCode className="h-4 w-4 text-[#00D4FF]" />
           <span className="text-white/30">①</span>
           Contract Analysis
+          <a
+            href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}`}
+            target="_blank" rel="noopener noreferrer"
+            className="ml-auto text-[10px] text-gray-600 hover:text-[#00D4FF] transition-colors flex items-center gap-1 font-normal normal-case tracking-normal"
+          >
+            Verify on Explorer <ExternalLink className="h-3 w-3" />
+          </a>
         </h3>
         <SubScore label="Contract" score={safety.contract_score} max={25} icon={<FileCode className="h-4 w-4" />} />
         <div className="space-y-2 text-sm">
@@ -841,6 +848,14 @@ export function TokenSafetyPage() {
         </div>
         <p className="text-[10px] text-gray-600">
           Tested via FeeChecker on-chain simulation on PulseX V1 + V2 routers.
+          {' '}
+          <a
+            href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}?tab=contract`}
+            target="_blank" rel="noopener noreferrer"
+            className="text-[#00D4FF]/60 hover:text-[#00D4FF] transition-colors inline-flex items-center gap-0.5"
+          >
+            View contract <ExternalLink className="h-2.5 w-2.5 inline" />
+          </a>
         </p>
       </div>
 
@@ -1158,6 +1173,13 @@ export function TokenSafetyPage() {
           <Users className="h-4 w-4 text-[#00D4FF]" />
           <span className="text-white/30">⑤</span>
           Holder Distribution
+          <a
+            href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/token/${address}?tab=holders`}
+            target="_blank" rel="noopener noreferrer"
+            className="ml-auto text-[10px] text-gray-600 hover:text-[#00D4FF] transition-colors flex items-center gap-1 font-normal normal-case tracking-normal"
+          >
+            View holders <ExternalLink className="h-3 w-3" />
+          </a>
         </h3>
         <SubScore label="Holders" score={safety.holders_score} max={15} icon={<Users className="h-4 w-4" />} />
         <div className="space-y-2 text-sm">

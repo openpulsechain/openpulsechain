@@ -167,6 +167,7 @@ interface Filters {
   hideEthForks: boolean
   hasPriceOnly: boolean
   category: TokenCategory | null
+  safetyGrade: string | null  // 'safe' | 'moderate' | 'risky' | 'honeypot' | 'unanalyzed' | null
 }
 
 const DEFAULT_FILTERS: Filters = {
@@ -176,6 +177,7 @@ const DEFAULT_FILTERS: Filters = {
   hideEthForks: false,
   hasPriceOnly: true,
   category: null,
+  safetyGrade: null,
 }
 
 const LIQUIDITY_PRESETS = [
@@ -365,6 +367,7 @@ export function TokensPage() {
     if (filters.hideEthForks) n++
     if (filters.hasPriceOnly) n++
     if (filters.category) n++
+    if (filters.safetyGrade) n++
     return n
   }, [filters])
 
@@ -583,6 +586,16 @@ export function TokensPage() {
           if (!t.market_cap_usd || t.market_cap_usd < filters.minMcap) return false
         }
         if (filters.category && t.category !== filters.category) return false
+        if (filters.safetyGrade) {
+          const ss = safetyScores[t.address.toLowerCase()]
+          switch (filters.safetyGrade) {
+            case 'safe': if (!ss || !['A', 'B'].includes(ss.grade)) return false; break
+            case 'moderate': if (!ss || ss.grade !== 'C') return false; break
+            case 'risky': if (!ss || !['D', 'F'].includes(ss.grade)) return false; break
+            case 'honeypot': if (!ss || ss.grade !== 'F' || ss.score > 15) return false; break
+            case 'unanalyzed': if (ss) return false; break
+          }
+        }
         return true
       })
 
@@ -861,6 +874,23 @@ export function TokensPage() {
                 {ALL_CATEGORIES.map(c => (
                   <option key={c} value={c}>{c}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Safety Grade */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Safety</label>
+              <select
+                value={filters.safetyGrade ?? ''}
+                onChange={(e) => setFilters(f => ({ ...f, safetyGrade: e.target.value || null }))}
+                className="w-full bg-gray-900/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#00D4FF]/50"
+              >
+                <option value="">All</option>
+                <option value="safe">Safe (A-B)</option>
+                <option value="moderate">Moderate (C)</option>
+                <option value="risky">Risky (D-F)</option>
+                <option value="honeypot">Honeypots</option>
+                <option value="unanalyzed">Not analyzed</option>
               </select>
             </div>
 
@@ -1390,18 +1420,16 @@ export function TokensPage() {
                       <colgroup>
                         <col style={{ width: '2.5%' }} />
                         <col style={{ width: '6%' }} />
-                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '9%' }} />
                         <col style={{ width: '10%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '7.5%' }} />
-                        <col style={{ width: '5%' }} />
-                        <col style={{ width: '5%' }} />
-                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '8%' }} />
                         <col style={{ width: '8%' }} />
                         <col style={{ width: '5%' }} />
                         <col style={{ width: '5%' }} />
-                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '5%' }} />
                       </colgroup>
                       <thead>
                         <tr className="border-b border-white/10 text-gray-500">
@@ -1415,24 +1443,13 @@ export function TokensPage() {
                           <ClickableHeader label="Buys" />
                           <ClickableHeader label="Sells" />
                           <ClickableHeader label="Price Change 24h" />
-                          <ClickableHeader label="Confidence" />
                           <ClickableHeader label="Safety" />
-                          <ClickableHeader label="Tier" />
                           <ClickableHeader label="DexScreener" />
                         </tr>
                       </thead>
                       <tbody>
                         {livePools.map((pool, i) => {
                           const isSpam = !pool.pool_is_legitimate
-                          // P0-B fix: Low=orange (distinct from Suspect=red)
-                          const confColor = isSpam || pool.pool_confidence === 'suspect' ? 'text-red-400 font-bold'
-                            : pool.pool_confidence === 'high' ? 'text-emerald-400'
-                            : pool.pool_confidence === 'medium' ? 'text-yellow-400'
-                            : pool.pool_confidence === 'low' ? 'text-orange-400'
-                            : 'text-gray-400'
-                          const tierColor = pool.tier === 'hot' ? 'text-red-400'
-                            : pool.tier === 'warm' ? 'text-yellow-400'
-                            : 'text-gray-500'
                           const pChange = formatChange(pool.price_change_24h)
                           const shortAddr = `${pool.pair_address.slice(0, 6)}...${pool.pair_address.slice(-4)}`
                           return (
@@ -1469,33 +1486,32 @@ export function TokensPage() {
                               <td className={`py-2 text-center text-gray-300 ${isSpam ? 'opacity-40' : ''}`}>{pool.buys_24h?.toLocaleString() ?? '--'}</td>
                               <td className={`py-2 text-center text-gray-300 ${isSpam ? 'opacity-40' : ''}`}>{pool.sells_24h?.toLocaleString() ?? '--'}</td>
                               <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''} ${pChange.className}`}>{pChange.text}</td>
-                              <td className={`py-2 text-center whitespace-nowrap ${confColor}`}>
-                                <a
-                                  href={`/token/${pool.token_address}#liquidity`}
-                                  className="inline-flex items-center gap-1 hover:underline"
-                                  title={CONFIDENCE_INFO[pool.pool_confidence ?? '']?.explanation ?? CONFIDENCE_INFO.suspect.explanation}
-                                >
-                                  {isSpam ? '\u26A0' : '\u25CF'} {CONFIDENCE_INFO[pool.pool_confidence ?? '']?.label ?? 'Suspect'}
-                                  <ExternalLink className="h-2.5 w-2.5 opacity-40" />
-                                </a>
-                              </td>
                               <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''}`}>
                                 {(() => {
                                   const ss = safetyScores[pool.token_address?.toLowerCase()]
-                                  if (!ss) return <span className="text-gray-600" title="Not analyzed">—</span>
+                                  const conf = pool.pool_confidence
+                                  const confDotClass = conf === 'high' ? 'bg-emerald-400' : conf === 'medium' ? 'bg-yellow-400' : conf === 'low' ? 'bg-orange-400' : 'bg-red-400'
+                                  if (!ss) {
+                                    return (
+                                      <span className="text-gray-500 text-[10px] inline-flex items-center gap-1" title={`Pool confidence: ${conf || 'unknown'}`}>
+                                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${confDotClass}`} />
+                                        <span>{'\u2014'}</span>
+                                      </span>
+                                    )
+                                  }
                                   const gc = ss.grade === 'A' ? 'text-emerald-400'
                                     : ss.grade === 'B' ? 'text-green-400'
                                     : ss.grade === 'C' ? 'text-yellow-400'
                                     : ss.grade === 'D' ? 'text-orange-400'
                                     : 'text-red-400'
                                   return (
-                                    <a href={`/token/${pool.token_address}`} className={`${gc} font-bold hover:underline`} title={`Safety: ${ss.score}/100`} onClick={e => e.stopPropagation()}>
-                                      {ss.grade}
+                                    <a href={`/token/${pool.token_address}`} className={`${gc} font-bold hover:underline inline-flex items-center gap-1`} title={`Safety ${ss.score}/100 \u00B7 Pool: ${conf}`} onClick={e => e.stopPropagation()}>
+                                      <span className={`inline-block w-1.5 h-1.5 rounded-full ${confDotClass}`} />
+                                      <span>{ss.grade}</span>
                                     </a>
                                   )
                                 })()}
                               </td>
-                              <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''} ${tierColor}`}>{pool.tier}</td>
                               <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''}`}>
                                 <a
                                   href={pool.dx_url || `https://dexscreener.com/pulsechain/${pool.pair_address}`}

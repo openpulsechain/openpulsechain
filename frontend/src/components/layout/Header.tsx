@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Github, Menu, X, Shield, TrendingUp, Crown, Search, Loader2 } from 'lucide-react'
+import { Github, Menu, X, Shield, TrendingUp, Crown, Search, Loader2, Activity, ChevronDown } from 'lucide-react'
 import { RpcStatusIndicator } from '../ui/RpcStatusIndicator'
 import { Component, type ReactNode, type ErrorInfo } from 'react'
 
@@ -25,10 +25,13 @@ const PAGES = [
   { id: 'safety', label: 'Safety', path: '/safety', icon: Shield },
   { id: 'smart-money', label: 'Smart $', path: '/smart-money', icon: TrendingUp },
   { id: 'bridge', label: 'Bridge', path: '/bridge' },
+  { id: 'api', label: 'API', path: '/api' },
+]
+
+const ONCHAIN_PAGES = [
   { id: 'whales', label: 'Whales', path: '/whales' },
   { id: 'leagues', label: 'Leagues', path: '/leagues', icon: Crown },
   { id: 'intelligence', label: 'Intel', path: '/intelligence' },
-  { id: 'api', label: 'API', path: '/api' },
 ]
 
 export function Header({ activePage }: HeaderProps) {
@@ -37,8 +40,21 @@ export function Header({ activePage }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+  const [onchainOpen, setOnchainOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  const onchainRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+
+  // Close On-Chain dropdown on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (onchainRef.current && !onchainRef.current.contains(e.target as Node)) {
+        setOnchainOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   // Focus input when search opens
   useEffect(() => {
@@ -126,6 +142,40 @@ export function Header({ activePage }: HeaderProps) {
               {page.label}
             </Link>
           ))}
+          {/* On-Chain dropdown */}
+          <div ref={onchainRef} className="relative">
+            <button
+              onClick={() => setOnchainOpen(!onchainOpen)}
+              className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                ONCHAIN_PAGES.some(p => p.id === activePage)
+                  ? 'bg-[#8000E0]/20 text-[#00D4FF] border border-[#8000E0]/30'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Activity className="h-3.5 w-3.5" />
+              On-Chain
+              <ChevronDown className={`h-3 w-3 transition-transform ${onchainOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {onchainOpen && (
+              <div className="absolute top-full left-0 mt-1 w-40 rounded-lg border border-white/10 bg-gray-950/95 backdrop-blur-xl shadow-xl py-1 z-50">
+                {ONCHAIN_PAGES.map((page) => (
+                  <Link
+                    key={page.id}
+                    to={page.path}
+                    onClick={() => setOnchainOpen(false)}
+                    className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
+                      activePage === page.id
+                        ? 'bg-[#8000E0]/20 text-[#00D4FF]'
+                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {page.icon && <page.icon className="h-3.5 w-3.5" />}
+                    {page.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setSearchOpen(true)}
             className="ml-3 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:text-white hover:bg-white/5 border border-white/10 transition-colors"
@@ -167,6 +217,24 @@ export function Header({ activePage }: HeaderProps) {
       {menuOpen && (
         <div className="md:hidden border-t border-white/5 bg-gray-950/90 backdrop-blur-xl px-4 py-3 space-y-1">
           {PAGES.map((page) => (
+            <Link
+              key={page.id}
+              to={page.path}
+              onClick={() => setMenuOpen(false)}
+              className={`flex items-center gap-2 w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                activePage === page.id
+                  ? 'bg-[#8000E0]/20 text-[#00D4FF]'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {page.icon && <page.icon className="h-4 w-4" />}
+              {page.label}
+            </Link>
+          ))}
+          <div className="pt-2 mt-1 border-t border-white/5">
+            <span className="px-4 text-[10px] text-gray-600 uppercase tracking-wider">On-Chain</span>
+          </div>
+          {ONCHAIN_PAGES.map((page) => (
             <Link
               key={page.id}
               to={page.path}
