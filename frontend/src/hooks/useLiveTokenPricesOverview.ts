@@ -40,9 +40,6 @@ const TOKEN_CONFIG = [
   },
 ]
 
-const PULSEX_V2_SUBGRAPH = 'https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2'
-const WPLS_ADDRESS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27'
-
 const SCANNER_URL = 'https://scanner.tradingview.com/global/scan'
 
 /**
@@ -100,39 +97,19 @@ export function useLiveTokenPricesOverview() {
       }
     }
 
-    // Fetch WPLS price from PulseX V2 subgraph (same source as KPI "PLS Price")
-    const fetchWplsSubgraph = async (): Promise<number | null> => {
-      try {
-        const res = await fetch(PULSEX_V2_SUBGRAPH, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: `{ token(id: "${WPLS_ADDRESS}") { derivedUSD } }` }),
-        })
-        const json = await res.json()
-        const val = json?.data?.token?.derivedUSD
-        return val ? parseFloat(val) : null
-      } catch {
-        return null
-      }
-    }
-
     const fetchPrices = async () => {
       try {
-        // Fetch Scanner (HEX, PLSX, INC) + subgraph (WPLS) in parallel
-        const [scannerRes, wplsPrice] = await Promise.all([
-          fetch(SCANNER_URL, {
-            method: 'POST',
-            cache: 'no-store',
-            body: JSON.stringify({
-              symbols: {
-                tickers: TOKEN_CONFIG.map((t) => t.tvTicker),
-                query: { types: [] },
-              },
-              columns: ['close', 'change', 'volume'],
-            }),
+        const scannerRes = await fetch(SCANNER_URL, {
+          method: 'POST',
+          cache: 'no-store',
+          body: JSON.stringify({
+            symbols: {
+              tickers: TOKEN_CONFIG.map((t) => t.tvTicker),
+              query: { types: [] },
+            },
+            columns: ['close', 'change', 'volume'],
           }),
-          fetchWplsSubgraph(),
-        ])
+        })
 
         if (!scannerRes.ok) throw new Error(`Scanner ${scannerRes.status}`)
         const json = await scannerRes.json()
@@ -148,13 +125,10 @@ export function useLiveTokenPricesOverview() {
             const [close, change, volume] = item.d as [number | null, number | null, number | null]
             const cached = mcapCache.current.get(config.address)
 
-            // For WPLS: use subgraph price (identical to KPI) instead of Scanner
-            const price = config.symbol === 'WPLS' && wplsPrice != null ? wplsPrice : close
-
             results.push({
               token_address: config.address,
               token_symbol: config.symbol,
-              price_usd: price,
+              price_usd: close,
               price_change_24h: change,
               market_cap_usd: cached?.mcap ?? null,
               total_volume_24h_usd: cached?.volume ?? (volume ?? null),
