@@ -9,118 +9,140 @@ export interface LiveTokenPrice {
   total_volume_24h_usd: number | null
   total_liquidity_usd: number | null
   last_updated: string
-  top_pool_dx_url: string | null
-  top_pool_pair_address: string | null
+  chart_url: string
 }
 
-// Core PulseChain tokens to show on Overview
-const OVERVIEW_TOKENS = [
-  '0xa1077a294dde1b09bb078844df40758a5d0f9a27', // WPLS (Wrapped Pulse)
-  '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39', // HEX
-  '0x95b303987a60c71504d99aa1b13b4da07b0790ab', // PLSX (PulseX)
-  '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d', // INC (Incentive)
+// Token config: address, TradingView ticker, chart link
+// Chart link = DexScreener (stablecoin-quoted pairs → Price chart) or TradingView (when only non-stable pairs exist)
+const TOKEN_CONFIG = [
+  {
+    address: '0xa1077a294dde1b09bb078844df40758a5d0f9a27',
+    symbol: 'WPLS',
+    tvTicker: 'PULSEX:WPLSUSDT_322DF7.USD',
+    chartUrl: 'https://dexscreener.com/pulsechain/0x322df7921f28f1146cdf62afdac0d6bc0ab80711', // WPLS/USDT — stablecoin → Price chart
+  },
+  {
+    address: '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39',
+    symbol: 'HEX',
+    tvTicker: 'PULSEX:HEXWPLS_F1F4EE.USD',
+    chartUrl: 'https://www.tradingview.com/chart/?symbol=PULSEX%3AHEXWPLS_F1F4EE.USD', // HEX/WPLS — no stablecoin pair with good liq → TradingView
+  },
+  {
+    address: '0x95b303987a60c71504d99aa1b13b4da07b0790ab',
+    symbol: 'PLSX',
+    tvTicker: 'PULSEX:PLSXDAI_B2893C.USD',
+    chartUrl: 'https://dexscreener.com/pulsechain/0xb2893cea8080bf43b7b60b589edaab5211d98f23', // PLSX/DAI — stablecoin → Price chart
+  },
+  {
+    address: '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d',
+    symbol: 'INC',
+    tvTicker: 'PULSEX:INCWPLS_F808BB.USD',
+    chartUrl: 'https://www.tradingview.com/chart/?symbol=PULSEX%3AINCWPLS_F808BB.USD', // INC/WPLS — no stablecoin pair with good liq → TradingView
+  },
 ]
 
-// Stablecoins — DexScreener shows Price chart (not MCap) when quote is a stablecoin
-const STABLECOINS = new Set(['DAI', 'USDC', 'USDT', 'eDAI', 'eUSDC', 'eUSDT'])
-
-interface DexPair {
-  chainId: string
-  pairAddress: string
-  url: string
-  baseToken: { address: string; symbol: string; name: string }
-  quoteToken: { address: string; symbol: string; name: string }
-  priceUsd?: string
-  priceChange?: { h24?: number }
-  liquidity?: { usd?: number }
-  volume?: { h24?: number }
-  fdv?: number
-  marketCap?: number
-}
+const SCANNER_URL = 'https://scanner.tradingview.com/global/scan'
 
 /**
- * Fetch core PulseChain token prices directly from DexScreener API.
- * One API call per token (parallel) to avoid the 30-pair batch limit.
+ * Fetch core PulseChain token prices from TradingView Scanner API.
+ * Single POST request for all 4 tokens, high precision (10-16 sig figs).
  * Polls every 5 seconds for near-real-time data.
- * Only picks pairs where the target token is the BASE token so that:
- *   - priceUsd is correct for our token
- *   - DexScreener URL shows the price chart (not the quote token's chart)
+ * Market cap from DexScreener (TradingView Scanner returns null for PulseX pairs).
  */
 export function useLiveTokenPricesOverview() {
   const [data, setData] = useState<LiveTokenPrice[]>([])
   const [loading, setLoading] = useState(true)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Cache DexScreener market cap data (refreshed less frequently)
+  const mcapCache = useRef<Map<string, { mcap: number | null; volume: number | null; liquidity: number | null }>>(new Map())
+  const mcapLastFetch = useRef(0)
 
   useEffect(() => {
     let cancelled = false
 
-    const fetchToken = async (addr: string): Promise<LiveTokenPrice | null> => {
-      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${addr}`)
-      if (!res.ok) return null
-      const json = await res.json()
-      const pairs: DexPair[] = json.pairs || []
+    const fetchMcap = async () => {
+      // Refresh DexScreener data every 60s for market cap, volume, liquidity
+      const now = Date.now()
+      if (now - mcapLastFetch.current < 60_000 && mcapCache.current.size > 0) return
 
-      const addrLower = addr.toLowerCase()
-
-      // PulseChain pairs where our token is the BASE token
-      const basePairs = pairs.filter(
-        (p) => p.chainId === 'pulsechain' && p.baseToken.address.toLowerCase() === addrLower
-      )
-
-      if (basePairs.length === 0) return null
-
-      // Best pair for PRICE data: highest liquidity with volume
-      const pricePairs = [...basePairs].sort((a, b) => {
-        const aVol = a.volume?.h24 ?? 0
-        const bVol = b.volume?.h24 ?? 0
-        if (aVol > 0 && bVol === 0) return -1
-        if (bVol > 0 && aVol === 0) return 1
-        return (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
-      })
-      const bestPrice = pricePairs[0]
-
-      // Best pair for DEXSCREENER LINK: stablecoin-quoted (shows Price chart, not MCap)
-      // then highest liquidity with volume
-      const linkPairs = [...basePairs].sort((a, b) => {
-        const aStable = STABLECOINS.has(a.quoteToken.symbol) ? 1 : 0
-        const bStable = STABLECOINS.has(b.quoteToken.symbol) ? 1 : 0
-        if (aStable !== bStable) return bStable - aStable
-        const aVol = a.volume?.h24 ?? 0
-        const bVol = b.volume?.h24 ?? 0
-        if (aVol > 0 && bVol === 0) return -1
-        if (bVol > 0 && aVol === 0) return 1
-        return (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
-      })
-      const bestLink = linkPairs[0]
-
-      // Aggregate volume & liquidity across all base pairs
-      const totalVolume = basePairs.reduce((s, p) => s + (p.volume?.h24 ?? 0), 0)
-      const totalLiquidity = basePairs.reduce((s, p) => s + (p.liquidity?.usd ?? 0), 0)
-
-      return {
-        token_address: addr,
-        token_symbol: bestPrice.baseToken.symbol,
-        price_usd: bestPrice.priceUsd ? parseFloat(bestPrice.priceUsd) : null,
-        price_change_24h: bestPrice.priceChange?.h24 ?? null,
-        market_cap_usd: bestPrice.marketCap ?? bestPrice.fdv ?? null,
-        total_volume_24h_usd: totalVolume,
-        total_liquidity_usd: totalLiquidity,
-        last_updated: new Date().toISOString(),
-        top_pool_dx_url: bestLink.url,
-        top_pool_pair_address: bestLink.pairAddress,
+      try {
+        const addresses = TOKEN_CONFIG.map((t) => t.address)
+        const results = await Promise.all(
+          addresses.map(async (addr) => {
+            const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${addr}`)
+            if (!res.ok) return null
+            const json = await res.json()
+            const pairs = (json.pairs || []).filter(
+              (p: any) => p.chainId === 'pulsechain' && p.baseToken.address.toLowerCase() === addr.toLowerCase()
+            )
+            if (pairs.length === 0) return null
+            // Best pair by liquidity for mcap
+            pairs.sort((a: any, b: any) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))
+            const best = pairs[0]
+            const totalVolume = pairs.reduce((s: number, p: any) => s + (p.volume?.h24 ?? 0), 0)
+            const totalLiquidity = pairs.reduce((s: number, p: any) => s + (p.liquidity?.usd ?? 0), 0)
+            return {
+              address: addr,
+              mcap: best.marketCap ?? best.fdv ?? null,
+              volume: totalVolume,
+              liquidity: totalLiquidity,
+            }
+          })
+        )
+        for (const r of results) {
+          if (r) mcapCache.current.set(r.address, { mcap: r.mcap, volume: r.volume, liquidity: r.liquidity })
+        }
+        mcapLastFetch.current = now
+      } catch {
+        // Keep cached data
       }
     }
 
-    const fetchAll = async () => {
+    const fetchPrices = async () => {
       try {
-        // 4 parallel calls — well within DexScreener rate limit (300/min)
-        const results = await Promise.all(OVERVIEW_TOKENS.map(fetchToken))
+        // Single POST to TradingView Scanner for all 4 tokens
+        const res = await fetch(SCANNER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbols: {
+              tickers: TOKEN_CONFIG.map((t) => t.tvTicker),
+              query: { types: [] },
+            },
+            columns: ['close', 'change', 'volume'],
+          }),
+        })
+        if (!res.ok) throw new Error(`Scanner ${res.status}`)
+        const json = await res.json()
 
-        if (!cancelled) {
-          const valid = results
-            .filter((t): t is LiveTokenPrice => t != null)
-            .sort((a, b) => (b.total_volume_24h_usd ?? 0) - (a.total_volume_24h_usd ?? 0))
-          if (valid.length > 0) setData(valid)
+        if (!cancelled && json.data?.length > 0) {
+          const results: LiveTokenPrice[] = []
+
+          for (const item of json.data) {
+            const ticker = item.s as string
+            const config = TOKEN_CONFIG.find((t) => t.tvTicker === ticker)
+            if (!config) continue
+
+            const [close, change, volume] = item.d as [number | null, number | null, number | null]
+            const cached = mcapCache.current.get(config.address)
+
+            results.push({
+              token_address: config.address,
+              token_symbol: config.symbol,
+              price_usd: close,
+              price_change_24h: change,
+              market_cap_usd: cached?.mcap ?? null,
+              total_volume_24h_usd: cached?.volume ?? (volume ?? null),
+              total_liquidity_usd: cached?.liquidity ?? null,
+              last_updated: new Date().toISOString(),
+              chart_url: config.chartUrl,
+            })
+          }
+
+          if (results.length > 0) {
+            results.sort((a, b) => (b.total_volume_24h_usd ?? 0) - (a.total_volume_24h_usd ?? 0))
+            setData(results)
+          }
         }
       } catch {
         // Silently fail — keep previous data
@@ -129,8 +151,13 @@ export function useLiveTokenPricesOverview() {
       }
     }
 
+    const fetchAll = async () => {
+      await fetchMcap()
+      await fetchPrices()
+    }
+
     fetchAll()
-    intervalRef.current = setInterval(fetchAll, 15_000)
+    intervalRef.current = setInterval(fetchAll, 5_000)
 
     return () => {
       cancelled = true

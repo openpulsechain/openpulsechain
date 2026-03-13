@@ -325,7 +325,7 @@ export function OverviewPage() {
         source: 'live' as const,
         last_updated: t.last_updated,
         isLive: true,
-        dexscreener_url: t.top_pool_dx_url || (t.top_pool_pair_address ? `https://dexscreener.com/pulsechain/${t.top_pool_pair_address}` : null),
+        chart_url: t.chart_url,
       }
     })
   }, [liveTokens.data, prices.data])
@@ -399,7 +399,7 @@ export function OverviewPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
                 </span>
-                <span>Live · DexScreener API</span>
+                <span>Live · TradingView Scanner</span>
               </>
             )}
           </span>
@@ -417,7 +417,7 @@ export function OverviewPage() {
                   <span className="text-xs text-gray-500 ml-1" title="Fully Diluted Valuation for PulseChain tokens, Circulating for CoinGecko tokens">*</span>
                 </th>
                 <th className="py-3 text-center" title="24h trading volume from PulseX tokenDayDatas">Volume (24h)</th>
-                <th className="py-3 text-center">DexScreener</th>
+                <th className="py-3 text-center">Chart</th>
               </tr>
             </thead>
             <tbody>
@@ -468,14 +468,14 @@ export function OverviewPage() {
                     {(token.volume_24h_usd ?? 0) > 0 ? formatUsd(token.volume_24h_usd!) : <span className="text-gray-600">--</span>}
                   </td>
                   <td className="py-2.5 text-center">
-                    {token.dexscreener_url ? (
+                    {token.chart_url ? (
                       <a
-                        href={token.dexscreener_url}
+                        href={token.chart_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-xs text-[#00D4FF]/70 hover:text-[#00D4FF] transition-colors"
                       >
-                        <span>Top LP</span>
+                        <span>Price</span>
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     ) : (
@@ -501,7 +501,7 @@ export function OverviewPage() {
             </div>
             <p className="font-medium text-gray-400">Data Methodology</p>
             <ul className="space-y-1 list-disc list-inside">
-              <li><strong className="text-gray-400">Prices:</strong> Live prices from DexScreener API (direct, ~15s refresh). May differ slightly from PLS Price KPI (which uses PulseX Subgraph) due to different data sources.</li>
+              <li><strong className="text-gray-400">Prices:</strong> Live prices from TradingView Scanner API (PulseX pairs, ~5s refresh). Same data source as PLS Price KPI.</li>
               <li><strong className="text-gray-400">Market Cap*:</strong> Fully Diluted Valuation (FDV) = Total Supply × Price. No reliable circulating supply exists on-chain for PulseChain.</li>
               <li><strong className="text-gray-400">Volume (24h):</strong> Live 24h trading volume aggregated across all DEXes.</li>
               <li><strong className="text-gray-400">24h Change:</strong> Price change over the last 24 hours.</li>
