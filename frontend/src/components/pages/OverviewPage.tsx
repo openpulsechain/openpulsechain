@@ -408,15 +408,15 @@ export function OverviewPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-white/10 text-gray-400">
-                <th className="py-3 pr-4">Token</th>
-                <th className="py-3 pr-4 text-right">Price</th>
-                <th className="py-3 pr-4 text-right">24h Change</th>
-                <th className="py-3 pr-4 text-right" title="Fully Diluted Valuation = Total Supply × Price">
+                <th className="py-3">Token</th>
+                <th className="py-3 text-center">Price</th>
+                <th className="py-3 text-center">24h Change</th>
+                <th className="py-3 text-center" title="Fully Diluted Valuation = Total Supply × Price">
                   <span className="hidden sm:inline">Market Cap</span>
                   <span className="sm:hidden">MCap</span>
                   <span className="text-xs text-gray-500 ml-1" title="Fully Diluted Valuation for PulseChain tokens, Circulating for CoinGecko tokens">*</span>
                 </th>
-                <th className="py-3 pr-4 text-right" title="24h trading volume from PulseX tokenDayDatas">Volume (24h)</th>
+                <th className="py-3 text-center" title="24h trading volume from PulseX tokenDayDatas">Volume (24h)</th>
                 <th className="py-3 text-center">DexScreener</th>
               </tr>
             </thead>
@@ -447,24 +447,24 @@ export function OverviewPage() {
                       </a>
                     )}
                   </td>
-                  <td className="py-2.5 pr-4 text-right text-white">
+                  <td className="py-2.5 text-center text-white">
                     {token.price_usd != null
                       ? token.price_usd < 0.01
                         ? `$${token.price_usd.toPrecision(6)}`
                         : `$${token.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : '--'}
                   </td>
-                  <td className={`py-2.5 pr-4 text-right ${
+                  <td className={`py-2.5 text-center ${
                     (token.price_change_24h_pct ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
                   }`}>
                     {token.price_change_24h_pct != null
                       ? `${token.price_change_24h_pct >= 0 ? '+' : ''}${token.price_change_24h_pct.toFixed(2)}%`
                       : '--'}
                   </td>
-                  <td className="py-2.5 pr-4 text-right text-gray-300">
+                  <td className="py-2.5 text-center text-gray-300">
                     {token.market_cap_usd != null ? formatUsd(token.market_cap_usd) : '--'}
                   </td>
-                  <td className="py-2.5 pr-4 text-right text-gray-300">
+                  <td className="py-2.5 text-center text-gray-300">
                     {(token.volume_24h_usd ?? 0) > 0 ? formatUsd(token.volume_24h_usd!) : <span className="text-gray-600">--</span>}
                   </td>
                   <td className="py-2.5 text-center">
