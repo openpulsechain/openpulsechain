@@ -450,7 +450,7 @@ export function OverviewPage() {
                   <td className="py-2.5 text-center text-white">
                     {token.price_usd != null
                       ? token.price_usd < 0.01
-                        ? `$${parseFloat(token.price_usd.toPrecision(6))}`
+                        ? `$${parseFloat(token.price_usd.toPrecision(4))}`
                         : `$${token.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : '--'}
                   </td>
