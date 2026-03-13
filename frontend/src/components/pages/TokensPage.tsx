@@ -1376,7 +1376,9 @@ export function TokensPage() {
                       <tbody>
                         {livePools.map((pool, i) => {
                           const isSpam = !pool.pool_is_legitimate
-                          const confColor = pool.pool_confidence === 'high' ? 'text-emerald-400'
+                          const isSuspect = pool.pool_confidence === 'suspect' || pool.pool_confidence === 'low'
+                          const confColor = isSpam || isSuspect ? 'text-red-500 font-bold'
+                            : pool.pool_confidence === 'high' ? 'text-emerald-400'
                             : pool.pool_confidence === 'medium' ? 'text-yellow-400'
                             : 'text-orange-400'
                           const tierColor = pool.tier === 'hot' ? 'text-red-400'
