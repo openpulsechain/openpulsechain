@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react'
-import { X, Search, ChevronLeft, ChevronRight, ExternalLink, Info, ChevronDown, ChevronUp, ArrowUpDown, Filter, Users } from 'lucide-react'
+import { X, Search, ChevronLeft, ChevronRight, ExternalLink, Info, ChevronDown, ChevronUp, ArrowUpDown, Filter, Users, Shield } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AreaChartComponent } from '../charts/AreaChart'
 import { Spinner } from '../ui/Spinner'
@@ -403,6 +403,8 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
 
   const conf = CONFIDENCE_INFO[pool.pool_confidence ?? ''] ?? CONFIDENCE_INFO.suspect
   const isSpam = !pool.pool_is_legitimate
+  const lastSnapshot = history.length > 0 ? history[0] : null
+  const hasTransition = lastSnapshot && lastSnapshot.pool_confidence !== pool.pool_confidence
 
   return (
     <div className="fixed inset-0 z-[60] backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -430,6 +432,20 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
             {isSpam && <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 font-bold">NOT LEGITIMATE</span>}
           </div>
           <p className="text-sm text-gray-300 leading-relaxed">{conf.explanation}</p>
+          {hasTransition && lastSnapshot && (
+            <div className="mt-2 rounded bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 flex items-start gap-2">
+              <span className="text-yellow-400 text-xs mt-0.5">↑</span>
+              <div className="text-xs text-yellow-300">
+                <span className="font-bold">Recent transition:</span>{' '}
+                <span className={CONFIDENCE_INFO[lastSnapshot.pool_confidence]?.color ?? 'text-gray-400'}>
+                  {(CONFIDENCE_INFO[lastSnapshot.pool_confidence]?.label ?? lastSnapshot.pool_confidence)}
+                </span>
+                {' → '}
+                <span className={conf.color}>{conf.label}</span>
+                <span className="text-yellow-400/60 ml-1">— The monitoring history below still shows the previous state. The next indexer run (every 6h) will record this transition.</span>
+              </div>
+            </div>
+          )}
           {pool.pool_spam_reason && (
             <div className="mt-3 space-y-2">
               <div className="text-xs text-red-400 font-bold">Flagged reasons:</div>
@@ -454,6 +470,7 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
                   <th className="py-1.5 text-left">Symbol</th>
                   <th className="py-1.5 text-left">Address in this Pool</th>
                   <th className="py-1.5 text-center">Status</th>
+                  <th className="py-1.5 text-center">Safety</th>
                 </tr>
               </thead>
               <tbody>
@@ -481,6 +498,14 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
                             : verified && verified.length > 0 ? <span className="text-red-400 font-bold">Mismatch</span>
                             : <span className="text-yellow-400">Unknown</span>}
                         </td>
+                        <td className="py-1.5 text-center">
+                          {t.address && (
+                            <a href={`/token/${t.address}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors" title={`Token Safety analysis for ${t.symbol}`}>
+                              <Shield className="h-3 w-3" />
+                              <span className="text-[10px] font-medium">Analyze</span>
+                            </a>
+                          )}
+                        </td>
                       </tr>
                       {/* Show the real verified address if mismatch */}
                       {verified && verified.length > 0 && !matchesVerified && (
@@ -493,6 +518,12 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
                             </a>
                           </td>
                           <td className="py-1 text-center text-emerald-400 font-bold">Verified</td>
+                          <td className="py-1 text-center">
+                            <a href={`/token/${verified[0].address}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors" title={`Token Safety analysis for real ${t.symbol}`}>
+                              <Shield className="h-3 w-3" />
+                              <span className="text-[10px] font-medium">Analyze</span>
+                            </a>
+                          </td>
                         </tr>
                       )}
                     </Fragment>
