@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react'
 import { X, Search, ChevronLeft, ChevronRight, ExternalLink, Info, ChevronDown, ChevronUp, ArrowUpDown, Filter, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AreaChartComponent } from '../charts/AreaChart'
@@ -245,7 +245,9 @@ interface PoolRow {
   token_address: string
   pair_address: string
   dex_id: string | null
+  base_token_address: string | null
   base_token_symbol: string | null
+  quote_token_address: string | null
   quote_token_symbol: string | null
   price_usd: number | null
   liquidity_usd: number | null
@@ -335,28 +337,53 @@ interface MonitoringSnapshot {
   token1_is_core: boolean
 }
 
+interface VerifiedToken { address: string; symbol: string; name: string | null }
+
 function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => void }) {
   const [history, setHistory] = useState<MonitoringSnapshot[]>([])
+  const [verifiedTokens, setVerifiedTokens] = useState<Record<string, VerifiedToken[]>>({})
   const [loading, setLoading] = useState(true)
   const popupRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     ;(async () => {
       try {
-        const { data } = await supabase
+        // Fetch monitoring history
+        const historyPromise = supabase
           .from('token_monitoring_pools')
           .select('snapshot_at, pool_confidence, pool_is_legitimate, pool_spam_reason, reserve_usd, volume_24h_usd, token0_symbol, token1_symbol, token0_is_known, token0_is_core, token1_is_known, token1_is_core')
           .eq('pair_address', pool.pair_address)
           .order('snapshot_at', { ascending: false })
           .limit(50)
-        setHistory((data ?? []) as MonitoringSnapshot[])
+
+        // Fetch verified tokens matching base/quote symbols
+        const symbols = [pool.base_token_symbol, pool.quote_token_symbol].filter(Boolean) as string[]
+        const verifiedPromise = symbols.length > 0
+          ? supabase
+              .from('pulsechain_tokens')
+              .select('address, symbol, name')
+              .in('symbol', symbols)
+              .gt('total_volume_usd', 0)
+              .order('total_liquidity_usd', { ascending: false, nullsFirst: false })
+          : Promise.resolve({ data: [] })
+
+        const [histResult, verifiedResult] = await Promise.all([historyPromise, verifiedPromise])
+        setHistory((histResult.data ?? []) as MonitoringSnapshot[])
+
+        // Group verified tokens by symbol
+        const grouped: Record<string, VerifiedToken[]> = {}
+        for (const t of (verifiedResult.data ?? []) as VerifiedToken[]) {
+          if (!grouped[t.symbol]) grouped[t.symbol] = []
+          grouped[t.symbol].push(t)
+        }
+        setVerifiedTokens(grouped)
       } catch (e) {
         console.error('Failed to load monitoring history:', e)
       } finally {
         setLoading(false)
       }
     })()
-  }, [pool.pair_address])
+  }, [pool.pair_address, pool.base_token_symbol, pool.quote_token_symbol])
 
   // Close on click outside
   useEffect(() => {
@@ -391,8 +418,8 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
         {/* Header */}
         <div>
           <h3 className="text-lg font-bold text-white">Pool Confidence Analysis</h3>
-          <p className="text-sm text-gray-400 mt-1 font-mono">{pool.pair_address}</p>
-          <p className="text-sm text-gray-400">{pool.base_token_symbol}/{pool.quote_token_symbol} on {formatDexName(pool.dex_id)}</p>
+          <p className="text-base font-semibold text-cyan-400 mt-1">{pool.base_token_symbol}/{pool.quote_token_symbol} on {formatDexName(pool.dex_id)}</p>
+          <p className="text-xs text-gray-500 font-mono mt-0.5">{pool.pair_address}</p>
         </div>
 
         {/* Current Confidence */}
@@ -415,6 +442,69 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
             </div>
           )}
         </div>
+
+        {/* Token Address Comparison */}
+        {(pool.base_token_address || pool.quote_token_address) && (
+          <div className="rounded-lg bg-white/5 p-4">
+            <div className="text-xs text-gray-400 mb-3 font-medium">Token Address Comparison</div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-white/10 text-gray-500">
+                  <th className="py-1.5 text-left">Role</th>
+                  <th className="py-1.5 text-left">Symbol</th>
+                  <th className="py-1.5 text-left">Address in this Pool</th>
+                  <th className="py-1.5 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { role: 'Base (token 0)', symbol: pool.base_token_symbol, address: pool.base_token_address },
+                  { role: 'Quote (token 1)', symbol: pool.quote_token_symbol, address: pool.quote_token_address },
+                ].map((t, idx) => {
+                  const verified = t.symbol ? verifiedTokens[t.symbol] : undefined
+                  const matchesVerified = verified?.some(v => v.address.toLowerCase() === t.address?.toLowerCase())
+                  return (
+                    <Fragment key={idx}>
+                      <tr className="border-b border-white/5">
+                        <td className="py-1.5 text-gray-400">{t.role}</td>
+                        <td className="py-1.5 text-white font-medium">{t.symbol ?? '--'}</td>
+                        <td className="py-1.5 font-mono text-gray-300">
+                          {t.address ? (
+                            <a href={`https://scan.pulsechain.com/address/${t.address}`} target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400 transition-colors">
+                              {t.address.slice(0, 10)}...{t.address.slice(-8)}
+                            </a>
+                          ) : '--'}
+                        </td>
+                        <td className="py-1.5 text-center">
+                          {!t.address ? <span className="text-gray-600">--</span>
+                            : matchesVerified ? <span className="text-emerald-400 font-bold">Verified</span>
+                            : verified && verified.length > 0 ? <span className="text-red-400 font-bold">Mismatch</span>
+                            : <span className="text-yellow-400">Unknown</span>}
+                        </td>
+                      </tr>
+                      {/* Show the real verified address if mismatch */}
+                      {verified && verified.length > 0 && !matchesVerified && (
+                        <tr className="border-b border-white/5 bg-red-500/5">
+                          <td className="py-1 text-gray-600 pl-4">↳ Real {t.symbol}</td>
+                          <td className="py-1 text-emerald-400 font-medium">{t.symbol}</td>
+                          <td className="py-1 font-mono text-emerald-400/80">
+                            <a href={`https://scan.pulsechain.com/address/${verified[0].address}`} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-300 transition-colors">
+                              {verified[0].address.slice(0, 10)}...{verified[0].address.slice(-8)}
+                            </a>
+                          </td>
+                          <td className="py-1 text-center text-emerald-400 font-bold">Verified</td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+            {Object.values(verifiedTokens).some(arr => arr.length > 0) && (
+              <p className="text-[10px] text-gray-600 mt-2">Verified addresses come from PulseChain token registry (by trading volume). A mismatch means this pool uses a different contract than the established token.</p>
+            )}
+          </div>
+        )}
 
         {/* Confidence Levels Legend */}
         <div className="rounded-lg bg-white/5 p-4">
