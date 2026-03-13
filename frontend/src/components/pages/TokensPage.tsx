@@ -319,7 +319,7 @@ export function TokensPage() {
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [sortField, setSortField] = useState<SortField>('market_cap')
+  const [sortField, setSortField] = useState<SortField>('liquidity')
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [showFilters, setShowFilters] = useState(false)
   const [selectedToken, setSelectedToken] = useState<TokenWithPrice | null>(null)
