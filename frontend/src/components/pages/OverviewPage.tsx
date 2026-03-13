@@ -499,9 +499,17 @@ export function OverviewPage() {
               {sortedPrices.map((token) => (
                 <tr key={token.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                   <td className="py-2.5 pr-4">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-medium text-white">{token.symbol}</span>
-                      <span className="text-gray-500">{token.name}</span>
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={`/tokens/${token.symbol === 'HEX' ? 'phex' : token.symbol.toLowerCase()}.png`}
+                        alt={token.symbol}
+                        className="h-7 w-7 rounded-full bg-gray-800 border border-white/10 shrink-0"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                      <div>
+                        <span className="font-medium text-white">{token.symbol}</span>
+                        <span className="text-gray-500 ml-1.5">{token.name}</span>
+                      </div>
                     </div>
                     {token.address && (
                       <a
@@ -541,30 +549,29 @@ export function OverviewPage() {
         </div>
         <div className="mt-4 rounded-lg bg-white/5 border border-white/10 p-4 text-xs text-gray-500 space-y-2">
           <div className="rounded bg-gray-800/50 border border-white/5 p-3 mb-2">
-            <p className="text-gray-300 font-medium text-xs mb-1">What is this table?</p>
+            <p className="text-gray-300 font-medium text-xs mb-1">About these tokens</p>
             <p className="text-xs text-gray-400">
-              This table lists <strong className="text-gray-300">all tokens traded on PulseChain</strong> with their current price, market capitalization, and 24h trading volume.
-              Prices are derived from on-chain liquidity pools (PulseX Subgraph) for PulseChain-native tokens, and from CoinGecko for major bridged assets (BTC, ETH, stablecoins — marked <span className="text-blue-400">Ref</span>).
-              Ethereum fork copies are marked <span className="text-orange-400">Fork</span> — these are not the real bridged versions.
+              These four tokens — <strong className="text-gray-300">PLS</strong> (Wrapped Pulse), <strong className="text-gray-300">HEX</strong>, <strong className="text-gray-300">PLSX</strong> (PulseX), and <strong className="text-gray-300">INC</strong> (Incentive) — are the core tokens created by <strong className="text-gray-300">Richard Heart</strong>, the founder of PulseChain.
+              Beyond these, thousands of other tokens have been created on PulseChain by independent developers and communities. Browse all of them on the <a href="/tokens" className="text-[#00D4FF]/70 hover:text-[#00D4FF] transition-colors">Tokens</a> page.
             </p>
           </div>
           <p className="font-medium text-gray-400">Data Methodology</p>
           <ul className="space-y-1 list-disc list-inside">
             <li>
-              <strong className="text-gray-400">Prices:</strong> PulseChain tokens use <code className="text-[#00D4FF]/70">derivedUSD</code> from PulseX Subgraph (100% on-chain). Major tokens (BTC, ETH, stables) use CoinGecko.
+              <strong className="text-gray-400">Prices:</strong> Live prices aggregated across all PulseChain DEXes (DexScreener). Refreshes every 60 seconds.
             </li>
             <li>
-              <strong className="text-gray-400">Market Cap*:</strong> For PulseChain tokens, this is the <span className="text-gray-400">Fully Diluted Valuation (FDV)</span> = Total Supply × Price. No reliable circulating supply data exists on-chain for PulseChain — this is a known ecosystem limitation (PulseChain Scan also reports $0 circulating market cap). For CoinGecko tokens, this is the standard circulating market cap.
+              <strong className="text-gray-400">Market Cap*:</strong> <span className="text-gray-400">Fully Diluted Valuation (FDV)</span> = Total Supply × Price. No reliable circulating supply data exists on-chain for PulseChain — this is a known ecosystem limitation.
             </li>
             <li>
-              <strong className="text-gray-400">Volume (24h):</strong> Live 24h trading volume aggregated across all DEXes (DexScreener). Refreshes every 60 seconds.
+              <strong className="text-gray-400">Volume (24h):</strong> Live 24h trading volume aggregated across all DEXes.
             </li>
             <li>
-              <strong className="text-gray-400">24h Change:</strong> Calculated from price history stored daily. Compares current price to the most recent historical price (1-3 days ago).
+              <strong className="text-gray-400">24h Change:</strong> Price change over the last 24 hours.
             </li>
           </ul>
           <p className="text-gray-600 pt-1">
-            Contract addresses link to <a href="https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/" target="_blank" rel="noopener noreferrer" className="text-[#00D4FF]/50 hover:text-[#00D4FF] transition-colors">PulseChain Explorer</a> (Otterscan) for independent verification.
+            Contract addresses link to <a href="https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/" target="_blank" rel="noopener noreferrer" className="text-[#00D4FF]/50 hover:text-[#00D4FF] transition-colors">PulseChain Explorer</a> for independent verification.
             This is not investment advice. Data is provided for educational and informational purposes only.
           </p>
         </div>
