@@ -959,17 +959,9 @@ export function DexPage() {
           <h2 className="mb-4 text-lg font-semibold text-white">Top Pairs by Volume</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <colgroup>
-                <col style={{ width: '5%' }} />
-                <col style={{ width: '25%' }} />
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '20%' }} />
-                <col style={{ width: '17%' }} />
-                <col style={{ width: '15%' }} />
-              </colgroup>
               <thead>
                 <tr className="border-b border-white/10 text-gray-400">
-                  <th className="py-3 pr-4">#</th>
+                  <th className="py-3 pr-4 w-12">#</th>
                   <th className="py-3 pr-4">Pair</th>
                   <th className="py-3 pr-4 text-right">Volume (24h)</th>
                   <th className="py-3 pr-4 text-right">Volume (All Time)</th>
@@ -985,29 +977,29 @@ export function DexPage() {
                   const dexScreenerUrl = `https://dexscreener.com/pulsechain/${pair.pair_address}`
 
                   return (
-                    <tr key={pair.pair_address} className="border-b border-white/5">
-                      <td colSpan={6} className="p-0">
-                        {/* Main row */}
-                        <button
-                          onClick={() => setExpandedPair(isExpanded ? null : pair.pair_address)}
-                          className="w-full hover:bg-white/5 transition-colors text-left"
-                          style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}
-                        >
-                          <span style={{ display: 'table-cell', width: '5%' }} className="py-2.5 pr-4 text-gray-500">{i + 1}</span>
-                          <span style={{ display: 'table-cell', width: '25%' }} className="py-2.5 pr-4">
-                            <span className="font-medium text-white">{pair.token0_symbol}</span>
-                            <span className="text-gray-500"> / </span>
-                            <span className="text-gray-300">{pair.token1_symbol}</span>
-                            <ChevronDown className={`inline-block ml-1.5 h-3 w-3 text-gray-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                          </span>
-                          <span style={{ display: 'table-cell', width: '18%' }} className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{pair.daily_volume_usd ? formatUsd(pair.daily_volume_usd) : '--'}</span>
-                          <span style={{ display: 'table-cell', width: '20%' }} className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.volume_usd)}</span>
-                          <span style={{ display: 'table-cell', width: '17%' }} className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.reserve_usd)}</span>
-                          <span style={{ display: 'table-cell', width: '15%' }} className="py-2.5 text-right text-gray-400 whitespace-nowrap">{formatNumber(pair.total_transactions)}</span>
-                        </button>
+                    <>
+                    <tr
+                      key={pair.pair_address}
+                      className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                      onClick={() => setExpandedPair(isExpanded ? null : pair.pair_address)}
+                    >
+                      <td className="py-2.5 pr-4 text-gray-500">{i + 1}</td>
+                      <td className="py-2.5 pr-4">
+                        <span className="font-medium text-white">{pair.token0_symbol}</span>
+                        <span className="text-gray-500"> / </span>
+                        <span className="text-gray-300">{pair.token1_symbol}</span>
+                        <ChevronDown className={`inline-block ml-1.5 h-3 w-3 text-gray-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </td>
+                      <td className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{pair.daily_volume_usd ? formatUsd(pair.daily_volume_usd) : '--'}</td>
+                      <td className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.volume_usd)}</td>
+                      <td className="py-2.5 pr-4 text-right text-gray-300 whitespace-nowrap">{formatUsd(pair.reserve_usd)}</td>
+                      <td className="py-2.5 text-right text-gray-400 whitespace-nowrap">{formatNumber(pair.total_transactions)}</td>
+                    </tr>
 
-                        {/* Expanded details */}
-                        {isExpanded && (
+                    {/* Expanded details */}
+                    {isExpanded && (
+                      <tr key={`${pair.pair_address}-detail`} className="border-b border-white/5">
+                        <td colSpan={6} className="p-0">
                           <div className="px-4 pb-4 pt-1 bg-white/[0.02] border-t border-white/5">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               {/* Left: pair info */}
@@ -1080,9 +1072,10 @@ export function DexPage() {
                               </div>
                             </div>
                           </div>
-                        )}
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   )
                 })}
               </tbody>
