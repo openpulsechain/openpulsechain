@@ -194,6 +194,7 @@ def _fetch_and_upsert(token_address: str, token_symbol: str, token_name: str,
             "pool_is_legitimate": val.get("pool_is_legitimate", True),
             "pool_confidence": val.get("pool_confidence", "medium"),
             "pool_spam_reason": val.get("pool_spam_reason"),
+            "pool_risk_score": val.get("pool_risk_score"),
         })
 
     if rows:
@@ -219,7 +220,7 @@ def _load_validation_cache(addresses: list[str]) -> dict[str, dict]:
         batch = addresses[i:i + 50]
         try:
             resp = supabase.table("token_monitoring_pools") \
-                .select("pair_address, pool_is_legitimate, pool_confidence, pool_spam_reason") \
+                .select("pair_address, pool_is_legitimate, pool_confidence, pool_spam_reason, pool_risk_score") \
                 .in_("token_address", batch) \
                 .order("snapshot_at", desc=True) \
                 .execute()
@@ -232,6 +233,7 @@ def _load_validation_cache(addresses: list[str]) -> dict[str, dict]:
                         "pool_is_legitimate": row["pool_is_legitimate"],
                         "pool_confidence": row["pool_confidence"],
                         "pool_spam_reason": row.get("pool_spam_reason"),
+                        "pool_risk_score": row.get("pool_risk_score"),
                     }
         except Exception as e:
             logger.warning(f"Failed to load validation cache: {e}")

@@ -1391,16 +1391,17 @@ export function TokensPage() {
                         <col style={{ width: '2.5%' }} />
                         <col style={{ width: '6%' }} />
                         <col style={{ width: '8%' }} />
-                        <col style={{ width: '11%' }} />
+                        <col style={{ width: '10%' }} />
+                        <col style={{ width: '7%' }} />
                         <col style={{ width: '7%' }} />
                         <col style={{ width: '7.5%' }} />
+                        <col style={{ width: '5%' }} />
+                        <col style={{ width: '5%' }} />
+                        <col style={{ width: '7%' }} />
                         <col style={{ width: '8%' }} />
                         <col style={{ width: '5%' }} />
                         <col style={{ width: '5%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '8.5%' }} />
-                        <col style={{ width: '5%' }} />
-                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '6%' }} />
                       </colgroup>
                       <thead>
                         <tr className="border-b border-white/10 text-gray-500">
@@ -1415,6 +1416,7 @@ export function TokensPage() {
                           <ClickableHeader label="Sells" />
                           <ClickableHeader label="Price Change 24h" />
                           <ClickableHeader label="Confidence" />
+                          <ClickableHeader label="Safety" />
                           <ClickableHeader label="Tier" />
                           <ClickableHeader label="DexScreener" />
                         </tr>
@@ -1476,6 +1478,22 @@ export function TokensPage() {
                                   {isSpam ? '\u26A0' : '\u25CF'} {CONFIDENCE_INFO[pool.pool_confidence ?? '']?.label ?? 'Suspect'}
                                   <ExternalLink className="h-2.5 w-2.5 opacity-40" />
                                 </a>
+                              </td>
+                              <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''}`}>
+                                {(() => {
+                                  const ss = safetyScores[pool.token_address?.toLowerCase()]
+                                  if (!ss) return <span className="text-gray-600" title="Not analyzed">—</span>
+                                  const gc = ss.grade === 'A' ? 'text-emerald-400'
+                                    : ss.grade === 'B' ? 'text-green-400'
+                                    : ss.grade === 'C' ? 'text-yellow-400'
+                                    : ss.grade === 'D' ? 'text-orange-400'
+                                    : 'text-red-400'
+                                  return (
+                                    <a href={`/token/${pool.token_address}`} className={`${gc} font-bold hover:underline`} title={`Safety: ${ss.score}/100`} onClick={e => e.stopPropagation()}>
+                                      {ss.grade}
+                                    </a>
+                                  )
+                                })()}
                               </td>
                               <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''} ${tierColor}`}>{pool.tier}</td>
                               <td className={`py-2 text-center ${isSpam ? 'opacity-40' : ''}`}>

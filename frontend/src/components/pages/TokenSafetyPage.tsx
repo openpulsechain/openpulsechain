@@ -73,6 +73,7 @@ interface PoolLive {
   pool_is_legitimate: boolean
   pool_confidence: string | null
   pool_spam_reason: string | null
+  pool_risk_score: number | null
   tier: string
   dx_url: string | null
   updated_at: string
@@ -260,7 +261,8 @@ function formatUsdCompact(val: number): string {
 }
 
 // P0-D fix: use real token symbols instead of generic "Token 0/1"
-function formatSpamReason(raw: string | null, baseSymbol?: string | null, quoteSymbol?: string | null): { code: string; explanation: string }[] {
+// P3-A: add actionable recommendations per spam reason type
+function formatSpamReason(raw: string | null, baseSymbol?: string | null, quoteSymbol?: string | null): { code: string; explanation: string; action?: string }[] {
   if (!raw) return []
   const t0 = baseSymbol || 'Base token'
   const t1 = quoteSymbol || 'Quote token'
@@ -268,18 +270,60 @@ function formatSpamReason(raw: string | null, baseSymbol?: string | null, quoteS
     const [code, val] = part.split(':')
     const key = code.trim()
     if (key.startsWith('low_reserve')) {
-      return { code: part, explanation: `Pool reserves are extremely low ($${val ?? '< 100'} USD). Legitimate pools typically have significantly higher reserves.` }
+      return {
+        code: part,
+        explanation: `Pool reserves are extremely low ($${val ?? '< 100'} USD). Legitimate pools typically have significantly higher reserves.`,
+        action: 'This pool has almost no capital. Trades here will have extreme price impact.',
+      }
     }
-    const map: Record<string, string> = {
-      unknown_token0: `${t0} is not recognized in our token database.`,
-      unknown_token1: `${t1} is not recognized in our token database.`,
-      low_volume_token0: `${t0} has very low all-time trading volume (< $1,000), indicating an inactive or fake token.`,
-      low_volume_token1: `${t1} has very low all-time trading volume (< $1,000), indicating an inactive or fake token.`,
-      spam_name: `One of the token names contains a spam keyword (e.g. "airdrop", "free", "claim", "test").`,
-      no_liquidity_token0: `${t0} has zero or near-zero liquidity in this pool.`,
-      no_liquidity_token1: `${t1} has zero or near-zero liquidity in this pool.`,
+    // Handle spam_name_token0/token1 patterns
+    if (key === 'spam_name_token0') {
+      return {
+        code: part,
+        explanation: `The name of ${t0} contains a flagged keyword: '${val ?? 'unknown'}'.`,
+        action: `Token names containing '${val ?? 'flagged keywords'}' are commonly associated with scam/test tokens.`,
+      }
     }
-    return { code: part, explanation: map[key] ?? `Flagged: ${part}` }
+    if (key === 'spam_name_token1') {
+      return {
+        code: part,
+        explanation: `The name of ${t1} contains a flagged keyword: '${val ?? 'unknown'}'.`,
+        action: `Token names containing '${val ?? 'flagged keywords'}' are commonly associated with scam/test tokens.`,
+      }
+    }
+    const map: Record<string, { explanation: string; action: string }> = {
+      unknown_token0: {
+        explanation: `${t0} is not recognized in our token database.`,
+        action: 'Check the contract address on PulseChain Scan. Compare with the official token website.',
+      },
+      unknown_token1: {
+        explanation: `${t1} is not recognized in our token database.`,
+        action: 'Check the contract address on PulseChain Scan. Compare with the official token website.',
+      },
+      low_volume_token0: {
+        explanation: `${t0} has very low all-time trading volume (< $1,000), indicating an inactive or fake token.`,
+        action: 'Low volume means high slippage and potential exit difficulty.',
+      },
+      low_volume_token1: {
+        explanation: `${t1} has very low all-time trading volume (< $1,000), indicating an inactive or fake token.`,
+        action: 'Low volume means high slippage and potential exit difficulty.',
+      },
+      spam_name: {
+        explanation: `One of the token names contains a spam keyword (e.g. "airdrop", "free", "claim", "test").`,
+        action: 'Token names with promotional keywords are commonly associated with scam tokens.',
+      },
+      no_liquidity_token0: {
+        explanation: `${t0} has zero or near-zero liquidity in this pool.`,
+        action: 'No liquidity means you cannot sell this token. Do not buy.',
+      },
+      no_liquidity_token1: {
+        explanation: `${t1} has zero or near-zero liquidity in this pool.`,
+        action: 'No liquidity means you cannot sell this token. Do not buy.',
+      },
+    }
+    const entry = map[key]
+    if (entry) return { code: part, ...entry }
+    return { code: part, explanation: `Flagged: ${part}` }
   })
 }
 
@@ -408,8 +452,9 @@ export function TokenSafetyPage() {
   // Section ⑥: Token identity comparison
   const [verifiedTokens, setVerifiedTokens] = useState<Record<string, VerifiedToken[]>>({})
 
-  // Section ⑦: Monitoring history
+  // Section ⑦: Monitoring history + confidence events
   const [monitoringHistory, setMonitoringHistory] = useState<MonitoringSnapshot[]>([])
+  const [confidenceEvents, setConfidenceEvents] = useState<{ pair_address: string; event_summary: string; prev_confidence: string; new_confidence: string; created_at: string }[]>([])
   const [historyExpanded, setHistoryExpanded] = useState(false)
 
   // Legacy: Safety API pair list (anchored/capped analysis)
@@ -499,6 +544,15 @@ export function TokenSafetyPage() {
           .order('snapshot_at', { ascending: false })
           .limit(200)
           .then(({ data }) => setMonitoringHistory((data ?? []) as MonitoringSnapshot[]))
+
+        // 3a-bis. Confidence transition events (from pool_confidence_events table)
+        supabase
+          .from('pool_confidence_events')
+          .select('pair_address, event_summary, prev_confidence, new_confidence, created_at')
+          .in('pair_address', pairAddresses)
+          .order('created_at', { ascending: false })
+          .limit(50)
+          .then(({ data }) => setConfidenceEvents((data ?? []) as typeof confidenceEvents))
 
         // 3b. Verified tokens for identity comparison (section ⑥)
         const symbols = [...new Set(
@@ -884,6 +938,7 @@ export function TokenSafetyPage() {
                       <th className="py-2 text-right">Liquidity</th>
                       <th className="py-2 text-right">Vol 24h</th>
                       <th className="py-2 text-center">Confidence</th>
+                      <th className="py-2 text-center" title="Pool risk score (0-100, higher is safer)">Risk</th>
                       <th className="py-2 text-center">DexScreener</th>
                     </tr>
                   </thead>
@@ -893,7 +948,7 @@ export function TokenSafetyPage() {
                       const transition = poolTransitions[pool.pair_address]
                       return (
                         <Fragment key={pool.pair_address}>
-                          <tr className={`border-b border-white/5 ${!pool.pool_is_legitimate ? 'opacity-60' : ''}`}>
+                          <tr className={`border-b border-white/5 ${(pool.pool_risk_score != null ? pool.pool_risk_score < 30 : !pool.pool_is_legitimate) ? 'opacity-60' : ''}`}>
                             <td className="py-2 text-gray-600">{i + 1}</td>
                             <td className="py-2">
                               <div className="flex items-center gap-1.5">
@@ -925,6 +980,20 @@ export function TokenSafetyPage() {
                               </div>
                             </td>
                             <td className="py-2 text-center">
+                              {pool.pool_risk_score != null ? (
+                                <span className={`font-mono text-[10px] font-bold ${
+                                  pool.pool_risk_score >= 70 ? 'text-emerald-400'
+                                  : pool.pool_risk_score >= 50 ? 'text-yellow-400'
+                                  : pool.pool_risk_score >= 30 ? 'text-orange-400'
+                                  : 'text-red-400'
+                                }`} title={`Pool risk score: ${pool.pool_risk_score}/100`}>
+                                  {pool.pool_risk_score}
+                                </span>
+                              ) : (
+                                <span className="text-gray-600">—</span>
+                              )}
+                            </td>
+                            <td className="py-2 text-center">
                               {pool.dx_url ? (
                                 <a href={pool.dx_url} target="_blank" rel="noopener noreferrer" className="text-[#00D4FF] hover:text-white">
                                   <ExternalLink className="h-3.5 w-3.5 inline" />
@@ -940,11 +1009,12 @@ export function TokenSafetyPage() {
                           {spamReasons.length > 0 && (
                             <tr className="border-b border-white/5">
                               <td></td>
-                              <td colSpan={6} className="py-1.5 pb-2.5">
+                              <td colSpan={7} className="py-1.5 pb-2.5">
                                 {spamReasons.map((r, j) => (
                                   <div key={j} className="text-[10px] text-red-400/80 leading-relaxed">
                                     <span className="font-mono text-red-400/50 mr-1">{r.code}</span>
                                     {r.explanation}
+                                    {r.action && <span className="text-orange-400/80 ml-1">→ {r.action}</span>}
                                   </div>
                                 ))}
                               </td>
@@ -1424,6 +1494,7 @@ export function TokenSafetyPage() {
               const pool = livePools.find(p => p.pair_address === pairAddr)
               const fromConf = CONFIDENCE_INFO[t.from] ?? CONFIDENCE_INFO.suspect
               const toConf = CONFIDENCE_INFO[t.to] ?? CONFIDENCE_INFO.suspect
+              const event = confidenceEvents.find(e => e.pair_address === pairAddr)
               return (
                 <div key={pairAddr} className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 flex items-start gap-2">
                   <span className="text-yellow-400 text-xs mt-0.5">↑</span>
@@ -1434,9 +1505,13 @@ export function TokenSafetyPage() {
                     <span className={fromConf.color}>{fromConf.label}</span>
                     {' → '}
                     <span className={toConf.color}>{toConf.label}</span>
-                    <span className="text-yellow-400/60 ml-1">
-                      — The monitoring history below still shows the previous state. The next indexer run (every 6h) will record this transition.
-                    </span>
+                    {event?.event_summary ? (
+                      <span className="text-yellow-400/80 ml-1">— {event.event_summary}</span>
+                    ) : (
+                      <span className="text-yellow-400/60 ml-1">
+                        — The monitoring history below still shows the previous state. The next indexer run (every 6h) will record this transition.
+                      </span>
+                    )}
                   </div>
                 </div>
               )
@@ -1516,6 +1591,11 @@ export function TokenSafetyPage() {
         <p className="text-[10px] text-gray-600 text-center">
           Analysis by token_monitoring indexer (runs every 6 hours). Not real-time. Not investment advice.
         </p>
+      </div>
+
+      {/* Classification version footer (P3-B) */}
+      <div className="text-center text-[10px] text-gray-600 pt-2">
+        Classification v2.0 — 7 criteria, last calibrated 2026-03-13
       </div>
     </div>
   )
