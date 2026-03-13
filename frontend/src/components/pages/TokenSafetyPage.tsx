@@ -109,7 +109,74 @@ interface DeployerInfo {
   risk_level: string
 }
 
+// Leagues holder data for section ⑤
+interface LeagueHolder {
+  holder_address: string
+  balance_pct: number
+  tier: string
+  family_id: string | null
+}
+
+interface LeagueFamily {
+  family_id: string
+  mother_address: string
+  daughter_count: number
+  combined_balance_pct: number
+  combined_tier: string
+  link_types: string[]
+}
+
+interface LeagueSummary {
+  total_holders: number
+  poseidon_count: number
+  whale_count: number
+  shark_count: number
+  dolphin_count: number
+  squid_count: number
+  turtle_count: number
+  updated_at: string
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
+
+// Tokens tracked by the Leagues module (holder_leagues scraper)
+const LEAGUE_TOKEN_ADDRESSES: Record<string, string> = {
+  '0xa1077a294dde1b09bb078844df40758a5d0f9a27': 'PLS',
+  '0x95b303987a60c71504d99aa1b13b4da07b0790ab': 'PLSX',
+  '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39': 'pHEX',
+  '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d': 'INC',
+}
+
+// Canonical token registry — curated list of verified token addresses
+// This replaces the unreliable "search by symbol in pulsechain_tokens" approach (Finding #3)
+// Status: Canonical (address matches) / Address differs (symbol match, wrong address) / Unlisted (not in registry)
+const CANONICAL_TOKENS: Record<string, { address: string; name: string; source: string }> = {
+  // Native & Core
+  WPLS: { address: '0xa1077a294dde1b09bb078844df40758a5d0f9a27', name: 'Wrapped Pulse', source: 'native' },
+  PLS: { address: '0xa1077a294dde1b09bb078844df40758a5d0f9a27', name: 'PulseChain', source: 'native' },
+  HEX: { address: '0x2b591e99afe9f32eaa6214f7b7629768c40eeb39', name: 'HEX', source: 'native' },
+  PLSX: { address: '0x95b303987a60c71504d99aa1b13b4da07b0790ab', name: 'PulseX', source: 'native' },
+  INC: { address: '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d', name: 'Incentive', source: 'native' },
+  // Bridged stablecoins
+  DAI: { address: '0xefd766ccb38eaf1dfd701853bfce31359239f305', name: 'Dai (bridged)', source: 'bridge' },
+  USDC: { address: '0x15d38573d2feeb82e7ad5187ab8c1d52810b1f07', name: 'USD Coin (bridged)', source: 'bridge' },
+  USDT: { address: '0x0cb6f5a34ad42ec934882a05265a7d5f59b51a2f', name: 'Tether (bridged)', source: 'bridge' },
+  // Bridged assets
+  WETH: { address: '0x02dcdd04e3f455d838cd1249292c58f3b79e3c3c', name: 'Wrapped Ether (bridged)', source: 'bridge' },
+  WBTC: { address: '0xb17d901469b9208b17d916112988a3fed19b5ca1', name: 'Wrapped Bitcoin (bridged)', source: 'bridge' },
+  // DeFi tokens
+  HEDRON: { address: '0x3819f64f282bf135d62168c1e513280daf905e06', name: 'Hedron', source: 'pulsex_top' },
+  eHEX: { address: '0x57fde0a71132198bbec939b98976993d8d89d225', name: 'HEX (Ethereum)', source: 'bridge' },
+  MAXI: { address: '0x0d86eb9f43c57f6ff3bc9e23d8f9d82503f0e84b', name: 'Maximus', source: 'pulsex_top' },
+  // Top tokens by liquidity
+  LOAN: { address: '0x9159f1d2a9f51998fc9ab03fbd8f265ab14a1b3b', name: 'Liquid Loans', source: 'pulsex_top' },
+  USDL: { address: '0x0defe0442277c3e8e7b0e3c9ca2acac65116ff25', name: 'USDL Stablecoin', source: 'pulsex_top' },
+  CST: { address: '0x5b44e5891bfa780099c3485e4bdc1161da3a2981', name: 'CST', source: 'pulsex_top' },
+  BEAR: { address: '0x06e678c8884f136e2a488c027a3ac7520e260749', name: 'Bear', source: 'pulsex_top' },
+  FLEX: { address: '0x98505e3f52c6c810ef4d2de3a6b4bea8e5caa563', name: 'FLEX', source: 'pulsex_top' },
+  SPARK: { address: '0x6386704cd6f7a584ea9d23ccca66af7eba5a727e', name: 'SparkSwap', source: 'pulsex_top' },
+  pDAI: { address: '0x6b175474e89094c44da98b954eedeac495271d0f', name: 'DAI (Ethereum fork)', source: 'fork' },
+}
 
 const KNOWN_LOGOS: Record<string, string> = {
   '0xa1077a294dde1b09bb078844df40758a5d0f9a27': 'https://tokens.app.pulsex.com/images/tokens/0xA1077a294dDE1B09bB078844df40758a5D0f9a27.png',
@@ -154,6 +221,24 @@ const CONFIDENCE_INFO: Record<string, { label: string; color: string; bg: string
     bg: 'bg-red-500/10 border-red-500/20',
     explanation: 'At least one token in this pair is not recognized in our database. This pool may involve an unverified or potentially fraudulent token. Do your own research before interacting.',
   },
+}
+
+const TIER_COLORS: Record<string, string> = {
+  poseidon: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+  whale: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  shark: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+  dolphin: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  squid: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
+  turtle: 'text-gray-400 bg-gray-500/10 border-gray-500/20',
+}
+
+const TIER_THRESHOLDS: Record<string, string> = {
+  poseidon: '10%+ of supply',
+  whale: '1%+ of supply',
+  shark: '0.1%+ of supply',
+  dolphin: '0.01%+ of supply',
+  squid: '0.001%+ of supply',
+  turtle: '0.0001%+ of supply',
 }
 
 const DEX_NAMES: Record<string, string> = {
@@ -314,6 +399,12 @@ export function TokenSafetyPage() {
   const [deployer, setDeployer] = useState<DeployerInfo | null>(null)
   const [deployerLoading, setDeployerLoading] = useState(true)
 
+  // Section ⑤: Leagues integration (whale/holder tier data)
+  const [leagueSummary, setLeagueSummary] = useState<LeagueSummary | null>(null)
+  const [leagueHolders, setLeagueHolders] = useState<LeagueHolder[]>([])
+  const [leagueFamilies, setLeagueFamilies] = useState<LeagueFamily[]>([])
+  const [leagueExpanded, setLeagueExpanded] = useState(false)
+
   // Section ⑥: Token identity comparison
   const [verifiedTokens, setVerifiedTokens] = useState<Record<string, VerifiedToken[]>>({})
 
@@ -439,6 +530,37 @@ export function TokenSafetyPage() {
       .then(r => { clearTimeout(deployerTimeout); if (!r.ok) throw new Error(`API ${r.status}`); return r.json() })
       .then(json => { if (json.data) setDeployer(json.data); setDeployerLoading(false) })
       .catch(() => setDeployerLoading(false))
+
+    // ── 5. Leagues data (holder tiers — only for tracked tokens) ──
+    const leagueSymbol = LEAGUE_TOKEN_ADDRESSES[addr]
+    if (leagueSymbol) {
+      // Summary (tier counts)
+      supabase
+        .from('holder_league_current')
+        .select('total_holders, poseidon_count, whale_count, shark_count, dolphin_count, squid_count, turtle_count, updated_at')
+        .eq('token_symbol', leagueSymbol)
+        .single()
+        .then(({ data }) => { if (data) setLeagueSummary(data as LeagueSummary) })
+
+      // Top holders (limit to top tiers for display)
+      supabase
+        .from('holder_league_addresses')
+        .select('holder_address, balance_pct, tier, family_id')
+        .eq('token_symbol', leagueSymbol)
+        .in('tier', ['poseidon', 'whale', 'shark'])
+        .order('balance_pct', { ascending: false })
+        .limit(20)
+        .then(({ data }) => setLeagueHolders((data ?? []) as LeagueHolder[]))
+
+      // Families (whale clusters)
+      supabase
+        .from('holder_league_families')
+        .select('family_id, mother_address, daughter_count, combined_balance_pct, combined_tier, link_types')
+        .eq('token_symbol', leagueSymbol)
+        .order('combined_balance_pct', { ascending: false })
+        .limit(10)
+        .then(({ data }) => setLeagueFamilies((data ?? []) as LeagueFamily[]))
+    }
 
   }, [address])
 
@@ -924,7 +1046,7 @@ export function TokenSafetyPage() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          ⑤ HOLDER DISTRIBUTION (15 pts)
+          ⑤ HOLDER DISTRIBUTION (15 pts) + Leagues integration
           ══════════════════════════════════════════════════════════════════════ */}
       <div id="holders" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
@@ -936,7 +1058,9 @@ export function TokenSafetyPage() {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-400">Total Holders</span>
-            <span className="font-medium">{(safety.holder_count || 0).toLocaleString()}</span>
+            <span className="font-medium">
+              {leagueSummary ? leagueSummary.total_holders.toLocaleString() : (safety.holder_count || 0).toLocaleString()}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-400">Top 10 Holders</span>
@@ -951,6 +1075,7 @@ export function TokenSafetyPage() {
             </span>
           </div>
         </div>
+
         {/* Distribution assessment */}
         <div className={`rounded-lg px-3 py-2 text-xs ${
           safety.top10_pct > 50 ? 'bg-red-500/5 border border-red-500/10 text-red-300' :
@@ -963,11 +1088,155 @@ export function TokenSafetyPage() {
             ? 'Moderate concentration: Top 10 holders control over 30% of supply. Exercise caution.'
             : 'Healthy distribution: No excessive concentration detected in top holders.'}
         </div>
+
+        {/* Leagues tier distribution — only for tracked tokens */}
+        {leagueSummary && (
+          <div className="pt-3 border-t border-white/5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400 font-medium">Holder Tier Distribution (Leagues)</span>
+              <span className="text-[10px] text-gray-600">
+                Updated {new Date(leagueSummary.updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {([
+                ['poseidon', leagueSummary.poseidon_count],
+                ['whale', leagueSummary.whale_count],
+                ['shark', leagueSummary.shark_count],
+                ['dolphin', leagueSummary.dolphin_count],
+                ['squid', leagueSummary.squid_count],
+                ['turtle', leagueSummary.turtle_count],
+              ] as [string, number][]).map(([tier, count]) => (
+                <div key={tier} className={`rounded-lg border px-2.5 py-1.5 ${TIER_COLORS[tier]}`} title={TIER_THRESHOLDS[tier]}>
+                  <div className="text-[10px] uppercase tracking-wider opacity-70">{tier}</div>
+                  <div className="text-sm font-bold">{count.toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Top whales + family clusters (expandable) */}
+            {(leagueHolders.length > 0 || leagueFamilies.length > 0) && (
+              <>
+                <button
+                  onClick={() => setLeagueExpanded(!leagueExpanded)}
+                  className="w-full flex items-center justify-center gap-2 text-xs font-medium text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/20 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2 transition-colors"
+                >
+                  {leagueExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  {leagueExpanded ? 'Hide whale details' : `View top holders & families (${leagueHolders.length} whales, ${leagueFamilies.length} clusters)`}
+                </button>
+
+                {leagueExpanded && (
+                  <div className="space-y-4">
+                    {/* Top holders table */}
+                    {leagueHolders.length > 0 && (
+                      <div>
+                        <div className="text-xs text-gray-400 mb-2 font-medium">Top Holders (Poseidon / Whale / Shark)</div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-white/10 text-gray-500">
+                                <th className="py-1.5 text-left">Address</th>
+                                <th className="py-1.5 text-center">Tier</th>
+                                <th className="py-1.5 text-right">% Supply</th>
+                                <th className="py-1.5 text-center">Family</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {leagueHolders.map((h, i) => (
+                                <tr key={i} className="border-b border-white/5">
+                                  <td className="py-1.5 font-mono text-gray-300">
+                                    <a
+                                      href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${h.holder_address}`}
+                                      target="_blank" rel="noopener noreferrer"
+                                      className="hover:text-cyan-400 transition-colors"
+                                    >
+                                      {h.holder_address.slice(0, 8)}...{h.holder_address.slice(-6)}
+                                    </a>
+                                  </td>
+                                  <td className="py-1.5 text-center">
+                                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${TIER_COLORS[h.tier] || 'text-gray-400'}`}>
+                                      {h.tier}
+                                    </span>
+                                  </td>
+                                  <td className={`py-1.5 text-right font-medium ${h.balance_pct > 5 ? 'text-red-400' : h.balance_pct > 1 ? 'text-orange-400' : ''}`}>
+                                    {h.balance_pct.toFixed(4)}%
+                                  </td>
+                                  <td className="py-1.5 text-center">
+                                    {h.family_id ? (
+                                      <span className="text-purple-400 text-[10px]" title={`Family: ${h.family_id.slice(0, 10)}...`}>Clustered</span>
+                                    ) : (
+                                      <span className="text-gray-600">--</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Family clusters */}
+                    {leagueFamilies.length > 0 && (
+                      <div>
+                        <div className="text-xs text-gray-400 mb-2 font-medium">Whale Family Clusters</div>
+                        <div className="space-y-2">
+                          {leagueFamilies.map((f, i) => (
+                            <div key={i} className="rounded-lg bg-purple-500/5 border border-purple-500/10 px-3 py-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-purple-400 text-xs font-medium">Mother</span>
+                                  <a
+                                    href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${f.mother_address}`}
+                                    target="_blank" rel="noopener noreferrer"
+                                    className="text-xs font-mono text-gray-300 hover:text-cyan-400 transition-colors"
+                                  >
+                                    {f.mother_address.slice(0, 8)}...{f.mother_address.slice(-6)}
+                                  </a>
+                                </div>
+                                <span className={`text-xs font-medium ${f.combined_balance_pct > 5 ? 'text-red-400' : 'text-orange-400'}`}>
+                                  {f.combined_balance_pct.toFixed(3)}% combined
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+                                <span>{f.daughter_count} daughter{f.daughter_count !== 1 ? 's' : ''}</span>
+                                <span className={`px-1.5 py-0.5 rounded border ${TIER_COLORS[f.combined_tier] || 'text-gray-400'}`}>{f.combined_tier}</span>
+                                {f.link_types.map((lt, j) => (
+                                  <span key={j} className="text-purple-400/60">{lt.replace(/_/g, ' ')}</span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Link
+                      to="/leagues"
+                      className="flex items-center justify-center gap-2 text-xs text-[#00D4FF] hover:text-white transition-colors"
+                    >
+                      View full Leagues page <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Message for non-tracked tokens */}
+        {!leagueSummary && address && !LEAGUE_TOKEN_ADDRESSES[address.toLowerCase()] && (
+          <p className="text-[10px] text-gray-600 text-center pt-2">
+            Detailed tier distribution (Leagues) is available for core tokens: PLS, PLSX, pHEX, INC.
+            <Link to="/leagues" className="text-[#00D4FF] hover:underline ml-1">View Leagues</Link>
+          </p>
+        )}
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
           ⑥ TOKEN IDENTITY (informational)
-          P0-A fix: "Verified" → "Known" (pulsechain_tokens is auto-populated)
+          Phase E: Canonical registry replaces auto-populated pulsechain_tokens (Finding #3)
+          Status: Canonical / Address differs / Unlisted
           ══════════════════════════════════════════════════════════════════════ */}
       <div id="identity" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
@@ -977,31 +1246,62 @@ export function TokenSafetyPage() {
           <span className="text-[10px] text-gray-600 font-normal normal-case tracking-normal ml-auto">Informational</span>
         </h3>
 
-        {/* Token registry status */}
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-400">Symbol</span>
-            <span className="font-medium">{tokenInfo?.symbol || address?.slice(0, 10)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Name</span>
-            <span>{tokenInfo?.name || 'Unknown'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Registry Status</span>
-            {tokenInfo ? (
-              <span className="inline-flex items-center gap-1 text-xs text-cyan-400">
-                <CheckCircle className="h-3 w-3" /> Known Token
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-xs text-yellow-400">
-                <AlertTriangle className="h-3 w-3" /> Unknown — not in database
-              </span>
-            )}
-          </div>
-        </div>
+        {/* Token registry status — canonical check */}
+        {(() => {
+          const symbol = tokenInfo?.symbol?.toUpperCase()
+          const canonical = symbol ? CANONICAL_TOKENS[symbol] : undefined
+          const isCanonical = canonical && address && canonical.address.toLowerCase() === address.toLowerCase()
+          const addressDiffers = canonical && address && canonical.address.toLowerCase() !== address.toLowerCase()
+          return (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Symbol</span>
+                <span className="font-medium">{tokenInfo?.symbol || address?.slice(0, 10)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Name</span>
+                <span>{tokenInfo?.name || 'Unknown'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Canonical Status</span>
+                {isCanonical ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-emerald-400 font-bold">
+                    <CheckCircle className="h-3 w-3" /> Canonical
+                  </span>
+                ) : addressDiffers ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-red-400 font-bold">
+                    <XCircle className="h-3 w-3" /> Address differs
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                    Unlisted
+                  </span>
+                )}
+              </div>
+              {canonical && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Source</span>
+                  <span className="text-xs text-gray-500">{canonical.source}</span>
+                </div>
+              )}
+              {/* Warning banner for address mismatch */}
+              {addressDiffers && canonical && (
+                <div className="rounded-lg bg-red-500/5 border border-red-500/10 px-3 py-2 mt-1">
+                  <div className="text-xs text-red-300 font-bold mb-1">Impersonation Warning</div>
+                  <p className="text-[11px] text-red-300/80">
+                    This token uses the symbol "{tokenInfo?.symbol}" but its address does not match the canonical {canonical.name} ({canonical.address.slice(0, 10)}...{canonical.address.slice(-6)}).
+                    This could be a fork copy, a scam, or a different token. Verify the contract before interacting.
+                  </p>
+                  <Link to={`/token/${canonical.address}`} className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-[#00D4FF] hover:underline">
+                    <Shield className="h-3 w-3" /> View canonical {tokenInfo?.symbol}
+                  </Link>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
-        {/* Token Address Comparison — migrated from PoolConfidencePopup */}
+        {/* Token Address Comparison — dual check: canonical + known (from pools) */}
         {uniquePoolTokens.length > 0 && (
           <div className="pt-2 border-t border-white/5">
             <div className="text-xs text-gray-400 mb-3 font-medium">Token Address Comparison (from pools)</div>
@@ -1016,8 +1316,13 @@ export function TokenSafetyPage() {
               </thead>
               <tbody>
                 {uniquePoolTokens.map((t, idx) => {
-                  const verified = t.symbol ? verifiedTokens[t.symbol] : undefined
-                  const matchesKnown = verified?.some(v => v.address.toLowerCase() === t.address?.toLowerCase())
+                  // Canonical registry check (curated, reliable)
+                  const canonicalEntry = t.symbol ? CANONICAL_TOKENS[t.symbol.toUpperCase()] : undefined
+                  const isCanonicalMatch = canonicalEntry && t.address && canonicalEntry.address.toLowerCase() === t.address.toLowerCase()
+                  const isCanonicalMismatch = canonicalEntry && t.address && canonicalEntry.address.toLowerCase() !== t.address.toLowerCase()
+                  // Fallback: pulsechain_tokens check (auto-populated, less reliable)
+                  const knownTokens = t.symbol ? verifiedTokens[t.symbol] : undefined
+                  const matchesKnown = knownTokens?.some(v => v.address.toLowerCase() === t.address?.toLowerCase())
                   return (
                     <Fragment key={idx}>
                       <tr className="border-b border-white/5">
@@ -1034,9 +1339,10 @@ export function TokenSafetyPage() {
                         </td>
                         <td className="py-1.5 text-center">
                           {!t.address ? <span className="text-gray-600">--</span>
-                            : matchesKnown ? <span className="text-cyan-400 font-bold">Known</span>
-                            : verified && verified.length > 0 ? <span className="text-red-400 font-bold">Mismatch</span>
-                            : <span className="text-yellow-400">Unknown</span>}
+                            : isCanonicalMatch ? <span className="text-emerald-400 font-bold">Canonical</span>
+                            : isCanonicalMismatch ? <span className="text-red-400 font-bold">Address differs</span>
+                            : matchesKnown ? <span className="text-cyan-400">Known</span>
+                            : <span className="text-gray-500">Unlisted</span>}
                         </td>
                         <td className="py-1.5 text-center">
                           {t.address && (
@@ -1050,23 +1356,23 @@ export function TokenSafetyPage() {
                           )}
                         </td>
                       </tr>
-                      {/* Show real known address if mismatch */}
-                      {verified && verified.length > 0 && !matchesKnown && (
+                      {/* Show canonical address if mismatch */}
+                      {isCanonicalMismatch && canonicalEntry && (
                         <tr className="border-b border-white/5 bg-red-500/5">
-                          <td className="py-1 text-cyan-400/60 pl-4 text-[10px]">Real {t.symbol}</td>
-                          <td className="py-1 font-mono text-cyan-400/80">
-                            <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${verified[0].address}`}
+                          <td className="py-1 text-emerald-400/60 pl-4 text-[10px]">Canonical {t.symbol}</td>
+                          <td className="py-1 font-mono text-emerald-400/80">
+                            <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${canonicalEntry.address}`}
                               target="_blank" rel="noopener noreferrer"
-                              className="hover:text-cyan-300 transition-colors"
+                              className="hover:text-emerald-300 transition-colors"
                             >
-                              {verified[0].address.slice(0, 10)}...{verified[0].address.slice(-8)}
+                              {canonicalEntry.address.slice(0, 10)}...{canonicalEntry.address.slice(-8)}
                             </a>
                           </td>
-                          <td className="py-1 text-center text-cyan-400 font-bold">Known</td>
+                          <td className="py-1 text-center text-emerald-400 font-bold">Canonical</td>
                           <td className="py-1 text-center">
-                            <Link to={`/token/${verified[0].address}`}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#00D4FF]/10 border border-[#00D4FF]/20 text-[#00D4FF] hover:bg-[#00D4FF]/20 transition-colors"
-                              title={`Token Safety for real ${t.symbol}`}
+                            <Link to={`/token/${canonicalEntry.address}`}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                              title={`Token Safety for canonical ${t.symbol}`}
                             >
                               <Shield className="h-3 w-3" />
                               <span className="text-[10px] font-medium">Analyze</span>
@@ -1080,8 +1386,10 @@ export function TokenSafetyPage() {
               </tbody>
             </table>
             <p className="text-[10px] text-gray-600 mt-2">
-              "Known" means the token exists in our database (auto-populated by trading volume). This is not a manual verification or endorsement.
-              A "Mismatch" means this pool uses a different contract than the established token with the same symbol.
+              "Canonical" = verified address from curated registry ({Object.keys(CANONICAL_TOKENS).length} tokens).
+              "Known" = found in auto-populated database (not manually verified).
+              "Address differs" = same symbol but different contract than canonical — potential impersonation.
+              "Unlisted" = symbol not in either registry.
             </p>
           </div>
         )}
