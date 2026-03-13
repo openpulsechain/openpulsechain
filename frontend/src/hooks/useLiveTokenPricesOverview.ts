@@ -21,6 +21,9 @@ const OVERVIEW_TOKENS = [
   '0x2fa878ab3f87cc1c9737fc071108f904c0b0c95d', // INC (Incentive)
 ]
 
+// Stablecoins — DexScreener shows Price chart (not MCap) when quote is a stablecoin
+const STABLECOINS = new Set(['DAI', 'USDC', 'USDT', 'eDAI', 'eUSDC', 'eUSDT'])
+
 interface DexPair {
   chainId: string
   pairAddress: string
@@ -64,17 +67,31 @@ export function useLiveTokenPricesOverview() {
         (p) => p.chainId === 'pulsechain' && p.baseToken.address.toLowerCase() === addrLower
       )
 
-      // Sort: prefer pairs with volume > 0, then by liquidity desc
-      basePairs.sort((a, b) => {
+      if (basePairs.length === 0) return null
+
+      // Best pair for PRICE data: highest liquidity with volume
+      const pricePairs = [...basePairs].sort((a, b) => {
         const aVol = a.volume?.h24 ?? 0
         const bVol = b.volume?.h24 ?? 0
         if (aVol > 0 && bVol === 0) return -1
         if (bVol > 0 && aVol === 0) return 1
         return (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
       })
+      const bestPrice = pricePairs[0]
 
-      const best = basePairs[0]
-      if (!best) return null
+      // Best pair for DEXSCREENER LINK: stablecoin-quoted (shows Price chart, not MCap)
+      // then highest liquidity with volume
+      const linkPairs = [...basePairs].sort((a, b) => {
+        const aStable = STABLECOINS.has(a.quoteToken.symbol) ? 1 : 0
+        const bStable = STABLECOINS.has(b.quoteToken.symbol) ? 1 : 0
+        if (aStable !== bStable) return bStable - aStable
+        const aVol = a.volume?.h24 ?? 0
+        const bVol = b.volume?.h24 ?? 0
+        if (aVol > 0 && bVol === 0) return -1
+        if (bVol > 0 && aVol === 0) return 1
+        return (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)
+      })
+      const bestLink = linkPairs[0]
 
       // Aggregate volume & liquidity across all base pairs
       const totalVolume = basePairs.reduce((s, p) => s + (p.volume?.h24 ?? 0), 0)
@@ -82,15 +99,15 @@ export function useLiveTokenPricesOverview() {
 
       return {
         token_address: addr,
-        token_symbol: best.baseToken.symbol,
-        price_usd: best.priceUsd ? parseFloat(best.priceUsd) : null,
-        price_change_24h: best.priceChange?.h24 ?? null,
-        market_cap_usd: best.marketCap ?? best.fdv ?? null,
+        token_symbol: bestPrice.baseToken.symbol,
+        price_usd: bestPrice.priceUsd ? parseFloat(bestPrice.priceUsd) : null,
+        price_change_24h: bestPrice.priceChange?.h24 ?? null,
+        market_cap_usd: bestPrice.marketCap ?? bestPrice.fdv ?? null,
         total_volume_24h_usd: totalVolume,
         total_liquidity_usd: totalLiquidity,
         last_updated: new Date().toISOString(),
-        top_pool_dx_url: best.url,
-        top_pool_pair_address: best.pairAddress,
+        top_pool_dx_url: bestLink.url,
+        top_pool_pair_address: bestLink.pairAddress,
       }
     }
 
