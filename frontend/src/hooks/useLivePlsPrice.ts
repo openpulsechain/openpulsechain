@@ -1,14 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 
-const PULSEX_V2_SUBGRAPH = 'https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2'
-const WPLS_ADDRESS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27'
+const SCANNER_URL = 'https://scanner.tradingview.com/global/scan'
+const WPLS_TICKER = 'PULSEX:WPLSUSDT_322DF7.USD'
 const REFRESH_INTERVAL = 5_000 // 5 seconds
-
-const QUERY = `{
-  token(id: "${WPLS_ADDRESS}") {
-    derivedUSD
-  }
-}`
 
 export function useLivePlsPrice() {
   const [price, setPrice] = useState<number | null>(null)
@@ -20,15 +14,22 @@ export function useLivePlsPrice() {
 
     async function fetchPrice() {
       try {
-        const res = await fetch(PULSEX_V2_SUBGRAPH, {
+        const res = await fetch(SCANNER_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: QUERY }),
+          cache: 'no-store',
+          body: JSON.stringify({
+            symbols: {
+              tickers: [WPLS_TICKER],
+              query: { types: [] },
+            },
+            columns: ['close'],
+          }),
         })
+        if (!res.ok) return
         const json = await res.json()
-        const derivedUSD = json?.data?.token?.derivedUSD
-        if (derivedUSD && mountedRef.current) {
-          setPrice(parseFloat(derivedUSD))
+        const close = json?.data?.[0]?.d?.[0]
+        if (close != null && mountedRef.current) {
+          setPrice(close)
           setLoading(false)
         }
       } catch {

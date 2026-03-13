@@ -360,7 +360,7 @@ export function OverviewPage() {
         <KpiCard
           title="PLS Price"
           titleSuffix={<LiveIndicator />}
-          value={plsPriceUsd ? `$${plsPriceUsd.toPrecision(6)}` : '--'}
+          value={plsPriceUsd ? `$${parseFloat(plsPriceUsd.toPrecision(4))}` : '--'}
           trend={plsPrice?.price_change_24h_pct ?? undefined}
           subtitle="24h change"
           icon={<DollarSign className="h-5 w-5" />}
