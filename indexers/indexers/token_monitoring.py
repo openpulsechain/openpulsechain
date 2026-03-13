@@ -825,6 +825,9 @@ def _fetch_all_pools(addresses: list[str], known_addresses: set[str],
             }
             unique.append(dx_only_pool)
 
+        # The monitored token itself must always be "known" in its own pools
+        known_addresses.add(addr.lower())
+
         # Classify each pool (anti-spam)
         classified = [_classify_pool(p, known_addresses) for p in unique]
 

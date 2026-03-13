@@ -262,11 +262,18 @@ function formatUsdCompact(val: number): string {
 
 // P0-D fix: use real token symbols instead of generic "Token 0/1"
 // P3-A: add actionable recommendations per spam reason type
-function formatSpamReason(raw: string | null, baseSymbol?: string | null, quoteSymbol?: string | null): { code: string; explanation: string; action?: string }[] {
+function formatSpamReason(raw: string | null, baseSymbol?: string | null, quoteSymbol?: string | null, pageAddress?: string | null, baseAddress?: string | null, quoteAddress?: string | null): { code: string; explanation: string; action?: string }[] {
   if (!raw) return []
   const t0 = baseSymbol || 'Base token'
   const t1 = quoteSymbol || 'Quote token'
-  return raw.split('; ').map(part => {
+  const pa = pageAddress?.toLowerCase()
+  return raw.split('; ').filter(part => {
+    // Don't flag the monitored token as "unknown" on its own page (stale cache safety net)
+    const k = part.split(':')[0].trim()
+    if (k === 'unknown_token0' && pa && baseAddress?.toLowerCase() === pa) return false
+    if (k === 'unknown_token1' && pa && quoteAddress?.toLowerCase() === pa) return false
+    return true
+  }).map(part => {
     const [code, val] = part.split(':')
     const key = code.trim()
     if (key.startsWith('low_reserve')) {
@@ -966,7 +973,7 @@ export function TokenSafetyPage() {
                   </thead>
                   <tbody>
                     {livePools.map((pool, i) => {
-                      const spamReasons = formatSpamReason(pool.pool_spam_reason, pool.base_token_symbol, pool.quote_token_symbol)
+                      const spamReasons = formatSpamReason(pool.pool_spam_reason, pool.base_token_symbol, pool.quote_token_symbol, address, pool.base_token_address, pool.quote_token_address)
                       const transition = poolTransitions[pool.pair_address]
                       return (
                         <Fragment key={pool.pair_address}>
