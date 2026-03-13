@@ -41,37 +41,49 @@ def _fetch_daily_volumes(endpoint: str, pair_addresses: list[str]) -> dict[str, 
     for i in range(0, len(pair_addresses), 10):
         batch = pair_addresses[i:i + 10]
         addr_list = ", ".join(f'"{a}"' for a in batch)
-        query = f"""{{
-          pairDayDatas(
-            first: {len(batch) * 3},
-            where: {{pairAddress_in: [{addr_list}], date_gt: {cutoff}}},
-            orderBy: date,
-            orderDirection: desc
-          ) {{
-            id
-            date
-            dailyVolumeUSD
-          }}
-        }}"""
 
-        try:
-            data = query_subgraph(endpoint, query)
-            day_datas = data.get("pairDayDatas", [])
-            if i == 0:
-                logger.info(f"  pairDayDatas batch 0: {len(day_datas)} entries, keys={list(day_datas[0].keys()) if day_datas else 'empty'}")
+        # Try pair_in first (Pair entity reference), fallback to pairAddress_in
+        for filter_field in ["pair_in", "pairAddress_in"]:
+            query = f"""{{
+              pairDayDatas(
+                first: {len(batch) * 3},
+                where: {{{filter_field}: [{addr_list}], date_gt: {cutoff}}},
+                orderBy: date,
+                orderDirection: desc
+              ) {{
+                id
+                date
+                dailyVolumeUSD
+              }}
+            }}"""
+
+            try:
+                data = query_subgraph(endpoint, query)
+                day_datas = data.get("pairDayDatas", [])
+                if i == 0:
+                    logger.info(f"  pairDayDatas ({filter_field}) batch 0: {len(day_datas)} entries")
+                    if day_datas:
+                        logger.info(f"  First entry: {day_datas[0]}")
+                for dd in day_datas:
+                    # id format: "{pairAddress}-{dayNumber}"
+                    raw_id = dd.get("id", "")
+                    addr = raw_id.rsplit("-", 1)[0] if "-" in raw_id else raw_id
+                    if not addr or addr in volumes:
+                        continue  # Keep most recent
+                    vol = float(dd.get("dailyVolumeUSD", 0))
+                    if vol >= 0:
+                        volumes[addr] = vol
+                # If we got results, no need to try fallback filter
                 if day_datas:
-                    logger.info(f"  First entry: {day_datas[0]}")
-            for dd in day_datas:
-                # id format: "{pairAddress}-{dayNumber}"
-                raw_id = dd.get("id", "")
-                addr = raw_id.rsplit("-", 1)[0] if "-" in raw_id else raw_id
-                if not addr or addr in volumes:
-                    continue  # Keep most recent
-                vol = float(dd.get("dailyVolumeUSD", 0))
-                if vol >= 0:
-                    volumes[addr] = vol
-        except Exception as e:
-            logger.warning(f"Failed to fetch pairDayDatas batch: {e}")
+                    break
+                # If empty results (not error), try next filter
+                if i == 0:
+                    logger.info(f"  {filter_field} returned 0 results, trying next filter...")
+            except Exception as e:
+                if i == 0:
+                    logger.warning(f"  {filter_field} failed: {e}")
+                # Try next filter
+                continue
 
         time.sleep(0.2)
 

@@ -558,28 +558,33 @@ def _fetch_pool_daily_volumes(pair_addresses: list[str], endpoint: str) -> dict[
     for i in range(0, len(pair_addresses), 10):
         batch = pair_addresses[i:i + 10]
         addr_list = ", ".join(f'"{a}"' for a in batch)
-        try:
-            query = f"""{{
-                pairDayDatas(
-                    first: {len(batch) * 3},
-                    where: {{pairAddress_in: [{addr_list}], date_gt: {cutoff}}},
-                    orderBy: date,
-                    orderDirection: desc
-                ) {{
-                    id
-                    dailyVolumeUSD
-                }}
-            }}"""
-            data = _query_subgraph(query, endpoint)
-            for dd in data.get("pairDayDatas", []):
-                # id format: "{pairAddress}-{dayNumber}"
-                raw_id = dd.get("id", "")
-                addr = raw_id.rsplit("-", 1)[0].lower() if "-" in raw_id else raw_id.lower()
-                if not addr or addr in volumes:
-                    continue
-                volumes[addr] = float(dd.get("dailyVolumeUSD", 0))
-        except Exception:
-            pass
+
+        for filter_field in ["pair_in", "pairAddress_in"]:
+            try:
+                query = f"""{{
+                    pairDayDatas(
+                        first: {len(batch) * 3},
+                        where: {{{filter_field}: [{addr_list}], date_gt: {cutoff}}},
+                        orderBy: date,
+                        orderDirection: desc
+                    ) {{
+                        id
+                        dailyVolumeUSD
+                    }}
+                }}"""
+                data = _query_subgraph(query, endpoint)
+                day_datas = data.get("pairDayDatas", [])
+                for dd in day_datas:
+                    raw_id = dd.get("id", "")
+                    addr = raw_id.rsplit("-", 1)[0].lower() if "-" in raw_id else raw_id.lower()
+                    if not addr or addr in volumes:
+                        continue
+                    volumes[addr] = float(dd.get("dailyVolumeUSD", 0))
+                if day_datas:
+                    break
+            except Exception:
+                continue
+
         time.sleep(0.2)
 
     return volumes
