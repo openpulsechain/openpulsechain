@@ -29,9 +29,8 @@ export function useLiveTokenPricesOverview(limit = 50) {
         const { data: rows, error } = await supabase
           .from('token_live_summary')
           .select('token_address, token_symbol, price_usd, price_change_24h, market_cap_usd, total_volume_24h_usd, total_liquidity_usd, last_updated')
-          .not('price_usd', 'is', null)
-          .gt('price_usd', 0)
-          .gt('market_cap_usd', 0)
+          .gt('price_usd', 0.0000001)
+          .gt('market_cap_usd', 1000)
           .gt('total_volume_24h_usd', 0)
           .order('total_volume_24h_usd', { ascending: false, nullsFirst: false })
           .limit(limit)
