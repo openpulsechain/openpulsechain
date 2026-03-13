@@ -381,7 +381,7 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
     <div className="fixed inset-0 z-[60] backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
         ref={popupRef}
-        className="relative w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl border border-white/10 bg-gray-900 shadow-2xl p-6 space-y-5"
+        className="relative w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-2xl border border-white/10 bg-gray-900 shadow-2xl p-6 space-y-5"
         onClick={e => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute top-3 right-3 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
@@ -441,12 +441,12 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-white/10 text-gray-500">
-                    <th className="py-2 text-left">Date</th>
+                    <th className="py-2 text-center">Date</th>
                     <th className="py-2 text-center">Confidence</th>
                     <th className="py-2 text-center">Legitimate</th>
-                    <th className="py-2 text-right">Reserve USD</th>
-                    <th className="py-2 text-right">Volume 24h</th>
-                    <th className="py-2 text-left">Spam Reason</th>
+                    <th className="py-2 text-center">Reserve USD</th>
+                    <th className="py-2 text-center">Volume 24h</th>
+                    <th className="py-2 text-center">Spam Reason</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -456,7 +456,7 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
                     const changed = prevSnap && (prevSnap.pool_confidence !== snap.pool_confidence || prevSnap.pool_is_legitimate !== snap.pool_is_legitimate)
                     return (
                       <tr key={i} className={`border-b border-white/5 ${changed ? 'bg-yellow-500/5' : ''}`}>
-                        <td className="py-1.5 text-gray-400 whitespace-nowrap">
+                        <td className="py-1.5 text-center text-gray-400 whitespace-nowrap">
                           {new Date(snap.snapshot_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           {changed && <span className="ml-1 text-yellow-400" title="Status changed">*</span>}
                         </td>
@@ -464,9 +464,9 @@ function PoolConfidencePopup({ pool, onClose }: { pool: PoolRow; onClose: () => 
                         <td className={`py-1.5 text-center ${snap.pool_is_legitimate ? 'text-emerald-400' : 'text-red-400 font-bold'}`}>
                           {snap.pool_is_legitimate ? 'Yes' : 'No'}
                         </td>
-                        <td className="py-1.5 text-right text-gray-300">{snap.reserve_usd != null ? formatUsd(snap.reserve_usd) : '--'}</td>
-                        <td className="py-1.5 text-right text-gray-300">{snap.volume_24h_usd != null ? formatUsd(snap.volume_24h_usd) : '--'}</td>
-                        <td className="py-1.5 text-left text-red-400/70 max-w-[250px]">
+                        <td className="py-1.5 text-center text-gray-300">{snap.reserve_usd != null ? formatUsd(snap.reserve_usd) : '--'}</td>
+                        <td className="py-1.5 text-center text-gray-300">{snap.volume_24h_usd != null ? formatUsd(snap.volume_24h_usd) : '--'}</td>
+                        <td className="py-1.5 text-center text-red-400/70 max-w-[250px]">
                           {snap.pool_spam_reason
                             ? formatSpamReason(snap.pool_spam_reason).map(r => r.explanation).join(' ')
                             : '—'}
