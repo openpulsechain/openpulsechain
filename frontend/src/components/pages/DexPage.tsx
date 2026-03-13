@@ -960,7 +960,7 @@ export function DexPage() {
             <h2 className="text-lg font-semibold text-white">Top Pairs by Volume</h2>
             {topPairs.data[0]?.updated_at && (
               <span className="text-[11px] text-gray-500">
-                Updated {new Date(topPairs.data[0].updated_at).toLocaleString()}
+                Updated {new Date(topPairs.data[0].updated_at).toLocaleString()} · Refreshes every 15 min
               </span>
             )}
           </div>
