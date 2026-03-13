@@ -19,25 +19,16 @@ def get_deployer_address(token_address: str) -> str | None:
     """Get the deployer address for a token contract."""
     addr = token_address.lower()
     try:
+        # Use /addresses/ endpoint which has creator_address_hash
         resp = requests.get(
-            f"{SCAN_API_URL}/api/v2/smart-contracts/{addr}",
+            f"{SCAN_API_URL}/api/v2/addresses/{addr}",
             timeout=15
         )
         if resp.status_code == 200:
             data = resp.json()
-            creator = data.get("creator", {})
-            if isinstance(creator, dict):
-                return creator.get("hash", "").lower()
-            # Try address creation tx
-            creation_tx = data.get("creation_tx_hash")
-            if creation_tx:
-                tx_resp = requests.get(
-                    f"{SCAN_API_URL}/api/v2/transactions/{creation_tx}",
-                    timeout=15
-                )
-                if tx_resp.status_code == 200:
-                    tx_data = tx_resp.json()
-                    return tx_data.get("from", {}).get("hash", "").lower()
+            creator = data.get("creator_address_hash")
+            if creator:
+                return creator.lower()
     except Exception as e:
         logger.warning(f"Failed to get deployer for {addr}: {str(e)[:100]}")
     return None
@@ -64,8 +55,8 @@ def get_deployer_tokens(deployer_address: str) -> list[dict]:
         data = resp.json()
         for tx in data.get("items", []):
             # Contract creation = "to" is null and "created_contract" exists
-            created = tx.get("created_contract", {})
-            if created and created.get("hash"):
+            created = tx.get("created_contract") or {}
+            if created.get("hash"):
                 contract_addr = created["hash"].lower()
 
                 # Check if it's a token (has token info)

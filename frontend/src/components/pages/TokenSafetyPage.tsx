@@ -604,7 +604,19 @@ export function TokenSafetyPage() {
     const deployerTimeout = setTimeout(() => deployerController.abort(), 10000)
     fetch(`${SAFETY_API}/api/v1/token/${addr}/deployer`, { signal: deployerController.signal })
       .then(r => { clearTimeout(deployerTimeout); if (!r.ok) throw new Error(`API ${r.status}`); return r.json() })
-      .then(json => { if (json.data) setDeployer(json.data); setDeployerLoading(false) })
+      .then(json => {
+        if (json.data) {
+          const d = json.data
+          setDeployer({
+            deployer_address: d.deployer || d.deployer_address || '',
+            tokens_deployed: d.tokens_deployed ?? 0,
+            dead_tokens: d.tokens_dead ?? d.dead_tokens ?? 0,
+            mortality_rate: (d.dead_ratio ?? 0) / 100,
+            risk_level: d.risk_level ?? 'unknown',
+          })
+        }
+        setDeployerLoading(false)
+      })
       .catch(() => setDeployerLoading(false))
 
     // ── 5. Leagues data (holder tiers — only for tracked tokens) ──
