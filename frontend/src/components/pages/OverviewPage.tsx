@@ -399,7 +399,7 @@ export function OverviewPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
                 </span>
-                <span>Live · Refreshes every 5s</span>
+                <span>Live · DexScreener API</span>
               </>
             )}
           </span>
@@ -450,7 +450,7 @@ export function OverviewPage() {
                   <td className="py-2.5 text-center text-white">
                     {token.price_usd != null
                       ? token.price_usd < 0.01
-                        ? `$${token.price_usd.toPrecision(6)}`
+                        ? `$${parseFloat(token.price_usd.toPrecision(6))}`
                         : `$${token.price_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : '--'}
                   </td>
@@ -501,7 +501,7 @@ export function OverviewPage() {
             </div>
             <p className="font-medium text-gray-400">Data Methodology</p>
             <ul className="space-y-1 list-disc list-inside">
-              <li><strong className="text-gray-400">Prices:</strong> Live prices from DexScreener API (direct). Refreshes every 5 seconds.</li>
+              <li><strong className="text-gray-400">Prices:</strong> Live prices from DexScreener API (direct, ~15s refresh). May differ slightly from PLS Price KPI (which uses PulseX Subgraph) due to different data sources.</li>
               <li><strong className="text-gray-400">Market Cap*:</strong> Fully Diluted Valuation (FDV) = Total Supply × Price. No reliable circulating supply exists on-chain for PulseChain.</li>
               <li><strong className="text-gray-400">Volume (24h):</strong> Live 24h trading volume aggregated across all DEXes.</li>
               <li><strong className="text-gray-400">24h Change:</strong> Price change over the last 24 hours.</li>

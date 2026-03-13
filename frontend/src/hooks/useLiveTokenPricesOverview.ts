@@ -130,7 +130,7 @@ export function useLiveTokenPricesOverview() {
     }
 
     fetchAll()
-    intervalRef.current = setInterval(fetchAll, 5_000)
+    intervalRef.current = setInterval(fetchAll, 15_000)
 
     return () => {
       cancelled = true
