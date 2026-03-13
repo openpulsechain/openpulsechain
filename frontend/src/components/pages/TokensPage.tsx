@@ -287,17 +287,8 @@ const COLUMN_DESCRIPTIONS: Record<string, string> = {
   'Buys': 'Number of buy transactions in this pool over the last 24 hours.',
   'Sells': 'Number of sell transactions in this pool over the last 24 hours.',
   'Price Change 24h': 'Percentage price change over the last 24 hours. Green = up, red = down.',
-  'Confidence': 'Pool legitimacy confidence level. High = verified legitimate pool. Medium = likely legitimate. Low = unverified. ⚠ = suspected spam.',
-  'Tier': 'Data freshness tier. Hot = updated every 30s. Warm = every 5 min. Cold = every 1 hour.',
+  'Safety': 'Composite indicator: colored dot = pool confidence (green=high, yellow=medium, orange=low, red=suspect), letter = token safety grade (A-F). Click to view full safety report.',
   'DexScreener': 'External link to view this pool on DexScreener for detailed charts and analytics.',
-}
-
-// Confidence explanations by level
-const CONFIDENCE_INFO: Record<string, { label: string; color: string; explanation: string }> = {
-  high: { label: 'High', color: 'text-emerald-400', explanation: 'Both tokens in this pair are core PulseChain tokens (WPLS, HEX, PLSX, INC, WETH, DAI, USDC, USDT, WBTC, HEDRON, MAXI, eHEX). Highest trust level.' },
-  medium: { label: 'Medium', color: 'text-yellow-400', explanation: 'One token is a core PulseChain token and the other is a known token listed in our database. Standard trust level for most legitimate pairs.' },
-  low: { label: 'Low', color: 'text-orange-400', explanation: 'Both tokens are known (listed in our database) but neither is a core token. Exercise caution — verify the token contracts independently.' },
-  suspect: { label: 'Suspect', color: 'text-red-400', explanation: 'At least one token in this pair is not recognized in our database. This pool may involve an unverified or potentially fraudulent token. Do your own research before interacting.' },
 }
 
 
