@@ -761,6 +761,9 @@ export function TokenSafetyPage() {
         </div>
       </div>
 
+      {/* ── Grid: 2-column layout for modules ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
       {/* ══════════════════════════════════════════════════════════════════════
           ① CONTRACT ANALYSIS (25 pts)
           ══════════════════════════════════════════════════════════════════════ */}
@@ -1649,6 +1652,8 @@ export function TokenSafetyPage() {
           Analysis by token_monitoring indexer (runs every 6 hours). Not real-time. Not investment advice.
         </p>
       </div>
+
+      </div>{/* end grid */}
 
       {/* Classification version footer (P3-B) */}
       <div className="text-center text-[10px] text-gray-600 pt-2">
