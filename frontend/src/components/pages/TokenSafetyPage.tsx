@@ -1118,7 +1118,7 @@ export function TokenSafetyPage() {
               {honeypotLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-[#00D4FF]" />
-                  <span className="ml-2 text-gray-400">Running on-chain simulation...</span>
+                  <span className="ml-2 text-gray-400 animate-pulse">Running on-chain simulation...</span>
                 </div>
               ) : (() => {
                 const hp = honeypotDetail

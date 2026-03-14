@@ -221,19 +221,36 @@ export function SafetyDashboardPage() {
     supabase.from('pulsechain_tokens').select('address, symbol, name').eq('address', addr).single()
       .then(({ data }) => { if (data) setHpToken(data) })
 
-    // Call Safety API for honeypot analysis
+    // Try cached analysis first (fast), then fallback to fresh analysis
     try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 30000)
-      const res = await fetch(`${SAFETY_API}/api/v1/token/${addr}/safety?fresh=true`, { signal: ctrl.signal })
-      clearTimeout(t)
-      if (!res.ok) throw new Error(`API ${res.status}`)
-      const json = await res.json()
-      const hp = json.data?.honeypot
-      if (hp) setHpData(hp)
+      const ctrl1 = new AbortController()
+      const t1 = setTimeout(() => ctrl1.abort(), 10000)
+      const res1 = await fetch(`${SAFETY_API}/api/v1/token/${addr}/safety`, { signal: ctrl1.signal })
+      clearTimeout(t1)
+      if (res1.ok) {
+        const json1 = await res1.json()
+        const hp1 = json1.data?.honeypot
+        if (hp1 && hp1.is_honeypot !== undefined) {
+          setHpData(hp1)
+          setHpLoading(false)
+          return
+        }
+      }
+    } catch { /* cache miss or timeout — continue to fresh */ }
+
+    // No cached data — run fresh analysis (longer timeout)
+    try {
+      const ctrl2 = new AbortController()
+      const t2 = setTimeout(() => ctrl2.abort(), 90000)
+      const res2 = await fetch(`${SAFETY_API}/api/v1/token/${addr}/safety?fresh=true`, { signal: ctrl2.signal })
+      clearTimeout(t2)
+      if (!res2.ok) throw new Error(`API ${res2.status}`)
+      const json2 = await res2.json()
+      const hp2 = json2.data?.honeypot
+      if (hp2) setHpData(hp2)
       else setHpError('No honeypot data returned.')
     } catch {
-      setHpError('Safety API unavailable. Try again later.')
+      setHpError('Safety API unavailable or analysis timed out. Try again later.')
     }
     setHpLoading(false)
   }
@@ -604,7 +621,7 @@ export function SafetyDashboardPage() {
               {hpLoading ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-[#00D4FF]" />
-                  <span className="text-sm text-gray-400">Running on-chain simulation...</span>
+                  <span className="text-sm text-gray-400 animate-pulse">Running on-chain simulation...</span>
                 </div>
               ) : hpError ? (
                 <div className="text-center py-8 space-y-3">
