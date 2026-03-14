@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity, Info, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react'
+import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity, Info, Copy, Check, ChevronDown, ChevronRight, MessageCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { ShareButton } from '../ui/ShareButton'
 import { supabase } from '../../lib/supabase'
 
@@ -539,6 +539,28 @@ function ConfidenceBadge({ level }: { level: string | null }) {
   )
 }
 
+// ─── Social Sentiment types ──────────────────────────────────────────────────
+
+interface TokenTweetStory {
+  id: string
+  token_address: string
+  token_symbol: string | null
+  title: string
+  subtitle: string | null
+  summary: string | null
+  content: { type: string; title?: string; body?: string; text?: string; author?: string; tweet_url?: string }[]
+  sentiment_score: number | null
+  sentiment_label: string | null
+  market_impact: string | null
+  source_tweet_ids: string[]
+  author_handles: string[]
+  source_count: number
+  importance_score: number
+  published_at: string
+  period_start: string | null
+  period_end: string | null
+}
+
 // ─── Safety API ──────────────────────────────────────────────────────────────
 
 const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
@@ -579,6 +601,12 @@ export function TokenSafetyPage() {
   const [monitoringHistory, setMonitoringHistory] = useState<MonitoringSnapshot[]>([])
   const [confidenceEvents, setConfidenceEvents] = useState<{ pair_address: string; event_summary: string; prev_confidence: string; new_confidence: string; created_at: string }[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
+
+  // Section ⑧: Social Sentiment (token tweet stories)
+  const [tweetStories, setTweetStories] = useState<TokenTweetStory[]>([])
+  const [tweetStoriesLoading, setTweetStoriesLoading] = useState(true)
+  const [sentimentOpen, setSentimentOpen] = useState(false)
+  const [selectedStory, setSelectedStory] = useState<TokenTweetStory | null>(null)
 
   // P0-C: Safety API health check
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
@@ -765,6 +793,19 @@ export function TokenSafetyPage() {
         setDeployerLoading(false)
       })
       .catch(() => setDeployerLoading(false))
+
+    // ── 5b. Social Sentiment (token tweet stories) ──
+    setTweetStoriesLoading(true)
+    supabase
+      .from('token_tweet_stories')
+      .select('*')
+      .eq('token_address', addr)
+      .order('published_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        setTweetStories((data ?? []) as TokenTweetStory[])
+        setTweetStoriesLoading(false)
+      })
 
     // ── 5. Leagues data (holder tiers — only for tracked tokens) ──
     const leagueSymbol = LEAGUE_TOKEN_ADDRESSES[addr]
@@ -2185,6 +2226,227 @@ export function TokenSafetyPage() {
           Analysis by token_monitoring indexer (runs every 6 hours). Not real-time. Not investment advice.
         </p>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ⑧ SOCIAL SENTIMENT (token tweet stories)
+          ══════════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
+        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+          <MessageCircle className="h-4 w-4 text-[#00D4FF]" />
+          Social Sentiment
+          {tweetStories.length > 0 && (
+            <span className="text-xs font-normal text-gray-500 ml-1">({tweetStories.length} analyses)</span>
+          )}
+        </h3>
+
+        {tweetStoriesLoading && (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+          </div>
+        )}
+
+        {!tweetStoriesLoading && tweetStories.length === 0 && (
+          <div className="text-center py-6">
+            <MessageCircle className="h-8 w-8 text-gray-700 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No social sentiment data yet.</p>
+            <p className="text-xs text-gray-600 mt-1">Twitter mentions are analyzed every 6 hours.</p>
+          </div>
+        )}
+
+        {!tweetStoriesLoading && tweetStories.length > 0 && (() => {
+          // Compute aggregate sentiment
+          const scored = tweetStories.filter(s => s.sentiment_score != null)
+          const avgSentiment = scored.length > 0
+            ? Math.round(scored.reduce((a, s) => a + (s.sentiment_score ?? 50), 0) / scored.length)
+            : null
+
+          const sentimentColor = avgSentiment == null ? 'text-gray-400'
+            : avgSentiment >= 65 ? 'text-emerald-400'
+            : avgSentiment >= 45 ? 'text-yellow-400'
+            : 'text-red-400'
+
+          const sentimentIcon = avgSentiment == null ? <Minus className="h-4 w-4" />
+            : avgSentiment >= 65 ? <TrendingUp className="h-4 w-4" />
+            : avgSentiment >= 45 ? <Minus className="h-4 w-4" />
+            : <TrendingDown className="h-4 w-4" />
+
+          return (
+            <>
+              {/* Aggregate score */}
+              <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-800/50 border border-white/5">
+                <div className={`flex items-center gap-2 text-lg font-bold ${sentimentColor}`}>
+                  {sentimentIcon}
+                  {avgSentiment != null ? `${avgSentiment}/100` : '--'}
+                </div>
+                <div className="text-xs text-gray-400">
+                  Aggregate sentiment from {scored.length} {scored.length === 1 ? 'analysis' : 'analyses'}
+                </div>
+              </div>
+
+              {/* Story timeline */}
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {tweetStories.slice(0, sentimentOpen ? undefined : 5).map(story => {
+                  const sc = story.sentiment_score ?? 50
+                  const sColor = sc >= 65 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                    : sc >= 45 ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20'
+                    : 'text-red-400 bg-red-500/10 border-red-500/20'
+                  const impactIcon = story.market_impact === 'bullish' || story.market_impact === 'haussier'
+                    ? <TrendingUp className="h-3 w-3 text-emerald-400" />
+                    : story.market_impact === 'bearish' || story.market_impact === 'baissier'
+                    ? <TrendingDown className="h-3 w-3 text-red-400" />
+                    : <Minus className="h-3 w-3 text-gray-500" />
+                  const timeAgo = (() => {
+                    const diff = Date.now() - new Date(story.published_at).getTime()
+                    const h = Math.floor(diff / 3600000)
+                    if (h < 1) return 'Just now'
+                    if (h < 24) return `${h}h ago`
+                    const d = Math.floor(h / 24)
+                    return `${d}d ago`
+                  })()
+
+                  return (
+                    <button
+                      key={story.id}
+                      onClick={() => setSelectedStory(story)}
+                      className="w-full text-left p-3 rounded-lg bg-gray-800/30 hover:bg-gray-800/60 border border-white/5 hover:border-white/10 transition-colors"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${sColor}`}>
+                          {sc}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-200 font-medium truncate">{story.title}</p>
+                          {story.summary && (
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{story.summary}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-600">
+                            {impactIcon}
+                            <span>{story.sentiment_label}</span>
+                            <span>·</span>
+                            <span>{story.source_count} sources</span>
+                            <span>·</span>
+                            <span>{timeAgo}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {tweetStories.length > 5 && (
+                <button
+                  onClick={() => setSentimentOpen(!sentimentOpen)}
+                  className="text-xs text-[#00D4FF] hover:text-[#00D4FF]/80 transition-colors flex items-center gap-1"
+                >
+                  {sentimentOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  {sentimentOpen ? 'Show less' : `Show all ${tweetStories.length} analyses`}
+                </button>
+              )}
+            </>
+          )
+        })()}
+
+        <p className="text-[10px] text-gray-600 text-center">
+          AI-analyzed Twitter mentions. Updated every 6 hours. Not investment advice.
+        </p>
+      </div>
+
+      {/* ── Story detail popup ── */}
+      {selectedStory && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={e => { if (e.target === e.currentTarget) setSelectedStory(null) }}
+        >
+          <div className="bg-gray-900 border border-white/10 rounded-2xl max-w-xl w-full max-h-[85vh] overflow-y-auto p-6 space-y-4">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-gray-100">{selectedStory.title}</h2>
+                {selectedStory.subtitle && (
+                  <p className="text-sm text-gray-400 mt-1">{selectedStory.subtitle}</p>
+                )}
+              </div>
+              <button onClick={() => setSelectedStory(null)} className="text-gray-500 hover:text-gray-300 text-xl shrink-0">×</button>
+            </div>
+
+            {/* Sentiment badge */}
+            {selectedStory.sentiment_score != null && (() => {
+              const sc = selectedStory.sentiment_score
+              const sColor = sc >= 65 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                : sc >= 45 ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20'
+                : 'text-red-400 bg-red-500/10 border-red-500/20'
+              return (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold border ${sColor}`}>
+                    {selectedStory.market_impact === 'bullish' || selectedStory.market_impact === 'haussier'
+                      ? <TrendingUp className="h-4 w-4" />
+                      : selectedStory.market_impact === 'bearish' || selectedStory.market_impact === 'baissier'
+                      ? <TrendingDown className="h-4 w-4" />
+                      : <Minus className="h-4 w-4" />}
+                    {sc}/100 — {selectedStory.sentiment_label}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(selectedStory.published_at).toLocaleString()} · {selectedStory.source_count} sources
+                  </span>
+                </div>
+              )
+            })()}
+
+            {/* Summary */}
+            {selectedStory.summary && (
+              <div className="p-3 rounded-lg bg-gray-800/50 border border-white/5">
+                <p className="text-sm text-gray-300">{selectedStory.summary}</p>
+              </div>
+            )}
+
+            {/* Content sections */}
+            <div className="space-y-3">
+              {(selectedStory.content || []).map((block, i) => {
+                if (block.type === 'section') {
+                  return (
+                    <div key={i}>
+                      {block.title && <h4 className="text-sm font-semibold text-gray-300 mb-1">{block.title}</h4>}
+                      <p className="text-sm text-gray-400">{block.body}</p>
+                    </div>
+                  )
+                }
+                if (block.type === 'quote') {
+                  return (
+                    <blockquote key={i} className="border-l-2 border-[#00D4FF]/50 pl-3 py-1">
+                      <p className="text-sm text-gray-300 italic">"{block.text}"</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-gray-500">{block.author}</span>
+                        {block.tweet_url && (
+                          <a href={block.tweet_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#00D4FF] hover:underline flex items-center gap-0.5">
+                            View <ExternalLink className="h-2.5 w-2.5" />
+                          </a>
+                        )}
+                      </div>
+                    </blockquote>
+                  )
+                }
+                if (block.type === 'key_takeaway') {
+                  return (
+                    <div key={i} className="flex items-start gap-2 p-2 rounded bg-[#00D4FF]/5 border border-[#00D4FF]/10">
+                      <CheckCircle className="h-4 w-4 text-[#00D4FF] shrink-0 mt-0.5" />
+                      <p className="text-sm text-gray-300">{block.text}</p>
+                    </div>
+                  )
+                }
+                return null
+              })}
+            </div>
+
+            {/* Source authors */}
+            {selectedStory.author_handles.length > 0 && (
+              <div className="text-xs text-gray-500">
+                Sources: {selectedStory.author_handles.map(h => `@${h}`).join(', ')}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       </div>{/* end grid */}
 
