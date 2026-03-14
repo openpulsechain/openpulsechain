@@ -828,7 +828,6 @@ export function TokenSafetyPage() {
       <div id="contract" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <FileCode className="h-4 w-4 text-[#00D4FF]" />
-          <span className="text-white/30">①</span>
           Contract Analysis
           <a
             href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}`}
@@ -889,7 +888,6 @@ export function TokenSafetyPage() {
       <div id="honeypot" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Shield className="h-4 w-4 text-[#00D4FF]" />
-          <span className="text-white/30">②</span>
           Honeypot Test
         </h3>
         <SubScore label="Honeypot" score={safety.honeypot_score} max={30} icon={<Shield className="h-4 w-4" />} />
@@ -936,7 +934,6 @@ export function TokenSafetyPage() {
       <div id="deployer" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Fingerprint className="h-4 w-4 text-[#00D4FF]" />
-          <span className="text-white/30">③</span>
           Deployer Reputation
           <span className="text-[10px] text-gray-600 font-normal normal-case tracking-normal ml-auto">Informational</span>
         </h3>
@@ -995,7 +992,6 @@ export function TokenSafetyPage() {
       <div id="liquidity" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Droplets className="h-4 w-4 text-[#00D4FF]" />
-          <span className="text-white/30">④</span>
           Liquidity Pools
         </h3>
         <SubScore label="Liquidity" score={safety.lp_score} max={20} icon={<Droplets className="h-4 w-4" />} />
@@ -1240,7 +1236,6 @@ export function TokenSafetyPage() {
       <div id="holders" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Users className="h-4 w-4 text-[#00D4FF]" />
-          <span className="text-white/30">⑤</span>
           Holder Distribution
           <a
             href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/token/${address}?tab=holders`}
@@ -1436,7 +1431,6 @@ export function TokenSafetyPage() {
       <div id="identity" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Fingerprint className="h-4 w-4 text-[#00D4FF]" />
-          <span className="text-white/30">⑥</span>
           Token Identity
           <span className="text-[10px] text-gray-600 font-normal normal-case tracking-normal ml-auto">Informational</span>
         </h3>
@@ -1596,7 +1590,6 @@ export function TokenSafetyPage() {
       <div id="timeline" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#00D4FF]" />
-          <span className="text-white/30">⑦</span>
           Activity Timeline
         </h3>
         <SubScore label="Age" score={safety.age_score} max={10} icon={<Clock className="h-4 w-4" />} />
