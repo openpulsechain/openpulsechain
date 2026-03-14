@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity, Info, Copy, Check } from 'lucide-react'
+import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity, Info, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { ShareButton } from '../ui/ShareButton'
 import { supabase } from '../../lib/supabase'
 
@@ -416,6 +416,19 @@ function CopyAddress({ address }: { address: string }) {
   )
 }
 
+function CopyBtn({ text }: { text: string }) {
+  const [ok, setOk] = useState(false)
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(text).then(() => { setOk(true); setTimeout(() => setOk(false), 1500) }) }}
+      className="text-gray-600 hover:text-[#00D4FF] transition-colors shrink-0 ml-1"
+      title="Copy address"
+    >
+      {ok ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+    </button>
+  )
+}
+
 function TokenLogo({ address }: { address: string }) {
   const [error, setError] = useState(false)
   const addr = address?.toLowerCase() || ''
@@ -556,6 +569,8 @@ export function TokenSafetyPage() {
   const [leagueFamilies, setLeagueFamilies] = useState<LeagueFamily[]>([])
   const [leagueOpen, setLeagueOpen] = useState(false)
   const [tokenTotalSupply, setTokenTotalSupply] = useState<number | null>(null)
+  const [expandedFamilies, setExpandedFamilies] = useState<Record<string, boolean>>({})
+  const [familyDaughters, setFamilyDaughters] = useState<Record<string, { holder_address: string; balance_pct: number; tier: string }[]>>({})
 
   // Section ⑥: Token identity comparison
   const [verifiedTokens, setVerifiedTokens] = useState<Record<string, VerifiedToken[]>>({})
@@ -1697,13 +1712,16 @@ export function TokenSafetyPage() {
                                 return (
                                 <tr key={i} className="border-b border-white/5">
                                   <td className="py-1.5 font-mono text-gray-300">
-                                    <a
-                                      href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${h.holder_address}`}
-                                      target="_blank" rel="noopener noreferrer"
-                                      className="hover:text-cyan-400 transition-colors"
-                                    >
-                                      {h.holder_address.slice(0, 8)}...{h.holder_address.slice(-6)}
-                                    </a>
+                                    <span className="inline-flex items-center">
+                                      <a
+                                        href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${h.holder_address}`}
+                                        target="_blank" rel="noopener noreferrer"
+                                        className="hover:text-cyan-400 transition-colors"
+                                      >
+                                        {h.holder_address.slice(0, 8)}...{h.holder_address.slice(-6)}
+                                      </a>
+                                      <CopyBtn text={h.holder_address} />
+                                    </span>
                                   </td>
                                   <td className="py-1.5 text-center">
                                     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${TIER_COLORS[h.tier] || 'text-gray-400'}`}>
@@ -1739,37 +1757,120 @@ export function TokenSafetyPage() {
                       </div>
                     )}
 
-                    {/* Family clusters */}
+                    {/* Family clusters (expandable) */}
                     {leagueFamilies.length > 0 && (
                       <div>
                         <div className="text-xs text-gray-400 mb-2 font-medium">Whale Family Clusters</div>
                         <div className="space-y-2">
-                          {leagueFamilies.map((f, i) => (
-                            <div key={i} className="rounded-lg bg-purple-500/5 border border-purple-500/10 px-3 py-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-purple-400 text-xs font-medium">Mother</span>
-                                  <a
-                                    href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${f.mother_address}`}
-                                    target="_blank" rel="noopener noreferrer"
-                                    className="text-xs font-mono text-gray-300 hover:text-cyan-400 transition-colors"
-                                  >
-                                    {f.mother_address.slice(0, 8)}...{f.mother_address.slice(-6)}
-                                  </a>
+                          {leagueFamilies.map((f, i) => {
+                            const expanded = expandedFamilies[f.family_id] ?? false
+                            const daughters = familyDaughters[f.family_id]
+                            const toggleFamily = () => {
+                              const next = !expanded
+                              setExpandedFamilies(prev => ({ ...prev, [f.family_id]: next }))
+                              if (next && !daughters && address) {
+                                const sym = LEAGUE_TOKEN_ADDRESSES[address.toLowerCase()]
+                                if (sym) {
+                                  supabase.from('holder_league_addresses')
+                                    .select('holder_address, balance_pct, tier')
+                                    .eq('token_symbol', sym)
+                                    .eq('family_id', f.family_id)
+                                    .neq('holder_address', f.mother_address)
+                                    .order('balance_pct', { ascending: false })
+                                    .limit(50)
+                                    .then(({ data }) => setFamilyDaughters(prev => ({ ...prev, [f.family_id]: data ?? [] })))
+                                }
+                              }
+                            }
+                            return (
+                            <div key={i} className="rounded-lg bg-purple-500/5 border border-purple-500/10 overflow-hidden">
+                              <button onClick={toggleFamily} className="w-full px-3 py-2 text-left hover:bg-purple-500/10 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    {expanded ? <ChevronDown className="h-3 w-3 text-purple-400" /> : <ChevronRight className="h-3 w-3 text-purple-400" />}
+                                    <span className="text-purple-400 text-xs font-medium">Mother</span>
+                                    <span className="text-xs font-mono text-gray-300">
+                                      {f.mother_address.slice(0, 8)}...{f.mother_address.slice(-6)}
+                                    </span>
+                                    <CopyBtn text={f.mother_address} />
+                                  </div>
+                                  <span className={`text-xs font-medium ${f.combined_balance_pct > 5 ? 'text-red-400' : 'text-orange-400'}`}>
+                                    {f.combined_balance_pct.toFixed(3)}% combined
+                                  </span>
                                 </div>
-                                <span className={`text-xs font-medium ${f.combined_balance_pct > 5 ? 'text-red-400' : 'text-orange-400'}`}>
-                                  {f.combined_balance_pct.toFixed(3)}% combined
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
-                                <span>{f.daughter_count} daughter{f.daughter_count !== 1 ? 's' : ''}</span>
-                                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border ${TIER_COLORS[f.combined_tier] || 'text-gray-400'}`}>{TIER_EMOJI[f.combined_tier]}{f.combined_tier}</span>
-                                {f.link_types.map((lt, j) => (
-                                  <span key={j} className="text-purple-400/60">{lt.replace(/_/g, ' ')}</span>
-                                ))}
-                              </div>
+                                <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500 ml-5">
+                                  <span>{f.daughter_count} daughter{f.daughter_count !== 1 ? 's' : ''}</span>
+                                  <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border ${TIER_COLORS[f.combined_tier] || 'text-gray-400'}`}>{TIER_EMOJI[f.combined_tier]}{f.combined_tier}</span>
+                                  {f.link_types.map((lt, j) => (
+                                    <span key={j} className="text-purple-400/60">{lt.replace(/_/g, ' ')}</span>
+                                  ))}
+                                </div>
+                              </button>
+                              {expanded && (
+                                <div className="border-t border-purple-500/10 px-3 py-2 space-y-1">
+                                  {!daughters ? (
+                                    <div className="flex items-center gap-2 py-2 justify-center">
+                                      <Loader2 className="h-3 w-3 animate-spin text-purple-400" />
+                                      <span className="text-[10px] text-gray-500">Loading daughters...</span>
+                                    </div>
+                                  ) : daughters.length === 0 ? (
+                                    <div className="text-[10px] text-gray-500 text-center py-1">No daughter addresses found</div>
+                                  ) : (
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="text-gray-500 border-b border-white/5">
+                                          <th className="py-1 text-left">Daughter Address</th>
+                                          <th className="py-1 text-center">Tier</th>
+                                          <th className="py-1 text-right">% Supply</th>
+                                          {hasBalanceData && <th className="py-1 text-right">Balance</th>}
+                                          {hasBalanceData && tokenPrice && <th className="py-1 text-right">Value</th>}
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {daughters.map((d, j) => {
+                                          const dBal = hasBalanceData ? (d.balance_pct / 100) * tokenTotalSupply! : null
+                                          const dVal = dBal != null && tokenPrice ? dBal * tokenPrice : null
+                                          return (
+                                          <tr key={j} className="border-b border-white/5">
+                                            <td className="py-1 font-mono text-gray-400">
+                                              <span className="inline-flex items-center">
+                                                <a
+                                                  href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${d.holder_address}`}
+                                                  target="_blank" rel="noopener noreferrer"
+                                                  className="hover:text-cyan-400 transition-colors"
+                                                >
+                                                  {d.holder_address.slice(0, 8)}...{d.holder_address.slice(-6)}
+                                                </a>
+                                                <CopyBtn text={d.holder_address} />
+                                              </span>
+                                            </td>
+                                            <td className="py-1 text-center">
+                                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border ${TIER_COLORS[d.tier] || 'text-gray-400'}`}>
+                                                {TIER_EMOJI[d.tier]}{d.tier}
+                                              </span>
+                                            </td>
+                                            <td className="py-1 text-right text-gray-300">{d.balance_pct.toFixed(4)}%</td>
+                                            {hasBalanceData && (
+                                              <td className="py-1 text-right font-mono text-gray-400">
+                                                {dBal != null ? (dBal >= 1_000_000 ? (dBal / 1_000_000).toFixed(2) + 'M' : dBal >= 1_000 ? (dBal / 1_000).toFixed(1) + 'K' : dBal.toFixed(0)) : '-'}
+                                              </td>
+                                            )}
+                                            {hasBalanceData && tokenPrice && (
+                                              <td className="py-1 text-right text-gray-400">
+                                                {dVal != null ? ('$' + (dVal >= 1_000_000 ? (dVal / 1_000_000).toFixed(2) + 'M' : dVal >= 1_000 ? (dVal / 1_000).toFixed(1) + 'K' : dVal.toFixed(0))) : '-'}
+                                              </td>
+                                            )}
+                                          </tr>
+                                          )
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}
