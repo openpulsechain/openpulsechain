@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Shield, Search, AlertTriangle, CheckCircle, XCircle, Loader2, TrendingDown, Coins, Clock } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Shield, Search, AlertTriangle, CheckCircle, XCircle, Loader2, TrendingDown, Coins, Clock, ExternalLink } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatTimeAgo } from '../../lib/format'
 import { keccak256 } from 'js-sha3'
@@ -111,6 +112,14 @@ export function SafetyDashboardPage() {
   const [alertsLoading, setAlertsLoading] = useState(true)
   const [alertFilter, setAlertFilter] = useState<string>('all')
 
+  // Quick analysis popup
+  const [quickOpen, setQuickOpen] = useState(false)
+  const [quickAddr, setQuickAddr] = useState('')
+  const [quickLoading, setQuickLoading] = useState(false)
+  const [quickData, setQuickData] = useState<SafetyEntry | null>(null)
+  const [quickToken, setQuickToken] = useState<TokenName | null>(null)
+  const [quickError, setQuickError] = useState<string | null>(null)
+
   // Load scanner data
   useEffect(() => {
     loadScores()
@@ -169,12 +178,57 @@ export function SafetyDashboardPage() {
     setAlertsLoading(false)
   }
 
-  function handleSearch(e: React.FormEvent) {
+  const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
+
+  async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
     const addr = searchAddress.trim().toLowerCase()
-    if (/^0x[0-9a-f]{40}$/i.test(addr)) {
-      navigate(`/token/${addr}`)
+    if (!/^0x[0-9a-f]{40}$/i.test(addr)) return
+
+    setQuickAddr(addr)
+    setQuickOpen(true)
+    setQuickLoading(true)
+    setQuickData(null)
+    setQuickToken(null)
+    setQuickError(null)
+
+    // Fetch token name
+    supabase.from('pulsechain_tokens').select('address, symbol, name').eq('address', addr).single()
+      .then(({ data }) => { if (data) setQuickToken(data) })
+
+    // Try Supabase cache first
+    const { data: cached } = await supabase
+      .from('token_safety_scores')
+      .select('token_address, score, grade, risks, is_honeypot, total_liquidity_usd, holder_count, top10_pct, buy_tax_pct, sell_tax_pct, analyzed_at')
+      .eq('token_address', addr)
+      .single()
+
+    if (cached) {
+      setQuickData(cached)
+      setQuickLoading(false)
+      return
     }
+
+    // Fallback: trigger Safety API analysis
+    try {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 30000)
+      const res = await fetch(`${SAFETY_API}/api/v1/token/${addr}/safety?fresh=true`, { signal: ctrl.signal })
+      clearTimeout(t)
+      if (!res.ok) throw new Error(`API ${res.status}`)
+      await res.json()
+      // Re-fetch from Supabase after API has written the score
+      const { data: fresh } = await supabase
+        .from('token_safety_scores')
+        .select('token_address, score, grade, risks, is_honeypot, total_liquidity_usd, holder_count, top10_pct, buy_tax_pct, sell_tax_pct, analyzed_at')
+        .eq('token_address', addr)
+        .single()
+      if (fresh) setQuickData(fresh)
+      else setQuickError('Analysis completed but no score found.')
+    } catch {
+      setQuickError('Safety API unavailable. Try the full report page.')
+    }
+    setQuickLoading(false)
   }
 
   function setTab(tab: string) {
@@ -528,6 +582,111 @@ export function SafetyDashboardPage() {
       <p className="text-center text-xs text-gray-600 pt-4">
         This is not investment advice. Data is provided for educational and informational purposes only.
       </p>
+
+      {/* ── Quick Analysis Popup ── */}
+      {quickOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md" onClick={e => { if (e.target === e.currentTarget) setQuickOpen(false) }}>
+          <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/10 bg-gray-900 shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
+              <h3 className="text-sm font-semibold text-white">
+                Quick Analysis {quickToken ? `— ${quickToken.name} (${quickToken.symbol})` : ''}
+              </h3>
+              <button onClick={() => setQuickOpen(false)} className="text-gray-500 hover:text-white transition-colors text-lg leading-none">&times;</button>
+            </div>
+            <div className="p-5 space-y-4">
+              {quickLoading ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#00D4FF]" />
+                  <span className="text-sm text-gray-400">Analyzing token on-chain...</span>
+                </div>
+              ) : quickError ? (
+                <div className="text-center py-8 space-y-3">
+                  <XCircle className="h-8 w-8 text-red-400 mx-auto" />
+                  <p className="text-sm text-gray-400">{quickError}</p>
+                  <Link
+                    to={`/token/${quickAddr}`}
+                    className="inline-flex items-center gap-1.5 text-sm text-[#00D4FF] hover:underline"
+                  >
+                    Try full report page <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </div>
+              ) : quickData ? (() => {
+                const d = quickData
+                const g = d.grade || 'F'
+                const gc = GRADE_COLORS[g] || GRADE_COLORS.F
+                return (
+                  <div className="space-y-4">
+                    {/* Score + Grade */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {quickToken && <TokenLogo address={quickAddr} />}
+                        <div>
+                          <div className="text-lg font-bold text-white">{quickToken?.name || quickAddr.slice(0, 10) + '...'}</div>
+                          <div className="text-xs text-gray-400 font-mono">{quickAddr.slice(0, 10)}...{quickAddr.slice(-6)}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-3xl font-black text-white">{d.score}</span>
+                        <span className={`px-2.5 py-1 rounded-lg border text-sm font-bold ${gc}`}>Grade {g}</span>
+                      </div>
+                    </div>
+
+                    {/* Honeypot verdict */}
+                    <div className={`rounded-xl px-4 py-3 text-center ${
+                      d.is_honeypot === true
+                        ? 'bg-red-500/20 border border-red-500/40'
+                        : d.is_honeypot === false
+                          ? 'bg-emerald-500/15 border border-emerald-500/30'
+                          : 'bg-gray-700/30 border border-gray-600/30'
+                    }`}>
+                      <div className={`text-lg font-black ${
+                        d.is_honeypot === true ? 'text-red-400' : d.is_honeypot === false ? 'text-emerald-400' : 'text-gray-400'
+                      }`}>
+                        {d.is_honeypot === true ? 'HONEYPOT DETECTED' : d.is_honeypot === false ? 'NOT A HONEYPOT' : 'INCONCLUSIVE'}
+                      </div>
+                    </div>
+
+                    {/* Key metrics */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-lg bg-gray-800/60 border border-white/5 p-3 text-center">
+                        <div className="text-[10px] text-gray-400 uppercase mb-1">Liquidity</div>
+                        <div className="text-sm font-bold text-white">${(d.total_liquidity_usd || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                      </div>
+                      <div className="rounded-lg bg-gray-800/60 border border-white/5 p-3 text-center">
+                        <div className="text-[10px] text-gray-400 uppercase mb-1">Buy / Sell Tax</div>
+                        <div className="text-sm font-bold text-white">{d.buy_tax_pct ?? '-'}% / {d.sell_tax_pct ?? '-'}%</div>
+                      </div>
+                      <div className="rounded-lg bg-gray-800/60 border border-white/5 p-3 text-center">
+                        <div className="text-[10px] text-gray-400 uppercase mb-1">Holders</div>
+                        <div className="text-sm font-bold text-white">{(d.holder_count || 0).toLocaleString()}</div>
+                      </div>
+                    </div>
+
+                    {/* Risks */}
+                    {d.risks && d.risks.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {d.risks.map((r, i) => (
+                          <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* CTA */}
+                    <Link
+                      to={`/token/${quickAddr}`}
+                      className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2.5 transition-colors"
+                    >
+                      View full safety report <ExternalLink className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                )
+              })() : null}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
