@@ -36,6 +36,22 @@ interface SafetyScore {
   analyzed_at: string
 }
 
+interface HoneypotDetail {
+  is_honeypot: boolean | null
+  buy_tax_pct: number | null
+  sell_tax_pct: number | null
+  transfer_tax_pct: number | null
+  buy_gas: number | null
+  sell_gas: number | null
+  max_tx_amount: string | null
+  max_wallet_amount: string | null
+  dynamic_tax: boolean
+  tax_by_amount: Record<string, { buy_tax: number | null; sell_tax: number | null; error?: boolean }> | null
+  flags: string[]
+  router: string | null
+  error: string | null
+}
+
 interface TokenInfo {
   address: string
   symbol: string
@@ -513,6 +529,27 @@ export function TokenSafetyPage() {
   // P0-C: Safety API health check
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
 
+  // Honeypot detail popup (enriched from Safety API)
+  const [honeypotOpen, setHoneypotOpen] = useState(false)
+  const [honeypotDetail, setHoneypotDetail] = useState<HoneypotDetail | null>(null)
+  const [honeypotLoading, setHoneypotLoading] = useState(false)
+
+  const loadHoneypotDetail = () => {
+    setHoneypotOpen(true)
+    if (honeypotDetail || !address) return
+    setHoneypotLoading(true)
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 20000)
+    fetch(`${SAFETY_API}/api/v1/token/${address.toLowerCase()}/safety?fresh=true`, { signal: ctrl.signal })
+      .then(r => { clearTimeout(t); if (!r.ok) throw new Error(`API ${r.status}`); return r.json() })
+      .then(json => {
+        const hp = json.data?.honeypot
+        if (hp) setHoneypotDetail(hp)
+        setHoneypotLoading(false)
+      })
+      .catch(() => setHoneypotLoading(false))
+  }
+
   // Legacy: Safety API pair list (anchored/capped analysis)
   const [pairs, setPairs] = useState<LiquidityPair[]>([])
   const [pairsOpen, setPairsOpen] = useState(false)
@@ -883,7 +920,7 @@ export function TokenSafetyPage() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          ② HONEYPOT TEST (30 pts)
+          HONEYPOT TEST (30 pts) — summary card + popup detail
           ══════════════════════════════════════════════════════════════════════ */}
       <div id="honeypot" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
@@ -891,17 +928,19 @@ export function TokenSafetyPage() {
           Honeypot Test
         </h3>
         <SubScore label="Honeypot" score={safety.honeypot_score} max={30} icon={<Shield className="h-4 w-4" />} />
+
+        {/* Verdict banner */}
+        <div className={`rounded-lg px-4 py-3 text-center font-bold text-lg ${
+          safety.is_honeypot === true
+            ? 'bg-red-500/20 border border-red-500/30 text-red-400'
+            : safety.is_honeypot === false
+              ? 'bg-emerald-500/15 border border-emerald-500/25 text-emerald-400'
+              : 'bg-gray-700/30 border border-gray-600/30 text-gray-400'
+        }`}>
+          {safety.is_honeypot === true ? 'HONEYPOT DETECTED' : safety.is_honeypot === false ? 'NOT A HONEYPOT' : 'INCONCLUSIVE'}
+        </div>
+
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-400">Honeypot Status</span>
-            {safety.is_honeypot === true ? (
-              <span className="text-red-400 font-bold">YES - CANNOT SELL</span>
-            ) : safety.is_honeypot === false ? (
-              <span className="text-emerald-400 font-medium">No - Can sell</span>
-            ) : (
-              <span className="text-gray-500">Unknown (simulation failed)</span>
-            )}
-          </div>
           <div className="flex justify-between">
             <span className="text-gray-400">Buy Tax</span>
             <span className={safety.buy_tax_pct != null && safety.buy_tax_pct > 10 ? 'text-orange-400 font-medium' : ''}>
@@ -915,6 +954,14 @@ export function TokenSafetyPage() {
             </span>
           </div>
         </div>
+
+        <button
+          onClick={loadHoneypotDetail}
+          className="w-full py-2 rounded-lg border border-[#00D4FF]/20 text-[#00D4FF] text-sm hover:bg-[#00D4FF]/10 transition-colors"
+        >
+          View full honeypot analysis
+        </button>
+
         <p className="text-[10px] text-gray-600">
           Tested via FeeChecker on-chain simulation on PulseX V1 + V2 routers.
           {' '}
@@ -1036,6 +1083,209 @@ export function TokenSafetyPage() {
             >
               {`View all ${livePools.length} pools with confidence`}
             </button>
+
+            {/* ── HONEYPOT DETAIL POPUP (style HoneyPot.is) ── */}
+            <PopupPanel open={honeypotOpen} onClose={() => setHoneypotOpen(false)} title="Honeypot Analysis — On-Chain Simulation">
+              {honeypotLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#00D4FF]" />
+                  <span className="ml-2 text-gray-400">Running on-chain simulation...</span>
+                </div>
+              ) : (() => {
+                const hp = honeypotDetail
+                const buyTax = hp?.buy_tax_pct ?? safety.buy_tax_pct
+                const sellTax = hp?.sell_tax_pct ?? safety.sell_tax_pct
+                const transferTax = hp?.transfer_tax_pct ?? null
+                const isHp = hp?.is_honeypot ?? safety.is_honeypot
+                const buyGas = hp?.buy_gas ?? null
+                const sellGas = hp?.sell_gas ?? null
+                const maxTx = hp?.max_tx_amount ?? null
+                const maxWallet = hp?.max_wallet_amount ?? null
+                const dynTax = hp?.dynamic_tax ?? false
+                const taxByAmt = hp?.tax_by_amount ?? null
+                const flags = hp?.flags ?? []
+                const router = hp?.router ?? null
+
+                return (
+                <div className="space-y-5">
+                  {/* Verdict banner */}
+                  <div className={`rounded-xl px-6 py-5 text-center ${
+                    isHp === true
+                      ? 'bg-red-500/20 border-2 border-red-500/40'
+                      : isHp === false
+                        ? 'bg-emerald-500/15 border-2 border-emerald-500/30'
+                        : 'bg-gray-700/30 border-2 border-gray-600/30'
+                  }`}>
+                    <div className={`text-2xl font-black tracking-wide ${
+                      isHp === true ? 'text-red-400' : isHp === false ? 'text-emerald-400' : 'text-gray-400'
+                    }`}>
+                      {isHp === true ? 'HONEYPOT DETECTED' : isHp === false ? 'NOT A HONEYPOT' : 'INCONCLUSIVE'}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {isHp === true
+                        ? 'This token cannot be sold. Do NOT buy.'
+                        : isHp === false
+                          ? 'On-chain simulation confirms this token can be bought and sold.'
+                          : 'Simulation failed — manual verification recommended.'}
+                    </p>
+                  </div>
+
+                  {/* Tax breakdown */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-lg bg-gray-800/60 border border-white/5 p-4 text-center">
+                      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Buy Tax</div>
+                      <div className={`text-xl font-bold ${(buyTax ?? 0) > 10 ? 'text-orange-400' : 'text-white'}`}>
+                        {buyTax != null ? `${buyTax}%` : '-'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-800/60 border border-white/5 p-4 text-center">
+                      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Sell Tax</div>
+                      <div className={`text-xl font-bold ${(sellTax ?? 0) > 10 ? 'text-red-400' : 'text-white'}`}>
+                        {sellTax != null ? `${sellTax}%` : '-'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-800/60 border border-white/5 p-4 text-center">
+                      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Transfer Tax</div>
+                      <div className={`text-xl font-bold ${(transferTax ?? 0) > 0 ? 'text-amber-400' : 'text-white'}`}>
+                        {transferTax != null ? `${transferTax}%` : '-'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gas estimation */}
+                  {(buyGas != null || sellGas != null) && (
+                    <div className="rounded-lg bg-gray-800/40 border border-white/5 p-4 space-y-2">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Gas Estimation</h4>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Buy Gas</span>
+                          <span className={buyGas && buyGas > 2_000_000 ? 'text-orange-400' : 'text-gray-300'}>
+                            {buyGas != null ? buyGas.toLocaleString() : '-'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Sell Gas</span>
+                          <span className={sellGas && sellGas > 3_500_000 ? 'text-red-400' : 'text-gray-300'}>
+                            {sellGas != null ? sellGas.toLocaleString() : '-'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Max transaction / wallet limits */}
+                  {(maxTx || maxWallet) && (
+                    <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 space-y-2">
+                      <h4 className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Transaction Limits
+                      </h4>
+                      <div className="space-y-1 text-sm">
+                        {maxTx && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Max Transaction</span>
+                            <span className="text-amber-300 font-mono text-xs">{maxTx}</span>
+                          </div>
+                        )}
+                        {maxWallet && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Max Wallet</span>
+                            <span className="text-amber-300 font-mono text-xs">{maxWallet}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Variable amount tax breakdown */}
+                  {taxByAmt && Object.keys(taxByAmt).length > 0 && (
+                    <div className="rounded-lg bg-gray-800/40 border border-white/5 p-4 space-y-2">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                        Tax by Amount
+                        {dynTax && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">
+                            DYNAMIC TAX
+                          </span>
+                        )}
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-gray-500 border-b border-white/5">
+                              <th className="text-left py-1.5 pr-4">Amount (PLS)</th>
+                              <th className="text-right py-1.5 px-2">Buy Tax</th>
+                              <th className="text-right py-1.5 pl-2">Sell Tax</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(taxByAmt).map(([amt, taxes]) => (
+                              <tr key={amt} className="border-b border-white/5">
+                                <td className="py-1.5 pr-4 text-gray-300 font-mono">{amt}</td>
+                                <td className="py-1.5 px-2 text-right">
+                                  {taxes.error ? (
+                                    <span className="text-gray-600">Failed</span>
+                                  ) : taxes.buy_tax != null ? (
+                                    <span className={taxes.buy_tax > 10 ? 'text-orange-400' : 'text-gray-300'}>{taxes.buy_tax}%</span>
+                                  ) : <span>-</span>}
+                                </td>
+                                <td className="py-1.5 pl-2 text-right">
+                                  {taxes.error ? (
+                                    <span className="text-gray-600">Failed</span>
+                                  ) : taxes.sell_tax != null ? (
+                                    <span className={taxes.sell_tax > 10 ? 'text-red-400' : 'text-gray-300'}>{taxes.sell_tax}%</span>
+                                  ) : <span>-</span>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Warning flags */}
+                  {flags.length > 0 && (
+                    <div className="rounded-lg bg-gray-800/40 border border-white/5 p-4 space-y-2">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Warning Flags</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {flags.map((flag, i) => (
+                          <span key={i} className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
+                            ['honeypot', 'extreme_tax'].includes(flag)
+                              ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                              : ['high_buy_tax', 'high_sell_tax', 'high_gas', 'dynamic_tax'].includes(flag)
+                                ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          }`}>
+                            {flag.replace(/_/g, ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Technical risks */}
+                  <div className="rounded-lg bg-gray-800/30 border border-white/5 p-4 space-y-2">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Technical Risks</h4>
+                    <ul className="text-[11px] text-gray-600 space-y-1 list-disc list-inside">
+                      <li>Gas estimation may fail for tokens requiring specific approvals</li>
+                      <li>Max TX/Wallet detection only works for tokens with public getter functions</li>
+                      <li>Dynamic tax detection tests 4 amounts (0.1, 1, 10, 100 PLS) — edge cases possible</li>
+                      <li>Transfer tax is inferred from bytecode analysis — may not capture all implementations</li>
+                    </ul>
+                  </div>
+
+                  {/* Simulation info */}
+                  <div className="text-center space-y-1">
+                    <p className="text-[10px] text-gray-600">
+                      Router: {router ?? 'Unknown'} | Simulated via FeeChecker on PulseX V1 + V2
+                    </p>
+                    <p className="text-[10px] text-amber-500/70">
+                      This is not a foolproof method. Just because it's not a honeypot now, does not mean it won't change.
+                    </p>
+                  </div>
+                </div>
+                )
+              })()}
+            </PopupPanel>
 
             <PopupPanel open={poolsOpen} onClose={() => setPoolsOpen(false)} title={`All ${livePools.length} Pools — Confidence Analysis`}>
               <div className="overflow-x-auto">
