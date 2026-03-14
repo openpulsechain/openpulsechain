@@ -71,7 +71,7 @@ SCROLL_PAUSE_MS = 2500            # ms between scrolls
 STALE_THRESHOLD = 10              # Stop after N scrolls without new tweets
 DELAY_BETWEEN_SEARCHES = (15, 30) # Random delay range (seconds) between searches
 DELAY_BETWEEN_TOKENS = (30, 60)   # Random delay range between tokens
-MAX_SEARCHES_PER_RUN = 20         # Max quarterly searches per cron run (anti-detection)
+MAX_SEARCHES_PER_RUN = int(os.getenv("MAX_SEARCHES", "20"))  # Override via env for full backfill
 MONTHS_BEFORE_CREATION = 6        # Start searching 6 months before token creation
 
 
