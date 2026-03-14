@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity, Info } from 'lucide-react'
+import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity, Info, Copy, Check } from 'lucide-react'
 import { ShareButton } from '../ui/ShareButton'
 import { supabase } from '../../lib/supabase'
 
@@ -386,6 +386,35 @@ function PopupPanel({ open, onClose, title, children }: { open: boolean; onClose
 }
 
 // ─── Utility components ──────────────────────────────────────────────────────
+
+function CopyAddress({ address }: { address: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    navigator.clipboard.writeText(address).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <p className="text-sm text-gray-400 font-mono mb-3 flex items-center gap-1.5 flex-wrap">
+      <span>{address}</span>
+      <button
+        onClick={handleCopy}
+        className="text-gray-500 hover:text-[#00D4FF] transition-colors shrink-0"
+        title="Copy address"
+      >
+        {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+      <a
+        href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}`}
+        target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-[#00D4FF] hover:underline"
+      >
+        Explorer <ExternalLink className="h-3 w-3" />
+      </a>
+    </p>
+  )
+}
 
 function TokenLogo({ address }: { address: string }) {
   const [error, setError] = useState(false)
@@ -842,16 +871,7 @@ export function TokenSafetyPage() {
               text="Check any PulseChain token on OpenPulsechain"
             />
           </div>
-          <p className="text-sm text-gray-400 font-mono mb-3">
-            {address}
-            <a
-              href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}`}
-              target="_blank" rel="noopener noreferrer"
-              className="ml-2 inline-flex items-center gap-1 text-[#00D4FF] hover:underline"
-            >
-              Explorer <ExternalLink className="h-3 w-3" />
-            </a>
-          </p>
+          <CopyAddress address={address || ''} />
           {safety.risks && safety.risks.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {safety.risks.map((risk, i) => <RiskBadge key={i} risk={risk} />)}
