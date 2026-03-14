@@ -912,12 +912,12 @@ export function TokenSafetyPage() {
       </div>
 
       {/* ── Grid: 2-column layout for modules ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="columns-1 lg:columns-2 gap-6 space-y-6">
 
       {/* ══════════════════════════════════════════════════════════════════════
           ① CONTRACT ANALYSIS (25 pts)
           ══════════════════════════════════════════════════════════════════════ */}
-      <div id="contract" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
+      <div id="contract" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <FileCode className="h-4 w-4 text-[#00D4FF]" />
           Contract Analysis
@@ -977,7 +977,7 @@ export function TokenSafetyPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           HONEYPOT TEST (30 pts) — summary card + popup detail
           ══════════════════════════════════════════════════════════════════════ */}
-      <div id="honeypot" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
+      <div id="honeypot" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Shield className="h-4 w-4 text-[#00D4FF]" />
           Honeypot Test
@@ -1033,7 +1033,7 @@ export function TokenSafetyPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           ③ DEPLOYER REPUTATION (informational)
           ══════════════════════════════════════════════════════════════════════ */}
-      <div id="deployer" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
+      <div id="deployer" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Fingerprint className="h-4 w-4 text-[#00D4FF]" />
           Deployer Reputation
@@ -1091,7 +1091,7 @@ export function TokenSafetyPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           ④ LIQUIDITY POOLS (20 pts) — absorbs Pool Confidence
           ══════════════════════════════════════════════════════════════════════ */}
-      <div id="liquidity" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
+      <div id="liquidity" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Droplets className="h-4 w-4 text-[#00D4FF]" />
           Liquidity Pools
@@ -1572,7 +1572,7 @@ export function TokenSafetyPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           ⑤ HOLDER DISTRIBUTION (15 pts) + Leagues integration
           ══════════════════════════════════════════════════════════════════════ */}
-      <div id="holders" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
+      <div id="holders" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Users className="h-4 w-4 text-[#00D4FF]" />
           Holder Distribution
@@ -1904,7 +1904,7 @@ export function TokenSafetyPage() {
           Phase E: Canonical registry replaces auto-populated pulsechain_tokens (Finding #3)
           Status: Canonical / Address differs / Unlisted
           ══════════════════════════════════════════════════════════════════════ */}
-      <div id="identity" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
+      <div id="identity" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Fingerprint className="h-4 w-4 text-[#00D4FF]" />
           Token Identity
@@ -2063,7 +2063,7 @@ export function TokenSafetyPage() {
       {/* ══════════════════════════════════════════════════════════════════════
           ⑦ ACTIVITY TIMELINE (10 pts)
           ══════════════════════════════════════════════════════════════════════ */}
-      <div id="timeline" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4">
+      <div id="timeline" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#00D4FF]" />
           Activity Timeline
