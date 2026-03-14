@@ -555,6 +555,7 @@ export function TokenSafetyPage() {
   const [leagueHolders, setLeagueHolders] = useState<LeagueHolder[]>([])
   const [leagueFamilies, setLeagueFamilies] = useState<LeagueFamily[]>([])
   const [leagueOpen, setLeagueOpen] = useState(false)
+  const [tokenTotalSupply, setTokenTotalSupply] = useState<number | null>(null)
 
   // Section ⑥: Token identity comparison
   const [verifiedTokens, setVerifiedTokens] = useState<Record<string, VerifiedToken[]>>({})
@@ -666,6 +667,16 @@ export function TokenSafetyPage() {
       .eq('address', addr)
       .single()
       .then(({ data }) => { if (data) setTokenInfo(data) })
+
+    // ── 2b. Total supply from Scan API (for holder balance calc) ──
+    fetch(`https://api.scan.pulsechain.com/api/v2/tokens/${addr}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.total_supply && d?.decimals != null) {
+          setTokenTotalSupply(Number(d.total_supply) / Math.pow(10, Number(d.decimals)))
+        }
+      })
+      .catch(() => {})
 
     // ── 3. Live pools → monitoring history + verified tokens ──
     supabase
@@ -1629,7 +1640,40 @@ export function TokenSafetyPage() {
                 </button>
 
                 <PopupPanel open={leagueOpen} onClose={() => setLeagueOpen(false)} title={`Top Holders & Whale Families (${leagueHolders.length} whales, ${leagueFamilies.length} clusters)`}>
+                  {(() => {
+                    // Derive token price from best legitimate pool
+                    const bestPool = livePools.find(p => p.pool_is_legitimate && p.price_usd)
+                    const tokenPrice = bestPool?.price_usd ?? null
+                    const hasBalanceData = tokenTotalSupply != null && tokenTotalSupply > 0
+                    const totalTopHoldersPct = leagueHolders.reduce((s, h) => s + h.balance_pct, 0)
+                    const totalTopHoldersValue = hasBalanceData && tokenPrice
+                      ? leagueHolders.reduce((s, h) => s + (h.balance_pct / 100) * tokenTotalSupply! * tokenPrice, 0)
+                      : null
+
+                    return (
                   <div className="space-y-4">
+                    {/* Portfolio summary */}
+                    {(hasBalanceData || tokenPrice) && (
+                      <div className="grid grid-cols-3 gap-3">
+                        {tokenPrice && (
+                          <div className="rounded-lg bg-gray-800/60 border border-white/5 p-3 text-center">
+                            <div className="text-[10px] text-gray-400 uppercase mb-1">Token Price</div>
+                            <div className="text-sm font-bold text-white">${tokenPrice < 0.01 ? tokenPrice.toExponential(2) : tokenPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
+                          </div>
+                        )}
+                        <div className="rounded-lg bg-gray-800/60 border border-white/5 p-3 text-center">
+                          <div className="text-[10px] text-gray-400 uppercase mb-1">Top Holders %</div>
+                          <div className="text-sm font-bold text-white">{totalTopHoldersPct.toFixed(2)}%</div>
+                        </div>
+                        {totalTopHoldersValue != null && (
+                          <div className="rounded-lg bg-gray-800/60 border border-white/5 p-3 text-center">
+                            <div className="text-[10px] text-gray-400 uppercase mb-1">Combined Value</div>
+                            <div className="text-sm font-bold text-white">${totalTopHoldersValue >= 1_000_000 ? (totalTopHoldersValue / 1_000_000).toFixed(2) + 'M' : totalTopHoldersValue >= 1_000 ? (totalTopHoldersValue / 1_000).toFixed(1) + 'K' : totalTopHoldersValue.toFixed(0)}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Top holders table */}
                     {leagueHolders.length > 0 && (
                       <div>
@@ -1641,11 +1685,16 @@ export function TokenSafetyPage() {
                                 <th className="py-1.5 text-left">Address</th>
                                 <th className="py-1.5 text-center">Tier</th>
                                 <th className="py-1.5 text-right">% Supply</th>
+                                {hasBalanceData && <th className="py-1.5 text-right">Balance</th>}
+                                {hasBalanceData && tokenPrice && <th className="py-1.5 text-right">Value</th>}
                                 <th className="py-1.5 text-center">Family</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {leagueHolders.map((h, i) => (
+                              {leagueHolders.map((h, i) => {
+                                const balance = hasBalanceData ? (h.balance_pct / 100) * tokenTotalSupply! : null
+                                const value = balance != null && tokenPrice ? balance * tokenPrice : null
+                                return (
                                 <tr key={i} className="border-b border-white/5">
                                   <td className="py-1.5 font-mono text-gray-300">
                                     <a
@@ -1664,6 +1713,16 @@ export function TokenSafetyPage() {
                                   <td className={`py-1.5 text-right font-medium ${h.balance_pct > 5 ? 'text-red-400' : h.balance_pct > 1 ? 'text-orange-400' : ''}`}>
                                     {h.balance_pct.toFixed(4)}%
                                   </td>
+                                  {hasBalanceData && (
+                                    <td className="py-1.5 text-right font-mono text-gray-300">
+                                      {balance != null ? (balance >= 1_000_000 ? (balance / 1_000_000).toFixed(2) + 'M' : balance >= 1_000 ? (balance / 1_000).toFixed(1) + 'K' : balance.toFixed(0)) : '-'}
+                                    </td>
+                                  )}
+                                  {hasBalanceData && tokenPrice && (
+                                    <td className="py-1.5 text-right text-gray-300">
+                                      {value != null ? ('$' + (value >= 1_000_000 ? (value / 1_000_000).toFixed(2) + 'M' : value >= 1_000 ? (value / 1_000).toFixed(1) + 'K' : value.toFixed(0))) : '-'}
+                                    </td>
+                                  )}
                                   <td className="py-1.5 text-center">
                                     {h.family_id ? (
                                       <span className="text-purple-400 text-[10px]" title={`Family: ${h.family_id.slice(0, 10)}...`}>Clustered</span>
@@ -1672,7 +1731,8 @@ export function TokenSafetyPage() {
                                     )}
                                   </td>
                                 </tr>
-                              ))}
+                                )
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -1721,6 +1781,8 @@ export function TokenSafetyPage() {
                       View full Leagues page <ExternalLink className="h-3 w-3" />
                     </Link>
                   </div>
+                    )
+                  })()}
                 </PopupPanel>
               </>
             )}
