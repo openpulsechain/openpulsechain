@@ -2,6 +2,33 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { Shield, Search, AlertTriangle, CheckCircle, XCircle, Loader2, TrendingDown, Coins, Clock, ExternalLink } from 'lucide-react'
+
+const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
+
+interface HoneypotDetail {
+  is_honeypot: boolean | null
+  buy_tax_pct: number | null
+  sell_tax_pct: number | null
+  transfer_tax_pct: number | null
+  buy_gas: number | null
+  sell_gas: number | null
+  max_tx_amount: string | null
+  max_wallet_amount: string | null
+  dynamic_tax: boolean
+  tax_by_amount: Record<string, { buy_tax: number | null; sell_tax: number | null; error?: boolean }> | null
+  flags: string[]
+  router: string | null
+  error: string | null
+  holder_analysis?: {
+    holders_tested: number
+    successful: number
+    failed: number
+    siphoned: number
+    average_tax: number | null
+    highest_tax: number | null
+    holder_results: { address: string; pct_supply: number; can_transfer: boolean | null; is_contract: boolean; error: string | null }[]
+  }
+}
 import { supabase } from '../../lib/supabase'
 import { formatTimeAgo } from '../../lib/format'
 import { keccak256 } from 'js-sha3'
@@ -112,13 +139,13 @@ export function SafetyDashboardPage() {
   const [alertsLoading, setAlertsLoading] = useState(true)
   const [alertFilter, setAlertFilter] = useState<string>('all')
 
-  // Quick analysis popup
-  const [quickOpen, setQuickOpen] = useState(false)
-  const [quickAddr, setQuickAddr] = useState('')
-  const [quickLoading, setQuickLoading] = useState(false)
-  const [quickData, setQuickData] = useState<SafetyEntry | null>(null)
-  const [quickToken, setQuickToken] = useState<TokenName | null>(null)
-  const [quickError, setQuickError] = useState<string | null>(null)
+  // Honeypot analysis popup
+  const [hpOpen, setHpOpen] = useState(false)
+  const [hpAddr, setHpAddr] = useState('')
+  const [hpLoading, setHpLoading] = useState(false)
+  const [hpData, setHpData] = useState<HoneypotDetail | null>(null)
+  const [hpToken, setHpToken] = useState<TokenName | null>(null)
+  const [hpError, setHpError] = useState<string | null>(null)
 
   // Load scanner data
   useEffect(() => {
@@ -178,57 +205,37 @@ export function SafetyDashboardPage() {
     setAlertsLoading(false)
   }
 
-  const SAFETY_API = import.meta.env.VITE_SAFETY_API_URL || 'https://safety.openpulsechain.com'
-
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
     const addr = searchAddress.trim().toLowerCase()
     if (!/^0x[0-9a-f]{40}$/i.test(addr)) return
 
-    setQuickAddr(addr)
-    setQuickOpen(true)
-    setQuickLoading(true)
-    setQuickData(null)
-    setQuickToken(null)
-    setQuickError(null)
+    setHpAddr(addr)
+    setHpOpen(true)
+    setHpLoading(true)
+    setHpData(null)
+    setHpToken(null)
+    setHpError(null)
 
-    // Fetch token name
+    // Fetch token name in parallel
     supabase.from('pulsechain_tokens').select('address, symbol, name').eq('address', addr).single()
-      .then(({ data }) => { if (data) setQuickToken(data) })
+      .then(({ data }) => { if (data) setHpToken(data) })
 
-    // Try Supabase cache first
-    const { data: cached } = await supabase
-      .from('token_safety_scores')
-      .select('token_address, score, grade, risks, is_honeypot, total_liquidity_usd, holder_count, top10_pct, buy_tax_pct, sell_tax_pct, analyzed_at')
-      .eq('token_address', addr)
-      .single()
-
-    if (cached) {
-      setQuickData(cached)
-      setQuickLoading(false)
-      return
-    }
-
-    // Fallback: trigger Safety API analysis
+    // Call Safety API for honeypot analysis
     try {
       const ctrl = new AbortController()
       const t = setTimeout(() => ctrl.abort(), 30000)
       const res = await fetch(`${SAFETY_API}/api/v1/token/${addr}/safety?fresh=true`, { signal: ctrl.signal })
       clearTimeout(t)
       if (!res.ok) throw new Error(`API ${res.status}`)
-      await res.json()
-      // Re-fetch from Supabase after API has written the score
-      const { data: fresh } = await supabase
-        .from('token_safety_scores')
-        .select('token_address, score, grade, risks, is_honeypot, total_liquidity_usd, holder_count, top10_pct, buy_tax_pct, sell_tax_pct, analyzed_at')
-        .eq('token_address', addr)
-        .single()
-      if (fresh) setQuickData(fresh)
-      else setQuickError('Analysis completed but no score found.')
+      const json = await res.json()
+      const hp = json.data?.honeypot
+      if (hp) setHpData(hp)
+      else setHpError('No honeypot data returned.')
     } catch {
-      setQuickError('Safety API unavailable. Try the full report page.')
+      setHpError('Safety API unavailable. Try again later.')
     }
-    setQuickLoading(false)
+    setHpLoading(false)
   }
 
   function setTab(tab: string) {
@@ -583,104 +590,225 @@ export function SafetyDashboardPage() {
         This is not investment advice. Data is provided for educational and informational purposes only.
       </p>
 
-      {/* ── Quick Analysis Popup ── */}
-      {quickOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md" onClick={e => { if (e.target === e.currentTarget) setQuickOpen(false) }}>
-          <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/10 bg-gray-900 shadow-2xl flex flex-col">
+      {/* ── Honeypot Analysis Popup ── */}
+      {hpOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md" onClick={e => { if (e.target === e.currentTarget) setHpOpen(false) }}>
+          <div className="relative w-full max-w-4xl max-h-[85vh] mx-4 rounded-2xl border border-white/10 bg-gray-900 shadow-2xl flex flex-col">
             <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
               <h3 className="text-sm font-semibold text-white">
-                Quick Analysis {quickToken ? `— ${quickToken.name} (${quickToken.symbol})` : ''}
+                Honeypot Analysis — On-Chain Simulation {hpToken ? `— ${hpToken.name} (${hpToken.symbol})` : ''}
               </h3>
-              <button onClick={() => setQuickOpen(false)} className="text-gray-500 hover:text-white transition-colors text-lg leading-none">&times;</button>
+              <button onClick={() => setHpOpen(false)} className="text-gray-500 hover:text-white transition-colors text-lg leading-none">&times;</button>
             </div>
-            <div className="p-5 space-y-4">
-              {quickLoading ? (
-                <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <div className="overflow-y-auto p-5 space-y-4">
+              {hpLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-[#00D4FF]" />
-                  <span className="text-sm text-gray-400">Analyzing token on-chain...</span>
+                  <span className="text-sm text-gray-400">Running on-chain simulation...</span>
                 </div>
-              ) : quickError ? (
+              ) : hpError ? (
                 <div className="text-center py-8 space-y-3">
                   <XCircle className="h-8 w-8 text-red-400 mx-auto" />
-                  <p className="text-sm text-gray-400">{quickError}</p>
-                  <Link
-                    to={`/token/${quickAddr}`}
-                    className="inline-flex items-center gap-1.5 text-sm text-[#00D4FF] hover:underline"
-                  >
+                  <p className="text-sm text-gray-400">{hpError}</p>
+                  <Link to={`/token/${hpAddr}`} className="inline-flex items-center gap-1.5 text-sm text-[#00D4FF] hover:underline">
                     Try full report page <ExternalLink className="h-3 w-3" />
                   </Link>
                 </div>
-              ) : quickData ? (() => {
-                const d = quickData
-                const g = d.grade || 'F'
-                const gc = GRADE_COLORS[g] || GRADE_COLORS.F
+              ) : hpData ? (() => {
+                const hp = hpData
+                const buyTax = hp.buy_tax_pct
+                const sellTax = hp.sell_tax_pct
+                const transferTax = hp.transfer_tax_pct
+                const isHp = hp.is_honeypot
+                const buyGas = hp.buy_gas
+                const sellGas = hp.sell_gas
+                const maxTx = hp.max_tx_amount
+                const maxWallet = hp.max_wallet_amount
+                const dynTax = hp.dynamic_tax
+                const taxByAmt = hp.tax_by_amount
+                const flags = hp.flags ?? []
+                const router = hp.router
+
                 return (
-                  <div className="space-y-4">
-                    {/* Score + Grade */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {quickToken && <TokenLogo address={quickAddr} />}
-                        <div>
-                          <div className="text-lg font-bold text-white">{quickToken?.name || quickAddr.slice(0, 10) + '...'}</div>
-                          <div className="text-xs text-gray-400 font-mono">{quickAddr.slice(0, 10)}...{quickAddr.slice(-6)}</div>
+                <div className="space-y-5">
+                  {/* Verdict banner */}
+                  <div className={`rounded-xl px-6 py-5 text-center ${
+                    isHp === true ? 'bg-red-500/20 border-2 border-red-500/40'
+                      : isHp === false ? 'bg-emerald-500/15 border-2 border-emerald-500/30'
+                      : 'bg-gray-700/30 border-2 border-gray-600/30'
+                  }`}>
+                    <div className={`text-2xl font-black tracking-wide ${
+                      isHp === true ? 'text-red-400' : isHp === false ? 'text-emerald-400' : 'text-gray-400'
+                    }`}>
+                      {isHp === true ? 'HONEYPOT DETECTED' : isHp === false ? 'NOT A HONEYPOT' : 'INCONCLUSIVE'}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {isHp === true ? 'This token cannot be sold. Do NOT buy.'
+                        : isHp === false ? 'On-chain simulation confirms this token can be bought and sold.'
+                        : 'Simulation failed — manual verification recommended.'}
+                    </p>
+                  </div>
+
+                  {/* Tax breakdown */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-lg bg-gray-800/60 border border-white/5 p-4 text-center">
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Buy Tax</div>
+                      <div className={`text-xl font-bold ${(buyTax ?? 0) > 10 ? 'text-orange-400' : 'text-white'}`}>
+                        {buyTax != null ? `${buyTax}%` : '-'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-800/60 border border-white/5 p-4 text-center">
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Sell Tax</div>
+                      <div className={`text-xl font-bold ${(sellTax ?? 0) > 10 ? 'text-red-400' : 'text-white'}`}>
+                        {sellTax != null ? `${sellTax}%` : '-'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-gray-800/60 border border-white/5 p-4 text-center">
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Transfer Tax</div>
+                      <div className={`text-xl font-bold ${(transferTax ?? 0) > 0 ? 'text-amber-400' : 'text-white'}`}>
+                        {transferTax != null ? `${transferTax}%` : '-'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gas estimation */}
+                  {(buyGas != null || sellGas != null) && (
+                    <div className="rounded-lg bg-gray-800/40 border border-white/5 p-4 space-y-2">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Gas Estimation</h4>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Buy Gas</span>
+                          <span className={buyGas && buyGas > 2_000_000 ? 'text-orange-400' : 'text-gray-300'}>
+                            {buyGas != null ? buyGas.toLocaleString() : '-'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Sell Gas</span>
+                          <span className={sellGas && sellGas > 3_500_000 ? 'text-red-400' : 'text-gray-300'}>
+                            {sellGas != null ? sellGas.toLocaleString() : '-'}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-3xl font-black text-white">{d.score}</span>
-                        <span className={`px-2.5 py-1 rounded-lg border text-sm font-bold ${gc}`}>Grade {g}</span>
+                    </div>
+                  )}
+
+                  {/* Max transaction / wallet limits */}
+                  {(maxTx || maxWallet) && (
+                    <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 space-y-2">
+                      <h4 className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Transaction Limits
+                      </h4>
+                      <div className="space-y-1 text-sm">
+                        {maxTx && <div className="flex justify-between"><span className="text-gray-400">Max Transaction</span><span className="text-amber-300 font-mono text-xs">{maxTx}</span></div>}
+                        {maxWallet && <div className="flex justify-between"><span className="text-gray-400">Max Wallet</span><span className="text-amber-300 font-mono text-xs">{maxWallet}</span></div>}
                       </div>
                     </div>
+                  )}
 
-                    {/* Honeypot verdict */}
-                    <div className={`rounded-xl px-4 py-3 text-center ${
-                      d.is_honeypot === true
-                        ? 'bg-red-500/20 border border-red-500/40'
-                        : d.is_honeypot === false
-                          ? 'bg-emerald-500/15 border border-emerald-500/30'
-                          : 'bg-gray-700/30 border border-gray-600/30'
-                    }`}>
-                      <div className={`text-lg font-black ${
-                        d.is_honeypot === true ? 'text-red-400' : d.is_honeypot === false ? 'text-emerald-400' : 'text-gray-400'
-                      }`}>
-                        {d.is_honeypot === true ? 'HONEYPOT DETECTED' : d.is_honeypot === false ? 'NOT A HONEYPOT' : 'INCONCLUSIVE'}
-                      </div>
+                  {/* Variable amount tax breakdown */}
+                  {taxByAmt && Object.keys(taxByAmt).length > 0 && (
+                    <div className="rounded-lg bg-gray-800/40 border border-white/5 p-4 space-y-2">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                        Tax by Amount
+                        {dynTax && <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30">DYNAMIC TAX</span>}
+                      </h4>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-gray-400 border-b border-white/5">
+                            <th className="text-left py-1.5 pr-4">Amount (PLS)</th>
+                            <th className="text-right py-1.5 px-2">Buy Tax</th>
+                            <th className="text-right py-1.5 pl-2">Sell Tax</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(taxByAmt).map(([amt, taxes]) => (
+                            <tr key={amt} className="border-b border-white/5">
+                              <td className="py-1.5 pr-4 text-gray-300 font-mono">{amt}</td>
+                              <td className="py-1.5 px-2 text-right">
+                                {taxes.error ? <span className="text-gray-500">Failed</span>
+                                  : taxes.buy_tax != null ? <span className={taxes.buy_tax > 10 ? 'text-orange-400' : 'text-gray-300'}>{taxes.buy_tax}%</span>
+                                  : <span>-</span>}
+                              </td>
+                              <td className="py-1.5 pl-2 text-right">
+                                {taxes.error ? <span className="text-gray-500">Failed</span>
+                                  : taxes.sell_tax != null ? <span className={taxes.sell_tax > 10 ? 'text-red-400' : 'text-gray-300'}>{taxes.sell_tax}%</span>
+                                  : <span>-</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
+                  )}
 
-                    {/* Key metrics */}
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-lg bg-gray-800/60 border border-white/5 p-3 text-center">
-                        <div className="text-[10px] text-gray-400 uppercase mb-1">Liquidity</div>
-                        <div className="text-sm font-bold text-white">${(d.total_liquidity_usd || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                  {/* Holder sell analysis */}
+                  {hp.holder_analysis && hp.holder_analysis.holders_tested > 0 && (() => {
+                    const ha = hp.holder_analysis!
+                    return (
+                      <div className="rounded-lg bg-gray-800/40 border border-white/5 p-4 space-y-3">
+                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Holder Sell Analysis</h4>
+                        <div className="grid grid-cols-4 gap-3 text-center">
+                          <div><div className="text-lg font-bold text-white">{ha.holders_tested}</div><div className="text-[10px] text-gray-400">Tested</div></div>
+                          <div><div className="text-lg font-bold text-emerald-400">{ha.successful}</div><div className="text-[10px] text-gray-400">Can Sell</div></div>
+                          <div><div className="text-lg font-bold text-red-400">{ha.failed}</div><div className="text-[10px] text-gray-400">Blocked</div></div>
+                          <div><div className="text-lg font-bold text-amber-400">{ha.siphoned}</div><div className="text-[10px] text-gray-400">Siphoned</div></div>
+                        </div>
+                        {ha.holder_results.length > 0 && (
+                          <table className="w-full text-xs">
+                            <thead><tr className="text-gray-400 border-b border-white/5"><th className="text-left py-1">Holder</th><th className="text-right py-1">Supply %</th><th className="text-right py-1">Status</th></tr></thead>
+                            <tbody>
+                              {ha.holder_results.slice(0, 10).map((h, i) => (
+                                <tr key={i} className="border-b border-white/5">
+                                  <td className="py-1 font-mono text-gray-400">{h.address.slice(0, 6)}...{h.address.slice(-4)} {h.is_contract ? <span className="text-[9px] text-gray-500 ml-1">Contract</span> : ''}</td>
+                                  <td className="py-1 text-right text-gray-300">{h.pct_supply?.toFixed(2)}%</td>
+                                  <td className="py-1 text-right">
+                                    {h.can_transfer === true ? <span className="inline-flex items-center gap-0.5 text-emerald-400"><CheckCircle className="h-3 w-3" /> OK</span>
+                                      : h.can_transfer === false ? <span className="inline-flex items-center gap-0.5 text-red-400"><XCircle className="h-3 w-3" /> Blocked</span>
+                                      : <span className="text-gray-500">?</span>}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
                       </div>
-                      <div className="rounded-lg bg-gray-800/60 border border-white/5 p-3 text-center">
-                        <div className="text-[10px] text-gray-400 uppercase mb-1">Buy / Sell Tax</div>
-                        <div className="text-sm font-bold text-white">{d.buy_tax_pct ?? '-'}% / {d.sell_tax_pct ?? '-'}%</div>
-                      </div>
-                      <div className="rounded-lg bg-gray-800/60 border border-white/5 p-3 text-center">
-                        <div className="text-[10px] text-gray-400 uppercase mb-1">Holders</div>
-                        <div className="text-sm font-bold text-white">{(d.holder_count || 0).toLocaleString()}</div>
-                      </div>
-                    </div>
+                    )
+                  })()}
 
-                    {/* Risks */}
-                    {d.risks && d.risks.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {d.risks.map((r, i) => (
-                          <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                            {r}
+                  {/* Warning flags */}
+                  {flags.length > 0 && (
+                    <div className="rounded-lg bg-gray-800/40 border border-white/5 p-4 space-y-2">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Warning Flags</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {flags.map((flag, i) => (
+                          <span key={i} className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
+                            ['honeypot', 'extreme_tax'].includes(flag) ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                              : ['high_buy_tax', 'high_sell_tax', 'high_gas', 'dynamic_tax'].includes(flag) ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+                              : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          }`}>
+                            {flag.replace(/_/g, ' ')}
                           </span>
                         ))}
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* CTA */}
+                  {/* Simulation info + full report link */}
+                  <div className="text-center space-y-2">
+                    <p className="text-[10px] text-gray-500">
+                      Router: {router ?? 'Unknown'} | Simulated via FeeChecker on PulseX V1 + V2
+                    </p>
+                    <p className="text-[10px] text-amber-400/80">
+                      This is not a foolproof method. Just because it's not a honeypot now, does not mean it won't change.
+                    </p>
                     <Link
-                      to={`/token/${quickAddr}`}
-                      className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2.5 transition-colors"
+                      to={`/token/${hpAddr}`}
+                      className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 px-6 py-2.5 transition-colors"
                     >
                       View full safety report <ExternalLink className="h-3.5 w-3.5" />
                     </Link>
                   </div>
+                </div>
                 )
               })() : null}
             </div>
