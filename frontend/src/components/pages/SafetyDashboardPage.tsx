@@ -221,7 +221,7 @@ export function SafetyDashboardPage() {
     supabase.from('pulsechain_tokens').select('address, symbol, name').eq('address', addr).single()
       .then(({ data }) => { if (data) setHpToken(data) })
 
-    // Try cached analysis first (fast), then fallback to fresh analysis
+    // Step 1: Try cached analysis (fast, no fresh recompute)
     try {
       const ctrl1 = new AbortController()
       const t1 = setTimeout(() => ctrl1.abort(), 10000)
@@ -229,16 +229,37 @@ export function SafetyDashboardPage() {
       clearTimeout(t1)
       if (res1.ok) {
         const json1 = await res1.json()
-        const hp1 = json1.data?.honeypot
-        if (hp1 && hp1.is_honeypot !== undefined) {
-          setHpData(hp1)
+        const d = json1.data
+        // If full honeypot detail exists, use it
+        if (d?.honeypot && d.honeypot.is_honeypot !== undefined) {
+          setHpData(d.honeypot)
+          setHpLoading(false)
+          return
+        }
+        // Otherwise build basic honeypot data from top-level fields
+        if (d && d.is_honeypot !== undefined) {
+          setHpData({
+            is_honeypot: d.is_honeypot,
+            buy_tax_pct: d.buy_tax_pct ?? null,
+            sell_tax_pct: d.sell_tax_pct ?? null,
+            transfer_tax_pct: null,
+            buy_gas: null,
+            sell_gas: null,
+            max_tx_amount: null,
+            max_wallet_amount: null,
+            dynamic_tax: false,
+            tax_by_amount: null,
+            flags: [],
+            router: null,
+            error: null,
+          })
           setHpLoading(false)
           return
         }
       }
     } catch { /* cache miss or timeout — continue to fresh */ }
 
-    // No cached data — run fresh analysis (longer timeout)
+    // Step 2: No cached data at all — run fresh analysis (longer timeout)
     try {
       const ctrl2 = new AbortController()
       const t2 = setTimeout(() => ctrl2.abort(), 90000)
@@ -246,9 +267,22 @@ export function SafetyDashboardPage() {
       clearTimeout(t2)
       if (!res2.ok) throw new Error(`API ${res2.status}`)
       const json2 = await res2.json()
-      const hp2 = json2.data?.honeypot
-      if (hp2) setHpData(hp2)
-      else setHpError('No honeypot data returned.')
+      const d2 = json2.data
+      if (d2?.honeypot) setHpData(d2.honeypot)
+      else if (d2 && d2.is_honeypot !== undefined) {
+        setHpData({
+          is_honeypot: d2.is_honeypot,
+          buy_tax_pct: d2.buy_tax_pct ?? null,
+          sell_tax_pct: d2.sell_tax_pct ?? null,
+          transfer_tax_pct: null,
+          buy_gas: null, sell_gas: null,
+          max_tx_amount: null, max_wallet_amount: null,
+          dynamic_tax: false, tax_by_amount: null,
+          flags: [], router: null, error: null,
+        })
+      } else {
+        setHpError('No honeypot data returned.')
+      }
     } catch {
       setHpError('Safety API unavailable or analysis timed out. Try again later.')
     }
