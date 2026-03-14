@@ -912,7 +912,7 @@ export function TokenSafetyPage() {
       </div>
 
       {/* ── Grid: 2-column layout for modules ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
       {/* ══════════════════════════════════════════════════════════════════════
           ① CONTRACT ANALYSIS (25 pts)
