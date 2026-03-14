@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity } from 'lucide-react'
+import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity, Info } from 'lucide-react'
 import { ShareButton } from '../ui/ShareButton'
 import { supabase } from '../../lib/supabase'
 
@@ -440,6 +440,28 @@ function BoolBadge({ value, trueLabel, falseLabel }: { value: boolean | null; tr
   )
 }
 
+function ContractCheckRow({ label, badge, tooltip, href }: { label: string; badge: React.ReactNode; tooltip: string; href: string }) {
+  return (
+    <div className="flex justify-between items-center">
+      <span className="text-gray-400 flex items-center gap-1.5">
+        {label}
+        <span className="group relative">
+          <Info className="h-3 w-3 text-gray-600 hover:text-[#00D4FF] cursor-help transition-colors" />
+          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg bg-gray-800 border border-white/10 px-3 py-2 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-xl">
+            {tooltip}
+          </span>
+        </span>
+      </span>
+      <span className="flex items-center gap-2">
+        {badge}
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#00D4FF] transition-colors" title="Verify on Explorer">
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </span>
+    </div>
+  )
+}
+
 function ConfidenceBadge({ level }: { level: string | null }) {
   const conf = CONFIDENCE_INFO[level ?? ''] ?? CONFIDENCE_INFO.suspect
   return (
@@ -820,26 +842,36 @@ export function TokenSafetyPage() {
         </h3>
         <SubScore label="Contract" score={safety.contract_score} max={25} icon={<FileCode className="h-4 w-4" />} />
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-400">Source Code Verified</span>
-            <BoolBadge value={safety.is_verified} trueLabel="Verified on Explorer" falseLabel="Not verified" />
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Proxy Contract</span>
-            <BoolBadge value={safety.is_proxy ? false : true} trueLabel="No proxy" falseLabel="Upgradeable (proxy)" />
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Ownership</span>
-            <BoolBadge value={safety.ownership_renounced} trueLabel="Renounced" falseLabel="Active owner" />
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Mint Function</span>
-            <BoolBadge value={!safety.has_mint} trueLabel="No mint" falseLabel="Can mint new tokens" />
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Blacklist</span>
-            <BoolBadge value={!safety.has_blacklist} trueLabel="No blacklist" falseLabel="Can blacklist addresses" />
-          </div>
+          <ContractCheckRow
+            label="Source Code Verified"
+            badge={<BoolBadge value={safety.is_verified} trueLabel="Verified on Explorer" falseLabel="Not verified" />}
+            tooltip='Explorer → onglet "Contract" → badge "Contract Source Code Verified"'
+            href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}?tab=contract`}
+          />
+          <ContractCheckRow
+            label="Proxy Contract"
+            badge={<BoolBadge value={safety.is_proxy ? false : true} trueLabel="No proxy" falseLabel="Upgradeable (proxy)" />}
+            tooltip='Explorer → "Read Contract" → chercher implementation() ou upgradeTo()'
+            href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}?tab=read_contract`}
+          />
+          <ContractCheckRow
+            label="Ownership"
+            badge={<BoolBadge value={safety.ownership_renounced} trueLabel="Renounced" falseLabel="Active owner" />}
+            tooltip='Explorer → "Read Contract" → appeler owner() — si 0x000...000 = renounced'
+            href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}?tab=read_contract`}
+          />
+          <ContractCheckRow
+            label="Mint Function"
+            badge={<BoolBadge value={!safety.has_mint} trueLabel="No mint" falseLabel="Can mint new tokens" />}
+            tooltip='Explorer → "Write Contract" → chercher mint() ou _mint() dans les fonctions'
+            href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}?tab=write_contract`}
+          />
+          <ContractCheckRow
+            label="Blacklist"
+            badge={<BoolBadge value={!safety.has_blacklist} trueLabel="No blacklist" falseLabel="Can blacklist addresses" />}
+            tooltip='Explorer → "Read/Write Contract" → chercher blacklist(), isBlacklisted(), addToBlacklist()'
+            href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${address}?tab=read_contract`}
+          />
         </div>
         {safety.contract_dangers && safety.contract_dangers.length > 0 && (
           <div className="space-y-1.5 pt-2 border-t border-white/5">
