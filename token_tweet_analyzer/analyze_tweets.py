@@ -188,12 +188,14 @@ def get_tokens_with_unprocessed() -> list[dict]:
     """Get distinct tokens that have unprocessed tweets."""
     cutoff = (datetime.utcnow() - timedelta(hours=HOURS_BACK)).isoformat() + "Z"
     # Get distinct token_address values with count
-    result = supabase.rpc("get_tokens_with_unprocessed_tweets", {
-        "cutoff_time": cutoff
-    }).execute()
-
-    if result.data:
-        return result.data
+    try:
+        result = supabase.rpc("get_tokens_with_unprocessed_tweets", {
+            "cutoff_time": cutoff
+        }).execute()
+        if result.data:
+            return result.data
+    except Exception:
+        pass  # RPC doesn't exist, use fallback
 
     # Fallback: simple query
     result = supabase.table("token_tweets") \

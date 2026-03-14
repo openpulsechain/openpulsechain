@@ -1,7 +1,14 @@
 """
-Token Tweet Scraper — Scrapes Twitter/X for PulseChain token mentions.
-Uses Playwright + SearchTimeline GraphQL interception.
-Searches for "$SYMBOL pulsechain" for each top token.
+Token Tweet Scraper — Deep historical + incremental Twitter/X scraper.
+Uses Playwright + SearchTimeline GraphQL interception with authenticated session.
+
+Strategy:
+  - Break each token's history into quarterly periods
+  - Start from (token_creation_date - 6 months) up to now
+  - Search by symbol AND by address for each period
+  - Deep scroll each period until exhausted
+  - Track progress in token_tweet_scrape_progress table
+  - Anti-detection: random delays, limited searches per run
 
 Cron Railway: 0 */6 * * * (every 6 hours)
 """
@@ -11,7 +18,9 @@ import sys
 import asyncio
 import logging
 import json
-from datetime import datetime, timezone
+import random
+from datetime import datetime, timezone, timedelta, date
+from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -29,14 +38,20 @@ logger = logging.getLogger(__name__)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+TWITTER_AUTH_TOKEN = os.getenv("TWITTER_AUTH_TOKEN")
+TWITTER_CT0 = os.getenv("TWITTER_CT0")
 
 if not all([SUPABASE_URL, SUPABASE_KEY]):
     logger.error("Missing env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY")
     sys.exit(1)
 
+if not all([TWITTER_AUTH_TOKEN, TWITTER_CT0]):
+    logger.error("Missing env vars: TWITTER_AUTH_TOKEN, TWITTER_CT0 (required for search)")
+    sys.exit(1)
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Stealth anti-detection scripts (same as research scraper)
+# Stealth anti-detection scripts
 STEALTH_JS = """
 Object.defineProperty(navigator, 'webdriver', { get: () => false });
 Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
@@ -49,38 +64,52 @@ window.navigator.permissions.query = (params) =>
     : origQuery(params);
 """
 
-MAX_TWEETS_PER_TOKEN = 50
-MAX_TOKENS_PER_RUN = 50
-MAX_SCROLLS = 5
+# ─── Configuration ───────────────────────────────────────────────────────────
+
+MAX_SCROLLS_PER_SEARCH = 30       # Deep scroll per quarterly search
+SCROLL_PAUSE_MS = 2500            # ms between scrolls
+STALE_THRESHOLD = 10              # Stop after N scrolls without new tweets
+DELAY_BETWEEN_SEARCHES = (15, 30) # Random delay range (seconds) between searches
+DELAY_BETWEEN_TOKENS = (30, 60)   # Random delay range between tokens
+MAX_SEARCHES_PER_RUN = 20         # Max quarterly searches per cron run (anti-detection)
+MONTHS_BEFORE_CREATION = 6        # Start searching 6 months before token creation
 
 
-def get_top_tokens() -> list[dict]:
-    """Fetch top tokens by liquidity from token_safety_scores."""
+# ─── Token info ──────────────────────────────────────────────────────────────
+
+def get_tokens_with_age() -> list[dict]:
+    """Fetch tokens with their creation age from token_safety_scores."""
     try:
         result = supabase.table("token_safety_scores") \
-            .select("token_address, analysis_details") \
+            .select("token_address, age_days, analyzed_at, total_liquidity_usd") \
             .order("total_liquidity_usd", desc=True) \
-            .limit(MAX_TOKENS_PER_RUN) \
+            .limit(50) \
             .execute()
 
         tokens = []
         for row in (result.data or []):
             addr = row["token_address"]
-            # Extract symbol from analysis_details if available
-            details = row.get("analysis_details")
-            symbol = None
-            if details:
-                if isinstance(details, str):
-                    try:
-                        details = json.loads(details)
-                    except Exception:
-                        details = {}
-                # Try to find symbol in various places
-                symbol = details.get("symbol")
+            age_days = row.get("age_days") or 0
+            analyzed_at = row.get("analyzed_at")
+
+            # Calculate creation date
+            if analyzed_at and age_days:
+                # Handle various ISO formats (with/without microseconds, Z suffix)
+                clean = analyzed_at.replace("Z", "+00:00")
+                try:
+                    analysis_date = datetime.fromisoformat(clean)
+                except ValueError:
+                    # Fallback: parse without timezone
+                    analysis_date = datetime.strptime(clean[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                creation_date = (analysis_date - timedelta(days=age_days)).date()
+            else:
+                # Fallback: PulseChain launch (May 2023)
+                creation_date = date(2023, 5, 10)
 
             tokens.append({
                 "address": addr,
-                "symbol": symbol,
+                "creation_date": creation_date,
+                "liquidity": row.get("total_liquidity_usd") or 0,
             })
 
         return tokens
@@ -101,59 +130,129 @@ def get_token_symbols() -> dict[str, str]:
         return {}
 
 
-def get_last_tweet_id(token_address: str) -> str | None:
-    """Get the most recent tweet_id for incremental scraping."""
+def get_intel_accounts() -> set[str]:
+    """Get usernames from research_followed_accounts (INTEL section)."""
     try:
-        result = supabase.table("token_tweets") \
-            .select("id") \
-            .eq("token_address", token_address.lower()) \
-            .order("tweeted_at", desc=True) \
-            .limit(1) \
+        result = supabase.table("research_followed_accounts") \
+            .select("username") \
+            .eq("is_active", True) \
             .execute()
-        return result.data[0]["id"] if result.data else None
+        return {r["username"].lower() for r in (result.data or [])}
     except Exception:
-        return None
+        return set()
 
+
+# ─── Quarterly period generation ─────────────────────────────────────────────
+
+def generate_quarters(creation_date: date) -> list[tuple[date, date]]:
+    """Generate quarterly periods from (creation - 6 months) to today."""
+    start = creation_date - relativedelta(months=MONTHS_BEFORE_CREATION)
+    # Align to quarter start (Jan, Apr, Jul, Oct)
+    quarter_month = ((start.month - 1) // 3) * 3 + 1
+    start = start.replace(month=quarter_month, day=1)
+
+    today = date.today()
+    quarters = []
+
+    current = start
+    while current < today:
+        end = current + relativedelta(months=3)
+        if end > today:
+            end = today + timedelta(days=1)  # Include today
+        quarters.append((current, end))
+        current = end
+
+    return quarters
+
+
+# ─── Progress tracking ──────────────────────────────────────────────────────
+
+def get_pending_searches(token_address: str, token_symbol: str | None, creation_date: date) -> list[dict]:
+    """Get list of quarterly searches not yet completed for a token."""
+    quarters = generate_quarters(creation_date)
+
+    # Check what's already done
+    try:
+        result = supabase.table("token_tweet_scrape_progress") \
+            .select("search_type, period_start, status") \
+            .eq("token_address", token_address.lower()) \
+            .in_("status", ["done", "in_progress"]) \
+            .execute()
+        done = {(r["search_type"], r["period_start"]) for r in (result.data or [])}
+    except Exception:
+        done = set()
+
+    pending = []
+    for q_start, q_end in quarters:
+        start_str = q_start.isoformat()
+
+        # Symbol search
+        if token_symbol and ("symbol", start_str) not in done:
+            pending.append({
+                "token_address": token_address,
+                "token_symbol": token_symbol,
+                "search_type": "symbol",
+                "period_start": q_start,
+                "period_end": q_end,
+                "query": f'"{token_symbol}" pulsechain since:{q_start.isoformat()} until:{q_end.isoformat()}',
+            })
+
+        # Address search
+        if ("address", start_str) not in done:
+            pending.append({
+                "token_address": token_address,
+                "token_symbol": token_symbol,
+                "search_type": "address",
+                "period_start": q_start,
+                "period_end": q_end,
+                "query": f'{token_address} since:{q_start.isoformat()} until:{q_end.isoformat()}',
+            })
+
+    return pending
+
+
+def mark_progress(token_address: str, search_type: str, period_start: date, period_end: date,
+                  status: str, tweet_count: int = 0, token_symbol: str | None = None):
+    """Update scrape progress in database."""
+    try:
+        supabase.table("token_tweet_scrape_progress").upsert({
+            "token_address": token_address.lower(),
+            "token_symbol": token_symbol,
+            "search_type": search_type,
+            "period_start": period_start.isoformat(),
+            "period_end": period_end.isoformat(),
+            "status": status,
+            "tweet_count": tweet_count,
+            "scraped_at": datetime.now(timezone.utc).isoformat() if status == "done" else None,
+        }, on_conflict="token_address,search_type,period_start").execute()
+    except Exception as e:
+        logger.warning(f"Failed to update progress: {e}")
+
+
+# ─── Tweet extraction ────────────────────────────────────────────────────────
 
 def extract_tweets_from_search(data: dict, token_address: str, token_symbol: str | None) -> list[dict]:
-    """Extract tweets from GraphQL SearchTimeline response.
-    Reuses the same recursive walk pattern as the research scraper."""
+    """Extract tweets from GraphQL SearchTimeline response."""
     tweets = []
 
     def _extract_user(obj: dict) -> tuple[dict, dict]:
-        """Try multiple paths to extract user info."""
         core = obj.get("core", {})
-
-        # Path 1: core.user_results.result.legacy
-        ur = core.get("user_results", {}).get("result", {})
-        ul = ur.get("legacy", {})
-        if ul.get("screen_name"):
-            return ul, ur
-
-        # Path 2: core.user_results.result direct
-        if ur.get("screen_name"):
-            return ur, ur
-
-        # Path 3: core.user_result (singular)
-        ur = core.get("user_result", {}).get("result", {})
-        ul = ur.get("legacy", {})
-        if ul.get("screen_name"):
-            return ul, ur
-        if ur.get("screen_name"):
-            return ur, ur
-
-        # Path 4: obj.author
-        author = obj.get("author", {})
-        al = author.get("legacy", {})
-        if al.get("screen_name"):
-            return al, author
-        if author.get("screen_name"):
-            return author, author
-
+        for path_fn in [
+            lambda: (core.get("user_results", {}).get("result", {}).get("legacy", {}),
+                     core.get("user_results", {}).get("result", {})),
+            lambda: (core.get("user_results", {}).get("result", {}),
+                     core.get("user_results", {}).get("result", {})),
+            lambda: (core.get("user_result", {}).get("result", {}).get("legacy", {}),
+                     core.get("user_result", {}).get("result", {})),
+            lambda: (obj.get("author", {}).get("legacy", {}), obj.get("author", {})),
+            lambda: (obj.get("author", {}), obj.get("author", {})),
+        ]:
+            ul, ur = path_fn()
+            if ul.get("screen_name"):
+                return ul, ur
         return {}, {}
 
     def walk(obj):
-        """Recursive walk to find tweet_results/legacy objects."""
         if isinstance(obj, dict):
             if obj.get("__typename") == "TweetWithVisibilityResults" and "tweet" in obj:
                 walk(obj["tweet"])
@@ -168,8 +267,6 @@ def extract_tweets_from_search(data: dict, token_address: str, token_symbol: str
 
                 if not tweet_id or not text:
                     return
-
-                # Skip retweets (keep quote tweets)
                 if text.startswith("RT @"):
                     return
                 if legacy.get("retweeted_status_result"):
@@ -265,101 +362,194 @@ def upsert_tweets(tweets: list[dict]) -> int:
     return total
 
 
-async def search_token(page, symbol: str, token_address: str) -> list[dict]:
-    """Search Twitter for token mentions via SearchTimeline GraphQL."""
-    collected_tweets = []
+# ─── Deep search with scroll ────────────────────────────────────────────────
+
+async def deep_search(page, query: str, token_address: str, token_symbol: str | None) -> list[dict]:
+    """Execute a Twitter search with deep scrolling until exhausted."""
+    collected = {}  # id -> tweet dict (dedup across scrolls)
 
     async def handle_response(response):
         url = response.url
         if "/graphql/" not in url:
             return
-        # SearchTimeline is the GraphQL endpoint for Twitter search
         if "SearchTimeline" in url or "SearchAdaptive" in url:
             try:
                 body = await response.json()
-                tweets = extract_tweets_from_search(body, token_address, symbol)
-                collected_tweets.extend(tweets)
+                tweets = extract_tweets_from_search(body, token_address, token_symbol)
+                for t in tweets:
+                    if t["id"] not in collected:
+                        collected[t["id"]] = t
             except Exception:
                 pass
 
     page.on("response", handle_response)
 
     try:
-        # Build search query — search for token symbol + pulsechain context
-        # Use quotes for exact symbol match, add PulseChain context
-        query = f'"{symbol}" pulsechain'
         encoded_query = query.replace('"', '%22').replace(' ', '%20')
         search_url = f"https://x.com/search?q={encoded_query}&src=typed_query&f=live"
 
-        logger.info(f"  Searching: {query}")
         await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(4000)
 
-        # Scroll to trigger more tweet loading
-        for scroll_num in range(MAX_SCROLLS):
-            await page.evaluate("window.scrollBy(0, 1200)")
-            await page.wait_for_timeout(2500)
+        stale_count = 0
+        prev_count = 0
 
-            # Stop if we have enough tweets
-            if len(collected_tweets) >= MAX_TWEETS_PER_TOKEN:
+        for i in range(MAX_SCROLLS_PER_SEARCH):
+            await page.evaluate("window.scrollBy(0, 1200)")
+            await page.wait_for_timeout(SCROLL_PAUSE_MS)
+
+            current = len(collected)
+            if current > prev_count:
+                stale_count = 0
+                prev_count = current
+            else:
+                stale_count += 1
+
+            if (i + 1) % 10 == 0:
+                logger.info(f"      Scroll {i+1}/{MAX_SCROLLS_PER_SEARCH} — {current} tweets")
+
+            if stale_count >= STALE_THRESHOLD:
+                logger.info(f"      End of results after {i+1} scrolls")
                 break
 
     except Exception as e:
-        logger.warning(f"  Error searching ${symbol}: {e}")
+        logger.warning(f"      Search error: {e}")
     finally:
         page.remove_listener("response", handle_response)
 
-    # Dedup and limit
-    unique = []
-    seen = set()
-    for t in collected_tweets:
-        if t["id"] not in seen and len(unique) < MAX_TWEETS_PER_TOKEN:
-            seen.add(t["id"])
-            unique.append(t)
+    return list(collected.values())
 
-    return unique
 
+# ─── Top voices aggregation ─────────────────────────────────────────────────
+
+def update_top_voices(token_address: str, token_symbol: str | None, intel_accounts: set[str]):
+    """Aggregate author stats from token_tweets into token_top_voices."""
+    try:
+        # Get all tweets for this token
+        result = supabase.table("token_tweets") \
+            .select("author_username, author_name, author_followers, author_is_verified, like_count, retweet_count, quote_count, tweeted_at") \
+            .eq("token_address", token_address.lower()) \
+            .execute()
+
+        if not result.data:
+            return
+
+        # Aggregate by author
+        authors: dict[str, dict] = {}
+        for t in result.data:
+            username = t["author_username"]
+            if username not in authors:
+                authors[username] = {
+                    "author_username": username,
+                    "author_name": t.get("author_name", ""),
+                    "author_followers": t.get("author_followers", 0),
+                    "author_is_verified": t.get("author_is_verified", False),
+                    "tweet_count": 0,
+                    "total_engagement": 0,
+                    "first_mention": t.get("tweeted_at"),
+                    "last_mention": t.get("tweeted_at"),
+                }
+
+            a = authors[username]
+            a["tweet_count"] += 1
+            a["total_engagement"] += (
+                (t.get("like_count") or 0)
+                + (t.get("retweet_count") or 0) * 2
+                + (t.get("quote_count") or 0) * 3
+            )
+            # Update followers to latest
+            if (t.get("author_followers") or 0) > (a["author_followers"] or 0):
+                a["author_followers"] = t["author_followers"]
+
+            tweeted = t.get("tweeted_at")
+            if tweeted:
+                if not a["first_mention"] or tweeted < a["first_mention"]:
+                    a["first_mention"] = tweeted
+                if not a["last_mention"] or tweeted > a["last_mention"]:
+                    a["last_mention"] = tweeted
+
+        # Upsert top voices (only authors with 2+ tweets)
+        voices = []
+        for username, data in authors.items():
+            if data["tweet_count"] >= 2:
+                voices.append({
+                    "token_address": token_address.lower(),
+                    "token_symbol": token_symbol,
+                    "author_username": username,
+                    "author_name": data["author_name"],
+                    "author_followers": data["author_followers"],
+                    "author_is_verified": data["author_is_verified"],
+                    "tweet_count": data["tweet_count"],
+                    "total_engagement": data["total_engagement"],
+                    "is_intel_account": username.lower() in intel_accounts,
+                    "first_mention": data["first_mention"],
+                    "last_mention": data["last_mention"],
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                })
+
+        if voices:
+            for v in voices:
+                supabase.table("token_top_voices").upsert(
+                    v, on_conflict="token_address,author_username"
+                ).execute()
+            logger.info(f"    Top voices: {len(voices)} authors tracked")
+
+    except Exception as e:
+        logger.warning(f"    Top voices update failed: {e}")
+
+
+# ─── Main ────────────────────────────────────────────────────────────────────
 
 async def run():
-    logger.info("=== Token Tweet Scraper (SearchTimeline) ===")
+    logger.info("=== Token Tweet Scraper (Quarterly Deep Search) ===")
     logger.info(f"Time: {datetime.now(timezone.utc).isoformat()}")
 
-    # Get top tokens
-    tokens = get_top_tokens()
+    # Get tokens with creation dates
+    tokens = get_tokens_with_age()
     if not tokens:
         logger.warning("No tokens found. Done.")
         return
 
     # Get symbol mapping
     symbol_map = get_token_symbols()
+    for t in tokens:
+        t["symbol"] = symbol_map.get(t["address"].lower())
 
-    # Resolve symbols for tokens that don't have one
+    # Get INTEL accounts for top voices cross-reference
+    intel_accounts = get_intel_accounts()
+    logger.info(f"INTEL accounts: {len(intel_accounts)}")
+
+    # Build priority queue of pending searches across all tokens
+    all_pending = []
     for t in tokens:
         if not t["symbol"]:
-            t["symbol"] = symbol_map.get(t["address"].lower())
+            continue
+        pending = get_pending_searches(t["address"], t["symbol"], t["creation_date"])
+        for p in pending:
+            p["liquidity"] = t["liquidity"]
+        all_pending.extend(pending)
 
-    # Filter tokens that have a symbol (can't search without one)
-    tokens_with_symbol = [t for t in tokens if t["symbol"]]
-    logger.info(f"Tokens with symbol: {len(tokens_with_symbol)}/{len(tokens)}")
+    # Sort: highest liquidity tokens first, then chronologically (newest quarters first)
+    all_pending.sort(key=lambda x: (-x["liquidity"], -x["period_start"].toordinal()))
 
-    if not tokens_with_symbol:
-        logger.warning("No tokens with symbols. Done.")
+    total_pending = len(all_pending)
+    searches_this_run = min(total_pending, MAX_SEARCHES_PER_RUN)
+    logger.info(f"Total pending searches: {total_pending}, this run: {searches_this_run}")
+
+    if searches_this_run == 0:
+        logger.info("All historical quarters already scraped. Running incremental update...")
+        # TODO: incremental mode for recent tweets
         return
 
     from playwright.async_api import async_playwright
 
-    total_collected = 0
-    total_skipped = 0
+    total_tweets = 0
+    searches_done = 0
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-            ]
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
         )
 
         context = await browser.new_context(
@@ -368,33 +558,77 @@ async def run():
             locale="en-US",
         )
 
+        # Inject Twitter session cookies
+        await context.add_cookies([
+            {"name": "auth_token", "value": TWITTER_AUTH_TOKEN, "domain": ".x.com", "path": "/"},
+            {"name": "ct0", "value": TWITTER_CT0, "domain": ".x.com", "path": "/"},
+        ])
+        logger.info("Twitter session cookies injected")
+
         await context.add_init_script(STEALTH_JS)
         page = await context.new_page()
-
-        # Block heavy resources
         await page.route("**/*.{png,jpg,jpeg,gif,webp,svg,mp4,woff,woff2,ttf}", lambda route: route.abort())
 
-        for token in tokens_with_symbol:
-            symbol = token["symbol"]
-            address = token["address"]
-            logger.info(f"${symbol} ({address[:10]}...)...")
+        current_token = None
 
-            tweets = await search_token(page, symbol, address)
+        for search in all_pending[:searches_this_run]:
+            token_addr = search["token_address"]
+            symbol = search["token_symbol"]
+            search_type = search["search_type"]
+            q = search["query"]
+            p_start = search["period_start"]
+            p_end = search["period_end"]
 
-            if tweets:
-                count = upsert_tweets(tweets)
-                logger.info(f"  {count} tweets upserted")
-                total_collected += count
-            else:
-                logger.info(f"  0 tweets (empty search or login required)")
-                total_skipped += 1
+            # Token change → update top voices for previous token + delay
+            if current_token and current_token != token_addr:
+                update_top_voices(current_token, symbol_map.get(current_token), intel_accounts)
+                delay = random.randint(*DELAY_BETWEEN_TOKENS)
+                logger.info(f"  Token change — waiting {delay}s...")
+                await page.wait_for_timeout(delay * 1000)
 
-            # Pause between searches to avoid rate limiting
-            await page.wait_for_timeout(5000)
+            current_token = token_addr
+
+            logger.info(f"  ${symbol} [{search_type}] {p_start} → {p_end}")
+            logger.info(f"    Query: {q}")
+
+            # Mark in_progress
+            mark_progress(token_addr, search_type, p_start, p_end, "in_progress", token_symbol=symbol)
+
+            try:
+                tweets = await deep_search(page, q, token_addr, symbol)
+
+                if tweets:
+                    count = upsert_tweets(tweets)
+                    logger.info(f"    {count} tweets upserted")
+                    total_tweets += count
+                else:
+                    logger.info(f"    0 tweets found")
+
+                mark_progress(token_addr, search_type, p_start, p_end, "done",
+                             tweet_count=len(tweets), token_symbol=symbol)
+
+            except Exception as e:
+                logger.error(f"    Search failed: {e}")
+                mark_progress(token_addr, search_type, p_start, p_end, "failed", token_symbol=symbol)
+
+            searches_done += 1
+
+            # Anti-detection delay between searches
+            if searches_done < searches_this_run:
+                delay = random.randint(*DELAY_BETWEEN_SEARCHES)
+                logger.info(f"    Waiting {delay}s before next search...")
+                await page.wait_for_timeout(delay * 1000)
+
+        # Final top voices update for last token
+        if current_token:
+            update_top_voices(current_token, symbol_map.get(current_token), intel_accounts)
 
         await browser.close()
 
-    logger.info(f"\nTotal: {total_collected} tweets collected, {total_skipped} tokens skipped")
+    remaining = total_pending - searches_done
+    logger.info(f"\nTotal: {total_tweets} tweets, {searches_done} searches done, {remaining} remaining")
+    if remaining > 0:
+        logger.info(f"Next cron run will process {min(remaining, MAX_SEARCHES_PER_RUN)} more searches")
     logger.info("=== Done ===")
 
 
