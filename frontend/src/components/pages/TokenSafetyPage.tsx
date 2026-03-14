@@ -443,17 +443,15 @@ function BoolBadge({ value, trueLabel, falseLabel }: { value: boolean | null; tr
 function ContractCheckRow({ label, badge, tooltip, href }: { label: string; badge: React.ReactNode; tooltip: string; href: string }) {
   return (
     <div className="flex justify-between items-center">
-      <span className="text-gray-400 flex items-center gap-1.5">
-        {label}
+      <span className="text-gray-400">{label}</span>
+      <span className="flex items-center gap-2">
+        {badge}
         <span className="group relative">
           <Info className="h-3 w-3 text-gray-600 hover:text-[#00D4FF] cursor-help transition-colors" />
-          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg bg-gray-800 border border-white/10 px-3 py-2 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-xl">
+          <span className="pointer-events-none absolute bottom-full right-0 mb-2 w-64 rounded-lg bg-gray-800 border border-white/10 px-3 py-2 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-xl">
             {tooltip}
           </span>
         </span>
-      </span>
-      <span className="flex items-center gap-2">
-        {badge}
         <a href={href} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#00D4FF] transition-colors" title="Verify on Explorer">
           <ExternalLink className="h-3 w-3" />
         </a>
