@@ -19,6 +19,7 @@ const SafetyDashboardPage = lazy(() => import('./components/pages/SafetyDashboar
 const SmartMoneyPage = lazy(() => import('./components/pages/SmartMoneyPage').then(m => ({ default: m.SmartMoneyPage })))
 const WalletProfilePage = lazy(() => import('./components/pages/WalletProfilePage').then(m => ({ default: m.WalletProfilePage })))
 const LeaguesPage = lazy(() => import('./components/pages/LeaguesPage').then(m => ({ default: m.LeaguesPage })))
+const HoneypotPage = lazy(() => import('./components/pages/HoneypotPage').then(m => ({ default: m.HoneypotPage })))
 
 function NotFoundPage() {
   return (
@@ -52,6 +53,7 @@ const ROUTE_TO_PAGE: Record<string, string> = {
   '/safety': 'safety',
   '/smart-money': 'smart-money',
   '/leagues': 'leagues',
+  '/honeypot': 'honeypot',
 }
 
 const PAGE_SEO: Record<string, { title: string; description: string }> = {
@@ -66,6 +68,7 @@ const PAGE_SEO: Record<string, { title: string; description: string }> = {
   alerts: { title: 'Scam Radar Alerts', description: 'Real-time PulseChain scam alerts: LP removals, whale dumps, suspicious mints. Stay safe with automated threat detection.' },
   'smart-money': { title: 'Smart Money Tracker', description: 'Track smart money on PulseChain: large swaps, top wallets by volume, whale activity on PulseX DEX.' },
   leagues: { title: 'Holder Leagues', description: 'PulseChain holder leagues: track whale concentration for PLS, PLSX, HEX, INC. Ocean-themed tier ranking updated every 6 hours.' },
+  honeypot: { title: 'Honeypot Checker', description: 'Free PulseChain honeypot detector: simulate buy and sell on-chain. Detect scam tokens, tax analysis, holder sell testing.' },
 }
 
 export default function App() {
@@ -142,6 +145,7 @@ export default function App() {
               <Route path="/alerts" element={<Navigate to="/safety?tab=alerts" replace />} />
               <Route path="/smart-money" element={<SmartMoneyPage />} />
               <Route path="/leagues" element={<LeaguesPage />} />
+              <Route path="/honeypot" element={<HoneypotPage />} />
               <Route path="/wallet/:address" element={<WalletProfilePage />} />
               <Route path="/token/:address" element={<TokenSafetyPage />} />
               <Route path="*" element={<NotFoundPage />} />

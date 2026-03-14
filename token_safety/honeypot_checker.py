@@ -2,8 +2,11 @@
 Honeypot detection via FeeChecker contract on PulseChain.
 Simulates buy+sell and checks if token can be sold.
 Enriched with: variable-amount testing, gas estimation,
-transfer tax detection, max-tx detection, and warning flags.
+transfer tax detection, max-tx detection, cooldown detection,
+transfer-block detection, and warning flags.
 """
+
+from __future__ import annotations
 
 import logging
 from web3 import Web3
@@ -146,6 +149,24 @@ _SELECTOR_MAP = {
     "maxWalletAmount()":      Web3.keccak(text="maxWalletAmount()")[:4].hex(),
     "_maxWalletAmount()":     Web3.keccak(text="_maxWalletAmount()")[:4].hex(),
 }
+
+# Cooldown-related function selectors (keccak-derived)
+_COOLDOWN_SELECTORS: list[str] = [
+    Web3.keccak(text="cooldownTimer()")[:4].hex(),
+    Web3.keccak(text="tradeCooldownEnabled()")[:4].hex(),
+    Web3.keccak(text="_cooldownBlocks()")[:4].hex(),
+]
+
+# Human-readable names for bytecode substring matching
+_COOLDOWN_BYTECODE_NAMES: list[str] = [
+    "cooldowntimer",
+    "tradecooldownenabled",
+    "_cooldownblocks",
+    "cooldown",
+]
+
+# Second dead-like address for transfer-block simulation
+ADDR_ONE = "0x0000000000000000000000000000000000000001"
 
 # ---------------------------------------------------------------------------
 # Contract instances
@@ -628,8 +649,23 @@ def _generate_flags(
     buy_success: bool,
     sell_success: bool,
     simulation_error: str | None,
+    *,
+    max_wallet_amount: str | None = None,
+    has_blacklist: bool = False,
+    has_pause: bool = False,
+    is_proxy: bool = False,
+    is_verified: bool = True,
+    ownership_renounced: bool | None = None,
+    has_cooldown: bool = False,
+    transfer_blocked: bool = False,
 ) -> list[str]:
-    """Generate warning flags from all collected data."""
+    """Generate warning flags from all collected data.
+
+    The keyword-only parameters (max_wallet_amount … transfer_blocked) are
+    optional so that existing callers in ``check_honeypot`` keep working
+    without any change.  The new ``generate_combined_flags`` helper passes
+    them when combining honeypot + contract results.
+    """
     flags: list[str] = []
 
     if is_honeypot is True:
@@ -670,7 +706,227 @@ def _generate_flags(
     if simulation_error is not None or (not buy_success and not sell_success):
         flags.append("simulation_failed")
 
+    # -- Additional flags from contract analysis / extra detections ----------
+    if max_wallet_amount is not None:
+        flags.append("max_wallet_limited")
+
+    if has_blacklist:
+        flags.append("has_blacklist_function")
+
+    if has_pause:
+        flags.append("can_be_paused")
+
+    if is_proxy:
+        flags.append("proxy_upgradeable")
+
+    if not is_verified:
+        flags.append("closed_source")
+
+    if ownership_renounced is False:
+        flags.append("active_owner")
+
+    if has_cooldown:
+        flags.append("has_cooldown")
+
+    if transfer_blocked:
+        flags.append("transfer_blocked")
+
     return flags
+
+
+# ---------------------------------------------------------------------------
+# 6. Cooldown detection
+# ---------------------------------------------------------------------------
+
+def _detect_cooldown(token_addr: str) -> bool:
+    """
+    Detect cooldown mechanisms by checking contract bytecode for known
+    cooldown-related function selectors and keyword patterns.
+
+    Returns True if a cooldown mechanism is likely present.
+    """
+    try:
+        token_cs = Web3.to_checksum_address(token_addr)
+        code = w3.eth.get_code(token_cs)
+        if not code or code == b"0x":
+            return False
+
+        code_hex = code.hex().lower()
+
+        # Check for keccak-derived 4-byte selectors in bytecode
+        for selector in _COOLDOWN_SELECTORS:
+            # Selectors appear in bytecode without the 0x prefix
+            if selector in code_hex:
+                logger.debug(f"Cooldown selector {selector} found in bytecode")
+                return True
+
+        # Check for human-readable keyword fragments in bytecode
+        # Solidity compiler encodes string literals and variable names;
+        # the ascii representation may appear in the deployed bytecode
+        # when the source uses these identifiers.
+        for name in _COOLDOWN_BYTECODE_NAMES:
+            name_hex = name.encode("utf-8").hex()
+            if name_hex in code_hex:
+                logger.debug(f"Cooldown keyword '{name}' found in bytecode")
+                return True
+
+        return False
+    except Exception as e:
+        logger.debug(f"Cooldown detection failed: {str(e)[:120]}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# 7. Transfer-block detection
+# ---------------------------------------------------------------------------
+
+def _detect_transfer_block(
+    token_addr: str,
+    router_addr: str,
+) -> bool:
+    """
+    Detect tokens that block direct wallet-to-wallet transfers while
+    allowing DEX swaps (a common anti-bot / rug mechanism).
+
+    Strategy:
+      1. Simulate a plain ``token.transfer()`` between two non-DEX
+         addresses (0x...dead and 0x...0001).
+      2. If the transfer reverts, check whether a router swap succeeds
+         (already validated by the honeypot simulation).
+      3. If swap works but transfer reverts -> the token blocks
+         non-DEX transfers.
+
+    Returns True if direct transfers appear blocked.
+    """
+    try:
+        token_cs = Web3.to_checksum_address(token_addr)
+        wpls = Web3.to_checksum_address(WPLS_ADDRESS)
+        router_cs = Web3.to_checksum_address(router_addr)
+
+        # Find the pair address (it holds tokens, so we can use it as sender)
+        router_contract = w3.eth.contract(address=router_cs, abi=ROUTER_ABI)
+        factory_addr = router_contract.functions.factory().call()
+        factory = w3.eth.contract(
+            address=Web3.to_checksum_address(factory_addr),
+            abi=FACTORY_ABI,
+        )
+        pair_addr = factory.functions.getPair(token_cs, wpls).call()
+        if pair_addr == "0x0000000000000000000000000000000000000000":
+            return False
+
+        token_contract = w3.eth.contract(address=token_cs, abi=ERC20_ABI)
+        pair_balance = token_contract.functions.balanceOf(pair_addr).call()
+        if pair_balance == 0:
+            return False
+
+        # Use a tiny fraction so max-tx limits don't interfere
+        test_amount = max(1, pair_balance // 100_000)
+
+        # Simulate: pair_addr -> ADDR_ONE  (two non-DEX addresses)
+        sender = pair_addr                                  # holds tokens
+        receiver = Web3.to_checksum_address(ADDR_ONE)       # 0x...0001
+
+        transfer_calldata = token_contract.encodeABI(
+            fn_name="transfer",
+            args=[receiver, test_amount],
+        )
+
+        try:
+            w3.eth.call({
+                "from": sender,
+                "to": token_cs,
+                "data": transfer_calldata,
+                "gas": 500_000,
+            })
+            # Transfer succeeded -> not blocked
+            return False
+        except Exception:
+            # Transfer reverted -> check if router swap works
+            pass
+
+        # Verify that the router swap path still works (buy direction)
+        try:
+            router_contract_obj = w3.eth.contract(address=router_cs, abi=ROUTER_ABI)
+            router_contract_obj.functions \
+                .swapExactETHForTokensSupportingFeeOnTransferTokens(
+                    0,
+                    [wpls, token_cs],
+                    Web3.to_checksum_address(DEAD_ADDRESS),
+                    2**64,
+                ).call({"value": SIM_AMOUNT, "from": Web3.to_checksum_address(DEAD_ADDRESS)})
+            # Router swap succeeded but direct transfer reverted
+            logger.debug("Transfer blocked: direct transfer reverts but DEX swap works")
+            return True
+        except Exception:
+            # Both failed -> probably a different issue (not transfer-block specific)
+            return False
+
+    except Exception as e:
+        logger.debug(f"Transfer block detection failed: {str(e)[:120]}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# 8. Combined flags (honeypot + contract analysis)
+# ---------------------------------------------------------------------------
+
+def generate_combined_flags(
+    honeypot_result: dict,
+    contract_result: dict,
+) -> list[str]:
+    """
+    Produce a complete flag list by merging honeypot simulation data with
+    contract-analysis data.
+
+    This is the recommended entry point for the analyzer: call it after
+    ``check_honeypot()`` and ``analyze_contract()`` have both returned.
+
+    The function also runs cooldown and transfer-block detection on-the-fly
+    when a working router is available in the honeypot result.
+    """
+    # --- Cooldown & transfer-block detection (needs RPC, not in contract) ---
+    token_addr = honeypot_result.get("_token_addr")
+    router_addr = honeypot_result.get("_router_addr")
+
+    has_cooldown = False
+    transfer_blocked = False
+
+    if token_addr:
+        try:
+            has_cooldown = _detect_cooldown(token_addr)
+        except Exception as e:
+            logger.debug(f"Cooldown detection error: {str(e)[:120]}")
+
+    if token_addr and router_addr:
+        try:
+            transfer_blocked = _detect_transfer_block(token_addr, router_addr)
+        except Exception as e:
+            logger.debug(f"Transfer block detection error: {str(e)[:120]}")
+
+    # --- Delegate to _generate_flags with all available info ---------------
+    return _generate_flags(
+        is_honeypot=honeypot_result.get("is_honeypot"),
+        buy_tax=honeypot_result.get("buy_tax_pct"),
+        sell_tax=honeypot_result.get("sell_tax_pct"),
+        transfer_tax=honeypot_result.get("transfer_tax_pct"),
+        buy_gas=honeypot_result.get("buy_gas"),
+        sell_gas=honeypot_result.get("sell_gas"),
+        dynamic_tax=honeypot_result.get("dynamic_tax", False),
+        max_tx_amount=honeypot_result.get("max_tx_amount"),
+        buy_success=honeypot_result.get("buy_success", False),
+        sell_success=honeypot_result.get("sell_success", False),
+        simulation_error=honeypot_result.get("error"),
+        # -- contract-sourced flags --
+        max_wallet_amount=honeypot_result.get("max_wallet_amount"),
+        has_blacklist=contract_result.get("has_blacklist", False),
+        has_pause=contract_result.get("has_pause", False),
+        is_proxy=contract_result.get("is_proxy", False),
+        is_verified=contract_result.get("is_verified", True),
+        ownership_renounced=contract_result.get("ownership_renounced"),
+        # -- extra detections --
+        has_cooldown=has_cooldown,
+        transfer_blocked=transfer_blocked,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -863,4 +1119,7 @@ def check_honeypot(token_address: str) -> dict:
         "sell_success": best_sell_success,
         "error": None,
         "router": working_router_name,
+        # Internal: used by generate_combined_flags for extra detections
+        "_token_addr": str(token_addr),
+        "_router_addr": str(working_router_addr) if working_router_addr else None,
     }

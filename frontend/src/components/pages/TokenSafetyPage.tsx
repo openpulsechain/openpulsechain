@@ -50,6 +50,15 @@ interface HoneypotDetail {
   flags: string[]
   router: string | null
   error: string | null
+  holder_analysis?: {
+    holders_tested: number
+    successful: number
+    failed: number
+    siphoned: number
+    average_tax: number | null
+    highest_tax: number | null
+    holder_results: { address: string; pct_supply: number; can_transfer: boolean | null; is_contract: boolean; error: string | null }[]
+  }
 }
 
 interface TokenInfo {
@@ -1241,6 +1250,40 @@ export function TokenSafetyPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Holder sell analysis */}
+                  {hp?.holder_analysis && hp.holder_analysis.holders_tested > 0 && (() => {
+                    const ha = hp.holder_analysis!
+                    return (
+                      <div className="rounded-lg bg-gray-800/40 border border-white/5 p-4 space-y-3">
+                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Holder Sell Analysis</h4>
+                        <div className="grid grid-cols-4 gap-3 text-center">
+                          <div><div className="text-lg font-bold text-white">{ha.holders_tested}</div><div className="text-[10px] text-gray-500">Tested</div></div>
+                          <div><div className="text-lg font-bold text-emerald-400">{ha.successful}</div><div className="text-[10px] text-gray-500">Can Sell</div></div>
+                          <div><div className="text-lg font-bold text-red-400">{ha.failed}</div><div className="text-[10px] text-gray-500">Blocked</div></div>
+                          <div><div className="text-lg font-bold text-amber-400">{ha.siphoned}</div><div className="text-[10px] text-gray-500">Siphoned</div></div>
+                        </div>
+                        {ha.holder_results.length > 0 && (
+                          <table className="w-full text-xs">
+                            <thead><tr className="text-gray-500 border-b border-white/5"><th className="text-left py-1">Holder</th><th className="text-right py-1">Supply %</th><th className="text-right py-1">Status</th></tr></thead>
+                            <tbody>
+                              {ha.holder_results.slice(0, 10).map((h, i) => (
+                                <tr key={i} className="border-b border-white/5">
+                                  <td className="py-1 font-mono text-gray-400">{h.address.slice(0, 6)}...{h.address.slice(-4)} {h.is_contract ? <span className="text-[9px] text-gray-600 ml-1">Contract</span> : ''}</td>
+                                  <td className="py-1 text-right text-gray-300">{h.pct_supply?.toFixed(2)}%</td>
+                                  <td className="py-1 text-right">
+                                    {h.can_transfer === true ? <span className="inline-flex items-center gap-0.5 text-emerald-400"><CheckCircle className="h-3 w-3" /> OK</span>
+                                      : h.can_transfer === false ? <span className="inline-flex items-center gap-0.5 text-red-400"><XCircle className="h-3 w-3" /> Blocked</span>
+                                      : <span className="text-gray-600">?</span>}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* Warning flags */}
                   {flags.length > 0 && (

@@ -6,7 +6,8 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from honeypot_checker import check_honeypot
+from honeypot_checker import check_honeypot, generate_combined_flags
+from holder_sell_analyzer import analyze_holder_sells
 from contract_analyzer import analyze_contract
 from lp_analyzer import analyze_lp
 from holder_analyzer import analyze_holders
@@ -29,6 +30,12 @@ def analyze_token(token_address: str) -> dict:
     honeypot = check_honeypot(addr)
     logger.info(f"  Honeypot check done: is_honeypot={honeypot.get('is_honeypot')}")
 
+    holder_sells = analyze_holder_sells(addr, buy_tax_pct=honeypot.get("buy_tax_pct"))
+    logger.info(
+        f"  Holder sell analysis done: tested={holder_sells.get('holders_tested')}, "
+        f"blocked={holder_sells.get('failed')}, siphoned={holder_sells.get('siphoned')}"
+    )
+
     contract = analyze_contract(addr)
     logger.info(f"  Contract analysis done: verified={contract.get('is_verified')}, dangers={contract.get('dangers')}")
 
@@ -37,6 +44,10 @@ def analyze_token(token_address: str) -> dict:
 
     holders = analyze_holders(addr)
     logger.info(f"  Holder analysis done: count={holders.get('holder_count')}, top10={holders.get('top10_pct')}%")
+
+    # Generate combined flags (honeypot + contract + extra detections)
+    combined_flags = generate_combined_flags(honeypot, contract)
+    logger.info(f"  Combined flags: {combined_flags}")
 
     # Calculate composite score
     score_result = calculate_score(honeypot, contract, lp, holders)
@@ -61,9 +72,10 @@ def analyze_token(token_address: str) -> dict:
             "max_wallet_amount": honeypot.get("max_wallet_amount"),
             "dynamic_tax": honeypot.get("dynamic_tax", False),
             "tax_by_amount": honeypot.get("tax_by_amount"),
-            "flags": honeypot.get("flags", []),
+            "flags": combined_flags,
             "router": honeypot.get("router"),
             "error": honeypot.get("error"),
+            "holder_analysis": holder_sells,
         },
         "contract": {
             "score": score_result["contract_score"],
