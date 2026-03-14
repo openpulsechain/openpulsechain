@@ -373,8 +373,8 @@ function formatSpamReason(raw: string | null, baseSymbol?: string | null, quoteS
 function PopupPanel({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md" onClick={onClose}>
-      <div className="relative w-full max-w-4xl max-h-[85vh] mx-4 rounded-2xl border border-white/10 bg-gray-900 shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="relative w-full max-w-4xl max-h-[85vh] mx-4 rounded-2xl border border-white/10 bg-gray-900 shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
           <h3 className="text-sm font-semibold text-white">{title}</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors text-lg leading-none">&times;</button>
@@ -1130,7 +1130,7 @@ export function TokenSafetyPage() {
                     }`}>
                       {isHp === true ? 'HONEYPOT DETECTED' : isHp === false ? 'NOT A HONEYPOT' : 'INCONCLUSIVE'}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       {isHp === true
                         ? 'This token cannot be sold. Do NOT buy.'
                         : isHp === false
@@ -1142,19 +1142,19 @@ export function TokenSafetyPage() {
                   {/* Tax breakdown */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="rounded-lg bg-gray-800/60 border border-white/5 p-4 text-center">
-                      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Buy Tax</div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Buy Tax</div>
                       <div className={`text-xl font-bold ${(buyTax ?? 0) > 10 ? 'text-orange-400' : 'text-white'}`}>
                         {buyTax != null ? `${buyTax}%` : '-'}
                       </div>
                     </div>
                     <div className="rounded-lg bg-gray-800/60 border border-white/5 p-4 text-center">
-                      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Sell Tax</div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Sell Tax</div>
                       <div className={`text-xl font-bold ${(sellTax ?? 0) > 10 ? 'text-red-400' : 'text-white'}`}>
                         {sellTax != null ? `${sellTax}%` : '-'}
                       </div>
                     </div>
                     <div className="rounded-lg bg-gray-800/60 border border-white/5 p-4 text-center">
-                      <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Transfer Tax</div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Transfer Tax</div>
                       <div className={`text-xl font-bold ${(transferTax ?? 0) > 0 ? 'text-amber-400' : 'text-white'}`}>
                         {transferTax != null ? `${transferTax}%` : '-'}
                       </div>
@@ -1167,13 +1167,13 @@ export function TokenSafetyPage() {
                       <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Gas Estimation</h4>
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-500">Buy Gas</span>
+                          <span className="text-gray-400">Buy Gas</span>
                           <span className={buyGas && buyGas > 2_000_000 ? 'text-orange-400' : 'text-gray-300'}>
                             {buyGas != null ? buyGas.toLocaleString() : '-'}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-500">Sell Gas</span>
+                          <span className="text-gray-400">Sell Gas</span>
                           <span className={sellGas && sellGas > 3_500_000 ? 'text-red-400' : 'text-gray-300'}>
                             {sellGas != null ? sellGas.toLocaleString() : '-'}
                           </span>
@@ -1219,7 +1219,7 @@ export function TokenSafetyPage() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
                           <thead>
-                            <tr className="text-gray-500 border-b border-white/5">
+                            <tr className="text-gray-400 border-b border-white/5">
                               <th className="text-left py-1.5 pr-4">Amount (PLS)</th>
                               <th className="text-right py-1.5 px-2">Buy Tax</th>
                               <th className="text-right py-1.5 pl-2">Sell Tax</th>
@@ -1231,14 +1231,14 @@ export function TokenSafetyPage() {
                                 <td className="py-1.5 pr-4 text-gray-300 font-mono">{amt}</td>
                                 <td className="py-1.5 px-2 text-right">
                                   {taxes.error ? (
-                                    <span className="text-gray-600">Failed</span>
+                                    <span className="text-gray-500">Failed</span>
                                   ) : taxes.buy_tax != null ? (
                                     <span className={taxes.buy_tax > 10 ? 'text-orange-400' : 'text-gray-300'}>{taxes.buy_tax}%</span>
                                   ) : <span>-</span>}
                                 </td>
                                 <td className="py-1.5 pl-2 text-right">
                                   {taxes.error ? (
-                                    <span className="text-gray-600">Failed</span>
+                                    <span className="text-gray-500">Failed</span>
                                   ) : taxes.sell_tax != null ? (
                                     <span className={taxes.sell_tax > 10 ? 'text-red-400' : 'text-gray-300'}>{taxes.sell_tax}%</span>
                                   ) : <span>-</span>}
@@ -1258,18 +1258,18 @@ export function TokenSafetyPage() {
                       <div className="rounded-lg bg-gray-800/40 border border-white/5 p-4 space-y-3">
                         <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Holder Sell Analysis</h4>
                         <div className="grid grid-cols-4 gap-3 text-center">
-                          <div><div className="text-lg font-bold text-white">{ha.holders_tested}</div><div className="text-[10px] text-gray-500">Tested</div></div>
-                          <div><div className="text-lg font-bold text-emerald-400">{ha.successful}</div><div className="text-[10px] text-gray-500">Can Sell</div></div>
-                          <div><div className="text-lg font-bold text-red-400">{ha.failed}</div><div className="text-[10px] text-gray-500">Blocked</div></div>
-                          <div><div className="text-lg font-bold text-amber-400">{ha.siphoned}</div><div className="text-[10px] text-gray-500">Siphoned</div></div>
+                          <div><div className="text-lg font-bold text-white">{ha.holders_tested}</div><div className="text-[10px] text-gray-400">Tested</div></div>
+                          <div><div className="text-lg font-bold text-emerald-400">{ha.successful}</div><div className="text-[10px] text-gray-400">Can Sell</div></div>
+                          <div><div className="text-lg font-bold text-red-400">{ha.failed}</div><div className="text-[10px] text-gray-400">Blocked</div></div>
+                          <div><div className="text-lg font-bold text-amber-400">{ha.siphoned}</div><div className="text-[10px] text-gray-400">Siphoned</div></div>
                         </div>
                         {ha.holder_results.length > 0 && (
                           <table className="w-full text-xs">
-                            <thead><tr className="text-gray-500 border-b border-white/5"><th className="text-left py-1">Holder</th><th className="text-right py-1">Supply %</th><th className="text-right py-1">Status</th></tr></thead>
+                            <thead><tr className="text-gray-400 border-b border-white/5"><th className="text-left py-1">Holder</th><th className="text-right py-1">Supply %</th><th className="text-right py-1">Status</th></tr></thead>
                             <tbody>
                               {ha.holder_results.slice(0, 10).map((h, i) => (
                                 <tr key={i} className="border-b border-white/5">
-                                  <td className="py-1 font-mono text-gray-400">{h.address.slice(0, 6)}...{h.address.slice(-4)} {h.is_contract ? <span className="text-[9px] text-gray-600 ml-1">Contract</span> : ''}</td>
+                                  <td className="py-1 font-mono text-gray-400">{h.address.slice(0, 6)}...{h.address.slice(-4)} {h.is_contract ? <span className="text-[9px] text-gray-500 ml-1">Contract</span> : ''}</td>
                                   <td className="py-1 text-right text-gray-300">{h.pct_supply?.toFixed(2)}%</td>
                                   <td className="py-1 text-right">
                                     {h.can_transfer === true ? <span className="inline-flex items-center gap-0.5 text-emerald-400"><CheckCircle className="h-3 w-3" /> OK</span>
@@ -1307,8 +1307,8 @@ export function TokenSafetyPage() {
 
                   {/* Technical risks */}
                   <div className="rounded-lg bg-gray-800/30 border border-white/5 p-4 space-y-2">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Technical Risks</h4>
-                    <ul className="text-[11px] text-gray-600 space-y-1 list-disc list-inside">
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Technical Risks</h4>
+                    <ul className="text-[11px] text-gray-400 space-y-1 list-disc list-inside">
                       <li>Gas estimation may fail for tokens requiring specific approvals</li>
                       <li>Max TX/Wallet detection only works for tokens with public getter functions</li>
                       <li>Dynamic tax detection tests 4 amounts (0.1, 1, 10, 100 PLS) — edge cases possible</li>
@@ -1318,10 +1318,10 @@ export function TokenSafetyPage() {
 
                   {/* Simulation info */}
                   <div className="text-center space-y-1">
-                    <p className="text-[10px] text-gray-600">
+                    <p className="text-[10px] text-gray-500">
                       Router: {router ?? 'Unknown'} | Simulated via FeeChecker on PulseX V1 + V2
                     </p>
-                    <p className="text-[10px] text-amber-500/70">
+                    <p className="text-[10px] text-amber-400/80">
                       This is not a foolproof method. Just because it's not a honeypot now, does not mean it won't change.
                     </p>
                   </div>
