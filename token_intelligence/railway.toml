@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+cronSchedule = "0 4 * * *"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

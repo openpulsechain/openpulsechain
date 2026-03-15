@@ -539,6 +539,77 @@ function ConfidenceBadge({ level }: { level: string | null }) {
   )
 }
 
+// ─── Token Intelligence types ────────────────────────────────────────────────
+
+interface TokenIntelligence {
+  token_address: string
+  token_symbol: string | null
+  project_summary: {
+    name: string
+    description: string
+    type: string
+    objective: string
+    team: string | null
+    launch_date: string | null
+    links: { website?: string; twitter?: string; telegram?: string; discord?: string }
+  } | null
+  social_timeline: {
+    date: string
+    category: string
+    title: string
+    description: string
+    cause: string | null
+    impact: string
+    sentiment: number
+    source_tweet_ids: string[]
+  }[]
+  mentioned_addresses: {
+    address: string
+    context: string
+    type: string
+    first_mentioned_at: string
+    mention_count: number
+    tweet_ids: string[]
+  }[]
+  chart_analyses: {
+    tweet_id: string
+    image_url: string
+    analysis: string
+    date: string
+  }[]
+  analyzed_tweet_count: number
+  last_analyzed_at: string | null
+  model_version: string | null
+}
+
+const INTEL_CATEGORY_STYLES: Record<string, { color: string; label: string }> = {
+  launch: { color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', label: 'Launch' },
+  pump: { color: 'bg-green-500/15 text-green-400 border-green-500/30', label: 'Pump' },
+  dump: { color: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'Dump' },
+  exploit: { color: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'Exploit' },
+  partnership: { color: 'bg-blue-500/15 text-blue-400 border-blue-500/30', label: 'Partnership' },
+  listing: { color: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30', label: 'Listing' },
+  controversy: { color: 'bg-orange-500/15 text-orange-400 border-orange-500/30', label: 'Controversy' },
+  milestone: { color: 'bg-purple-500/15 text-purple-400 border-purple-500/30', label: 'Milestone' },
+  rug_pull: { color: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'Rug Pull' },
+  community_split: { color: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30', label: 'Split' },
+  migration: { color: 'bg-blue-500/15 text-blue-400 border-blue-500/30', label: 'Migration' },
+  update: { color: 'bg-gray-500/15 text-gray-400 border-gray-500/30', label: 'Update' },
+  airdrop: { color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', label: 'Airdrop' },
+  other: { color: 'bg-gray-500/15 text-gray-400 border-gray-500/30', label: 'Event' },
+}
+
+const PROJECT_TYPE_STYLES: Record<string, string> = {
+  defi: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  meme: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+  nft: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+  utility: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+  bridge: 'bg-green-500/15 text-green-400 border-green-500/30',
+  stablecoin: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  wrapped: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
+  unknown: 'bg-gray-500/15 text-gray-400 border-gray-500/30',
+}
+
 // ─── Social Sentiment types ──────────────────────────────────────────────────
 
 interface TokenTweetStory {
@@ -607,6 +678,11 @@ export function TokenSafetyPage() {
   const [tweetStoriesLoading, setTweetStoriesLoading] = useState(true)
   const [sentimentOpen, setSentimentOpen] = useState(false)
   const [selectedStory, setSelectedStory] = useState<TokenTweetStory | null>(null)
+
+  // Section ⑨⑩: Token Intelligence (AI profile + social history)
+  const [tokenIntel, setTokenIntel] = useState<TokenIntelligence | null>(null)
+  const [intelLoading, setIntelLoading] = useState(true)
+  const [timelineExpanded, setTimelineExpanded] = useState(false)
 
   // P0-C: Safety API health check
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
@@ -805,6 +881,18 @@ export function TokenSafetyPage() {
       .then(({ data }) => {
         setTweetStories((data ?? []) as TokenTweetStory[])
         setTweetStoriesLoading(false)
+      })
+
+    // ── 5c. Token Intelligence (AI profile) ──
+    setIntelLoading(true)
+    supabase
+      .from('token_intelligence')
+      .select('*')
+      .eq('token_address', addr)
+      .maybeSingle()
+      .then(({ data }) => {
+        setTokenIntel(data as TokenIntelligence | null)
+        setIntelLoading(false)
       })
 
     // ── 5. Leagues data (holder tiers — only for tracked tokens) ──
@@ -2226,6 +2314,167 @@ export function TokenSafetyPage() {
           Analysis by token_monitoring indexer (runs every 6 hours). Not real-time. Not investment advice.
         </p>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ⑨ ABOUT THIS PROJECT (AI-generated from tweet analysis)
+          ══════════════════════════════════════════════════════════════════════ */}
+      {!intelLoading && tokenIntel?.project_summary && (
+        <div className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+            <Info className="h-4 w-4 text-[#00D4FF]" />
+            About This Project
+            {tokenIntel.project_summary.type && tokenIntel.project_summary.type !== 'unknown' && (
+              <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full border font-medium ${PROJECT_TYPE_STYLES[tokenIntel.project_summary.type] || PROJECT_TYPE_STYLES.unknown}`}>
+                {tokenIntel.project_summary.type.toUpperCase()}
+              </span>
+            )}
+          </h3>
+
+          <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+            {tokenIntel.project_summary.description}
+          </p>
+
+          {tokenIntel.project_summary.objective && tokenIntel.project_summary.objective !== 'Unknown' && (
+            <div className="rounded-lg bg-gray-800/40 border border-white/5 p-3">
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Objective</p>
+              <p className="text-sm text-gray-300">{tokenIntel.project_summary.objective}</p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-4 text-xs text-gray-400">
+            {tokenIntel.project_summary.team && (
+              <div><span className="text-gray-500">Team:</span> <span className="text-gray-300">{tokenIntel.project_summary.team}</span></div>
+            )}
+            {tokenIntel.project_summary.launch_date && (
+              <div><span className="text-gray-500">Launch:</span> <span className="text-gray-300">{tokenIntel.project_summary.launch_date}</span></div>
+            )}
+            {tokenIntel.project_summary.links?.website && (
+              <a href={tokenIntel.project_summary.links.website} target="_blank" rel="noopener noreferrer" className="text-[#00D4FF] hover:underline flex items-center gap-1">
+                Website <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {tokenIntel.project_summary.links?.twitter && (
+              <a href={tokenIntel.project_summary.links.twitter} target="_blank" rel="noopener noreferrer" className="text-[#00D4FF] hover:underline flex items-center gap-1">
+                Twitter <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+
+          <p className="text-[10px] text-gray-600 italic">
+            AI-generated profile based on {tokenIntel.analyzed_tweet_count} tweets. Not investment advice.
+          </p>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ⑩ SOCIAL HISTORY (AI timeline from tweet analysis)
+          ══════════════════════════════════════════════════════════════════════ */}
+      {!intelLoading && tokenIntel && tokenIntel.social_timeline.length > 0 && (
+        <div className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+            <Clock className="h-4 w-4 text-[#00D4FF]" />
+            Social History
+            <span className="text-xs font-normal text-gray-500 ml-1">({tokenIntel.social_timeline.length} events)</span>
+          </h3>
+
+          {/* Timeline */}
+          <div className="relative pl-6 space-y-4">
+            {/* Vertical line */}
+            <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gradient-to-b from-[#00D4FF]/30 via-[#8000E0]/20 to-transparent" />
+
+            {(timelineExpanded ? tokenIntel.social_timeline : tokenIntel.social_timeline.slice(0, 6)).map((event, i) => {
+              const cat = INTEL_CATEGORY_STYLES[event.category] || INTEL_CATEGORY_STYLES.other
+              const sentimentColor = event.sentiment >= 65 ? 'text-emerald-400'
+                : event.sentiment >= 40 ? 'text-yellow-400'
+                : 'text-red-400'
+              const impactIcon = event.impact === 'positive'
+                ? <TrendingUp className="h-3 w-3 text-emerald-400" />
+                : event.impact === 'negative'
+                ? <TrendingDown className="h-3 w-3 text-red-400" />
+                : <Minus className="h-3 w-3 text-gray-500" />
+
+              return (
+                <div key={i} className="relative">
+                  {/* Dot */}
+                  <div className={`absolute -left-6 top-1.5 w-[11px] h-[11px] rounded-full border-2 ${
+                    event.impact === 'positive' ? 'border-emerald-400 bg-emerald-400/20'
+                    : event.impact === 'negative' ? 'border-red-400 bg-red-400/20'
+                    : 'border-gray-500 bg-gray-500/20'
+                  }`} />
+
+                  <div className="rounded-lg bg-gray-800/30 border border-white/5 p-3 hover:bg-gray-800/50 transition-colors">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="text-[10px] text-gray-500 font-mono">{event.date?.slice(0, 10)}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${cat.color}`}>
+                        {cat.label}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {impactIcon}
+                        <span className={`text-[10px] ${sentimentColor}`}>{event.sentiment}/100</span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-200 font-medium">{event.title}</p>
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">{event.description}</p>
+                    {event.cause && (
+                      <p className="text-xs text-gray-500 mt-1.5 italic">
+                        <span className="text-gray-600">Cause:</span> {event.cause}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Expand/collapse */}
+          {tokenIntel.social_timeline.length > 6 && (
+            <button
+              onClick={() => setTimelineExpanded(!timelineExpanded)}
+              className="w-full text-center text-xs text-[#00D4FF] hover:text-white py-2 flex items-center justify-center gap-1 transition-colors"
+            >
+              {timelineExpanded ? (
+                <><ChevronDown className="h-3 w-3 rotate-180" /> Show less</>
+              ) : (
+                <><ChevronDown className="h-3 w-3" /> Show all {tokenIntel.social_timeline.length} events</>
+              )}
+            </button>
+          )}
+
+          {/* Mentioned addresses */}
+          {tokenIntel.mentioned_addresses.length > 0 && (
+            <div className="border-t border-white/5 pt-3 space-y-2">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Fingerprint className="h-3.5 w-3.5" />
+                Mentioned Addresses ({tokenIntel.mentioned_addresses.length})
+              </h4>
+              <div className="space-y-1">
+                {tokenIntel.mentioned_addresses.slice(0, 5).map((addr, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs p-1.5 rounded bg-gray-800/30">
+                    <a
+                      href={`https://scan.pulsechain.com/address/${addr.address}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-[#00D4FF] hover:underline shrink-0"
+                    >
+                      {addr.address.slice(0, 6)}...{addr.address.slice(-4)}
+                    </a>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                      addr.type === 'token' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                      : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                    }`}>{addr.type}</span>
+                    <span className="text-gray-500 truncate">{addr.context.slice(0, 60)}</span>
+                    <span className="text-gray-600 ml-auto shrink-0">{addr.mention_count}x</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="text-[10px] text-gray-600 italic">
+            AI analysis of {tokenIntel.analyzed_tweet_count} tweets via {tokenIntel.model_version?.split('/').pop() || 'LLM'}. Events are extracted from community discussion — verify independently.
+          </p>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           ⑧ SOCIAL SENTIMENT (token tweet stories)
