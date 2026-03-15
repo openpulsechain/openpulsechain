@@ -701,6 +701,7 @@ export function TokenSafetyPage() {
   const [sentimentLoading, setSentimentLoading] = useState(true)
   const [sentimentModalOpen, setSentimentModalOpen] = useState(false)
   const [sentimentTab, setSentimentTab] = useState<'positive' | 'negative'>('positive')
+  const [sentimentSource, setSentimentSource] = useState<'all' | 'community' | 'external'>('all')
 
   // Section ⑨⑩: Token Intelligence (AI profile + social history)
   const [tokenIntel, setTokenIntel] = useState<TokenIntelligence | null>(null)
@@ -2738,7 +2739,10 @@ export function TokenSafetyPage() {
           </div>
         )
 
-        const shownArgs = sentimentTab === 'positive' ? posArgs : negArgs
+        // Filter by stance first, then by source
+        const stanceArgs = sentimentTab === 'positive' ? posArgs : negArgs
+        const shownArgs = sentimentSource === 'all' ? stanceArgs
+          : stanceArgs.filter(a => a.source === sentimentSource)
 
         return (
           <div
@@ -2757,7 +2761,7 @@ export function TokenSafetyPage() {
                 <X className="h-5 w-5" />
               </button>
 
-              {/* Header with scores */}
+              {/* Header with scores + filters */}
               <div className="px-6 pt-5 pb-4 border-b border-white/5">
                 <h3 className="text-base font-semibold text-gray-200 flex items-center gap-2 mb-4">
                   <MessageCircle className="h-4 w-4 text-[#00D4FF]" />
@@ -2765,33 +2769,59 @@ export function TokenSafetyPage() {
                   <span className="text-xs font-normal text-gray-500">({tokenSentiment.analyzed_tweet_count} tweets)</span>
                 </h3>
 
-                {/* Score recap */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="p-3 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/10 flex items-center gap-3">
-                    <Users className="h-4 w-4 text-[#00D4FF]" />
-                    <div>
-                      <div className="text-[10px] text-gray-400 uppercase">Community</div>
-                      <div className={`text-lg font-bold ${
-                        (tokenSentiment.community_score ?? 0) >= 65 ? 'text-emerald-400'
-                        : (tokenSentiment.community_score ?? 0) >= 40 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>{tokenSentiment.community_score ?? '--'}/100</div>
+                {/* Source filter: All / Community / External — clickable score cards */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <button
+                    onClick={() => setSentimentSource('all')}
+                    className={`p-2.5 rounded-lg border text-center transition-colors ${
+                      sentimentSource === 'all'
+                        ? 'bg-white/5 border-white/20 ring-1 ring-white/10'
+                        : 'bg-gray-800/30 border-white/5 hover:bg-white/[0.03]'
+                    }`}
+                  >
+                    <div className="text-[10px] text-gray-400 uppercase">All</div>
+                    <div className="text-sm font-bold text-gray-200">{tokenSentiment.analyzed_tweet_count}</div>
+                    <div className="text-[10px] text-gray-500">tweets</div>
+                  </button>
+                  <button
+                    onClick={() => setSentimentSource('community')}
+                    className={`p-2.5 rounded-lg border transition-colors ${
+                      sentimentSource === 'community'
+                        ? 'bg-[#00D4FF]/10 border-[#00D4FF]/30 ring-1 ring-[#00D4FF]/20'
+                        : 'bg-[#00D4FF]/5 border-[#00D4FF]/10 hover:bg-[#00D4FF]/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-1 mb-0.5">
+                      <Users className="h-3 w-3 text-[#00D4FF]" />
+                      <span className="text-[10px] text-gray-400 uppercase">Community</span>
                     </div>
-                    <span className="text-[10px] text-gray-500 ml-auto">{tokenSentiment.community_tweet_count} tweets</span>
-                  </div>
-                  <div className="p-3 rounded-lg bg-[#8000E0]/5 border border-[#8000E0]/10 flex items-center gap-3">
-                    <Eye className="h-4 w-4 text-[#8000E0]" />
-                    <div>
-                      <div className="text-[10px] text-gray-400 uppercase">External</div>
-                      <div className={`text-lg font-bold ${
-                        (tokenSentiment.external_score ?? 0) >= 65 ? 'text-emerald-400'
-                        : (tokenSentiment.external_score ?? 0) >= 40 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>{tokenSentiment.external_score ?? '--'}/100</div>
+                    <div className={`text-lg font-bold ${
+                      (tokenSentiment.community_score ?? 0) >= 65 ? 'text-emerald-400'
+                      : (tokenSentiment.community_score ?? 0) >= 40 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>{tokenSentiment.community_score ?? '--'}/100</div>
+                    <div className="text-[10px] text-gray-500">{tokenSentiment.community_tweet_count} tweets</div>
+                  </button>
+                  <button
+                    onClick={() => setSentimentSource('external')}
+                    className={`p-2.5 rounded-lg border transition-colors ${
+                      sentimentSource === 'external'
+                        ? 'bg-[#8000E0]/10 border-[#8000E0]/30 ring-1 ring-[#8000E0]/20'
+                        : 'bg-[#8000E0]/5 border-[#8000E0]/10 hover:bg-[#8000E0]/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-1 mb-0.5">
+                      <Eye className="h-3 w-3 text-[#8000E0]" />
+                      <span className="text-[10px] text-gray-400 uppercase">External</span>
                     </div>
-                    <span className="text-[10px] text-gray-500 ml-auto">{tokenSentiment.external_tweet_count} tweets</span>
-                  </div>
+                    <div className={`text-lg font-bold ${
+                      (tokenSentiment.external_score ?? 0) >= 65 ? 'text-emerald-400'
+                      : (tokenSentiment.external_score ?? 0) >= 40 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>{tokenSentiment.external_score ?? '--'}/100</div>
+                    <div className="text-[10px] text-gray-500">{tokenSentiment.external_tweet_count} tweets</div>
+                  </button>
                 </div>
 
-                {/* Tabs */}
+                {/* Stance filter: Positive / Negative */}
                 <div className="flex rounded-lg bg-gray-800/50 border border-white/5 p-0.5">
                   <button
                     onClick={() => setSentimentTab('positive')}
@@ -2802,7 +2832,7 @@ export function TokenSafetyPage() {
                     }`}
                   >
                     <ThumbsUp className="h-3.5 w-3.5" />
-                    Positive Sentiment ({posArgs.length})
+                    Positive ({posArgs.filter(a => sentimentSource === 'all' || a.source === sentimentSource).length})
                   </button>
                   <button
                     onClick={() => setSentimentTab('negative')}
@@ -2813,7 +2843,7 @@ export function TokenSafetyPage() {
                     }`}
                   >
                     <ThumbsDown className="h-3.5 w-3.5" />
-                    Negative Sentiment ({negArgs.length})
+                    Negative ({negArgs.filter(a => sentimentSource === 'all' || a.source === sentimentSource).length})
                   </button>
                 </div>
               </div>
