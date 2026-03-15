@@ -349,6 +349,22 @@ export function SafetyDashboardPage() {
         </form>
       </div>
 
+      {/* Explainer (shown when no analysis is active) */}
+      {!hpOpen && !hpLoading && (
+        <div className="space-y-6 text-center">
+          <div className="rounded-xl border border-white/5 bg-gray-900/40 p-6 max-w-xl mx-auto">
+            <p className="text-sm text-gray-400">
+              Detect honeypot tokens on the PulseChain. Honeypot detector simulates a buy and a sell transaction to determine if the token is a honeypot or not.
+              To prevent getting tricked, honeypot detector performs extra checks to minimize false results.
+              Detect honeypots on PulseChain with the highest accuracy.
+            </p>
+            <p className="text-sm text-amber-500/70 mt-3">
+              This is not a foolproof method. Just because it's not a honeypot now, does not mean it won't change!
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Inline honeypot results (no popup) */}
       {hpOpen && !hpLoading && (hpData || hpError) && (
         <div className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-2">
