@@ -587,6 +587,28 @@ def process_token(token_address: str, token_symbol: str):
     logger.info(f"    External: {len(external_args)} arguments")
     time.sleep(1)
 
+    # ── Enrich arguments with date ranges from source tweets ──
+    tweet_date_map = {}
+    for t in tweets:
+        tid = t.get("id")
+        tweeted_at = t.get("tweeted_at")
+        if tid and tweeted_at:
+            tweet_date_map[str(tid)] = tweeted_at[:10]  # YYYY-MM-DD
+
+    def enrich_date_range(args: list[dict]) -> list[dict]:
+        for arg in args:
+            source_ids = arg.get("source_tweet_ids", [])
+            dates = [tweet_date_map[str(sid)] for sid in source_ids if str(sid) in tweet_date_map]
+            if dates:
+                dates.sort()
+                arg["earliest_date"] = dates[0]
+                arg["latest_date"] = dates[-1]
+        return args
+
+    community_args = enrich_date_range(community_args)
+    external_args = enrich_date_range(external_args)
+    logger.info(f"  Date ranges enriched from source tweet IDs")
+
     # ── Phase C: Factual Evaluation ──
     logger.info(f"  Phase C: Evaluating arguments factually...")
     if community_args:

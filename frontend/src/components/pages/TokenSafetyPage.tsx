@@ -617,6 +617,8 @@ interface SentimentArgument {
   argument: string
   frequency: number
   source_tweet_ids: string[]
+  earliest_date?: string   // YYYY-MM-DD from source tweets
+  latest_date?: string     // YYYY-MM-DD from source tweets
   ai_evaluation?: {
     factual: 'confirmed' | 'partial' | 'unverifiable' | 'debunked'
     evidence: string
@@ -2698,6 +2700,16 @@ export function TokenSafetyPage() {
           debunked: 'bg-red-500/10 text-red-400 border-red-500/20',
         }
 
+        const formatDateRange = (earliest?: string, latest?: string) => {
+          if (!earliest) return null
+          const fmt = (d: string) => {
+            const [y, m, day] = d.split('-')
+            return `${day}/${m}/${y}`
+          }
+          if (!latest || earliest === latest) return fmt(earliest)
+          return `${fmt(earliest)} — ${fmt(latest)}`
+        }
+
         const renderArg = (arg: SentimentArgument & { source: string }, i: number) => (
           <div key={i} className="p-3 rounded-lg bg-gray-800/30 border border-white/5 space-y-2">
             <div className="flex items-start gap-2">
@@ -2712,6 +2724,16 @@ export function TokenSafetyPage() {
                   ? 'bg-[#00D4FF]/5 text-[#00D4FF]/70 border-[#00D4FF]/15'
                   : 'bg-[#8000E0]/5 text-[#8000E0]/70 border-[#8000E0]/15'
               }`}>{arg.source === 'community' ? 'Community' : 'External'}</span>
+              {formatDateRange(arg.earliest_date, arg.latest_date) && (
+                <>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDateRange(arg.earliest_date, arg.latest_date)}
+                  </span>
+                </>
+              )}
+              <span>·</span>
               <span>{arg.frequency} mentions</span>
               {arg.ai_evaluation && (
                 <>
