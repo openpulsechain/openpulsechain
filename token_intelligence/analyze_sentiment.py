@@ -616,13 +616,15 @@ def process_token(token_address: str, token_symbol: str):
     external_score = round((external_pos / external_total) * 100)
 
     # ── Load existing history ──
-    existing = supabase.table("token_sentiment") \
-        .select("sentiment_history") \
-        .eq("token_address", token_address) \
-        .maybeSingle() \
-        .execute()
-
-    history = (existing.data or {}).get("sentiment_history", []) if existing.data else []
+    try:
+        existing = supabase.table("token_sentiment") \
+            .select("sentiment_history") \
+            .eq("token_address", token_address) \
+            .maybe_single() \
+            .execute()
+        history = (existing.data or {}).get("sentiment_history", []) if existing and existing.data else []
+    except Exception:
+        history = []
 
     # Append today's snapshot
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
