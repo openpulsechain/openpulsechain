@@ -1141,7 +1141,7 @@ export function TokenSafetyPage() {
 
         <button
           onClick={loadHoneypotDetail}
-          className="w-full py-2 rounded-lg border border-[#00D4FF]/20 text-[#00D4FF] text-sm hover:bg-[#00D4FF]/10 transition-colors"
+          className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2.5 transition-colors"
         >
           View full honeypot analysis
         </button>
@@ -1778,7 +1778,7 @@ export function TokenSafetyPage() {
               <>
                 <button
                   onClick={() => setLeagueOpen(true)}
-                  className="w-full flex items-center justify-center gap-2 text-xs font-medium text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/20 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2.5 transition-colors"
                 >
                   {`View top holders & families (${leagueHolders.length} whales, ${leagueFamilies.length} clusters)`}
                 </button>
