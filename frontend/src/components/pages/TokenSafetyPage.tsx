@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity, Info, Copy, Check, ChevronDown, ChevronRight, MessageCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Shield, AlertTriangle, CheckCircle, XCircle, ExternalLink, ArrowLeft, Loader2, Clock, Users, FileCode, Droplets, Fingerprint, Activity, Info, Copy, Check, ChevronDown, ChevronRight, MessageCircle, TrendingUp, TrendingDown, Minus, X } from 'lucide-react'
 import { ShareButton } from '../ui/ShareButton'
 import { supabase } from '../../lib/supabase'
 
@@ -682,7 +682,7 @@ export function TokenSafetyPage() {
   // Section ⑨⑩: Token Intelligence (AI profile + social history)
   const [tokenIntel, setTokenIntel] = useState<TokenIntelligence | null>(null)
   const [intelLoading, setIntelLoading] = useState(true)
-  const [timelineExpanded, setTimelineExpanded] = useState(false)
+  const [timelineModalOpen, setTimelineModalOpen] = useState(false)
 
   // P0-C: Safety API health check
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
@@ -2377,12 +2377,11 @@ export function TokenSafetyPage() {
             <span className="text-xs font-normal text-gray-500 ml-1">({tokenIntel.social_timeline.length} events)</span>
           </h3>
 
-          {/* Timeline */}
+          {/* Preview: first 3 events */}
           <div className="relative pl-6 space-y-4">
-            {/* Vertical line */}
             <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gradient-to-b from-[#00D4FF]/30 via-[#8000E0]/20 to-transparent" />
 
-            {(timelineExpanded ? tokenIntel.social_timeline : tokenIntel.social_timeline.slice(0, 6)).map((event, i) => {
+            {tokenIntel.social_timeline.slice(0, 3).map((event, i) => {
               const cat = INTEL_CATEGORY_STYLES[event.category] || INTEL_CATEGORY_STYLES.other
               const sentimentColor = event.sentiment >= 65 ? 'text-emerald-400'
                 : event.sentiment >= 40 ? 'text-yellow-400'
@@ -2395,7 +2394,6 @@ export function TokenSafetyPage() {
 
               return (
                 <div key={i} className="relative">
-                  {/* Dot */}
                   <div className={`absolute -left-6 top-1.5 w-[11px] h-[11px] rounded-full border-2 ${
                     event.impact === 'positive' ? 'border-emerald-400 bg-emerald-400/20'
                     : event.impact === 'negative' ? 'border-red-400 bg-red-400/20'
@@ -2426,18 +2424,89 @@ export function TokenSafetyPage() {
             })}
           </div>
 
-          {/* Expand/collapse */}
-          {tokenIntel.social_timeline.length > 6 && (
+          {/* Show all events button → opens modal */}
+          {tokenIntel.social_timeline.length > 3 && (
             <button
-              onClick={() => setTimelineExpanded(!timelineExpanded)}
+              onClick={() => setTimelineModalOpen(true)}
               className="w-full text-center text-xs text-[#00D4FF] hover:text-white py-2 flex items-center justify-center gap-1 transition-colors"
             >
-              {timelineExpanded ? (
-                <><ChevronDown className="h-3 w-3 rotate-180" /> Show less</>
-              ) : (
-                <><ChevronDown className="h-3 w-3" /> Show all {tokenIntel.social_timeline.length} events</>
-              )}
+              <ChevronDown className="h-3 w-3" /> Show all {tokenIntel.social_timeline.length} events
             </button>
+          )}
+
+          {/* ── Timeline Modal ── */}
+          {timelineModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setTimelineModalOpen(false)}>
+              <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+              <div
+                className="relative bg-gray-900 border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Modal header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
+                  <h3 className="text-base font-semibold text-gray-200 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[#00D4FF]" />
+                    Social History — {tokenIntel.token_symbol || 'Token'}
+                    <span className="text-xs font-normal text-gray-500">({tokenIntel.social_timeline.length} events)</span>
+                  </h3>
+                  <button
+                    onClick={() => setTimelineModalOpen(false)}
+                    className="text-gray-500 hover:text-white transition-colors p-1"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Modal body: scrollable timeline */}
+                <div className="overflow-y-auto flex-1 px-6 py-5">
+                  <div className="relative pl-6 space-y-4">
+                    <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gradient-to-b from-[#00D4FF]/30 via-[#8000E0]/20 to-transparent" />
+
+                    {tokenIntel.social_timeline.map((event, i) => {
+                      const cat = INTEL_CATEGORY_STYLES[event.category] || INTEL_CATEGORY_STYLES.other
+                      const sentimentColor = event.sentiment >= 65 ? 'text-emerald-400'
+                        : event.sentiment >= 40 ? 'text-yellow-400'
+                        : 'text-red-400'
+                      const impactIcon = event.impact === 'positive'
+                        ? <TrendingUp className="h-3 w-3 text-emerald-400" />
+                        : event.impact === 'negative'
+                        ? <TrendingDown className="h-3 w-3 text-red-400" />
+                        : <Minus className="h-3 w-3 text-gray-500" />
+
+                      return (
+                        <div key={i} className="relative">
+                          <div className={`absolute -left-6 top-1.5 w-[11px] h-[11px] rounded-full border-2 ${
+                            event.impact === 'positive' ? 'border-emerald-400 bg-emerald-400/20'
+                            : event.impact === 'negative' ? 'border-red-400 bg-red-400/20'
+                            : 'border-gray-500 bg-gray-500/20'
+                          }`} />
+
+                          <div className="rounded-lg bg-gray-800/30 border border-white/5 p-3 hover:bg-gray-800/50 transition-colors">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="text-[10px] text-gray-500 font-mono">{event.date?.slice(0, 10)}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${cat.color}`}>
+                                {cat.label}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {impactIcon}
+                                <span className={`text-[10px] ${sentimentColor}`}>{event.sentiment}/100</span>
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-200 font-medium">{event.title}</p>
+                            <p className="text-xs text-gray-400 mt-1 leading-relaxed">{event.description}</p>
+                            {event.cause && (
+                              <p className="text-xs text-gray-500 mt-1.5 italic">
+                                <span className="text-gray-600">Cause:</span> {event.cause}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Mentioned addresses */}

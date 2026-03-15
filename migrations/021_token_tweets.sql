@@ -64,8 +64,10 @@ CREATE INDEX IF NOT EXISTS idx_token_stories_slug ON token_tweet_stories(slug);
 ALTER TABLE token_tweets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE token_tweet_stories ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "token_tweets_anon_read" ON token_tweets FOR SELECT TO anon USING (true);
 CREATE POLICY "token_tweets_read" ON token_tweets FOR SELECT TO authenticated USING (true);
 CREATE POLICY "token_tweets_service" ON token_tweets FOR ALL TO service_role USING (true);
 
+CREATE POLICY "token_stories_anon_read" ON token_tweet_stories FOR SELECT TO anon USING (true);
 CREATE POLICY "token_stories_read" ON token_tweet_stories FOR SELECT TO authenticated USING (true);
 CREATE POLICY "token_stories_service" ON token_tweet_stories FOR ALL TO service_role USING (true);
