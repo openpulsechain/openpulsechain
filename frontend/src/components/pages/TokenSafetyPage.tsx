@@ -1193,6 +1193,9 @@ export function TokenSafetyPage() {
           Deployer Reputation
           <span className="text-[10px] text-gray-600 font-normal normal-case tracking-normal ml-auto">Informational</span>
         </h3>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          The deployer is the wallet that created this token's smart contract. A deployer with many dead or rugged tokens is a strong warning signal. We analyze all tokens deployed by this address to assess trust.
+        </p>
         {deployerLoading ? (
           <div className="flex items-center gap-2 py-2">
             <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
