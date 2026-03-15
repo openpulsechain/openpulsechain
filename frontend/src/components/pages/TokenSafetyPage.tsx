@@ -700,6 +700,7 @@ export function TokenSafetyPage() {
   const [tokenSentiment, setTokenSentiment] = useState<TokenSentiment | null>(null)
   const [sentimentLoading, setSentimentLoading] = useState(true)
   const [sentimentModalOpen, setSentimentModalOpen] = useState(false)
+  const [sentimentTab, setSentimentTab] = useState<'positive' | 'negative'>('positive')
 
   // Section ⑨⑩: Token Intelligence (AI profile + social history)
   const [tokenIntel, setTokenIntel] = useState<TokenIntelligence | null>(null)
@@ -2737,46 +2738,96 @@ export function TokenSafetyPage() {
           </div>
         )
 
+        const shownArgs = sentimentTab === 'positive' ? posArgs : negArgs
+
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSentimentModalOpen(false)}>
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div
+            className="fixed inset-0 z-50 backdrop-blur-md overflow-y-auto p-4 sm:p-[3vw]"
+            onClick={() => setSentimentModalOpen(false)}
+          >
             <div
-              className="relative bg-gray-900 border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+              className="relative w-full max-w-4xl mx-auto rounded-2xl border border-white/10 bg-gray-900 shadow-2xl"
               onClick={e => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
-                <h3 className="text-base font-semibold text-gray-200 flex items-center gap-2">
+              {/* Close button */}
+              <button
+                onClick={() => setSentimentModalOpen(false)}
+                className="absolute top-4 right-4 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors z-10"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              {/* Header with scores */}
+              <div className="px-6 pt-5 pb-4 border-b border-white/5">
+                <h3 className="text-base font-semibold text-gray-200 flex items-center gap-2 mb-4">
                   <MessageCircle className="h-4 w-4 text-[#00D4FF]" />
                   Sentiment Analysis — {tokenSentiment.token_symbol || 'Token'}
+                  <span className="text-xs font-normal text-gray-500">({tokenSentiment.analyzed_tweet_count} tweets)</span>
                 </h3>
-                <button onClick={() => setSentimentModalOpen(false)} className="text-gray-500 hover:text-white transition-colors p-1">
-                  <X className="h-5 w-5" />
-                </button>
+
+                {/* Score recap */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="p-3 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/10 flex items-center gap-3">
+                    <Users className="h-4 w-4 text-[#00D4FF]" />
+                    <div>
+                      <div className="text-[10px] text-gray-400 uppercase">Community</div>
+                      <div className={`text-lg font-bold ${
+                        (tokenSentiment.community_score ?? 0) >= 65 ? 'text-emerald-400'
+                        : (tokenSentiment.community_score ?? 0) >= 40 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>{tokenSentiment.community_score ?? '--'}/100</div>
+                    </div>
+                    <span className="text-[10px] text-gray-500 ml-auto">{tokenSentiment.community_tweet_count} tweets</span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-[#8000E0]/5 border border-[#8000E0]/10 flex items-center gap-3">
+                    <Eye className="h-4 w-4 text-[#8000E0]" />
+                    <div>
+                      <div className="text-[10px] text-gray-400 uppercase">External</div>
+                      <div className={`text-lg font-bold ${
+                        (tokenSentiment.external_score ?? 0) >= 65 ? 'text-emerald-400'
+                        : (tokenSentiment.external_score ?? 0) >= 40 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>{tokenSentiment.external_score ?? '--'}/100</div>
+                    </div>
+                    <span className="text-[10px] text-gray-500 ml-auto">{tokenSentiment.external_tweet_count} tweets</span>
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex rounded-lg bg-gray-800/50 border border-white/5 p-0.5">
+                  <button
+                    onClick={() => setSentimentTab('positive')}
+                    className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                      sentimentTab === 'positive'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <ThumbsUp className="h-3.5 w-3.5" />
+                    Positive Sentiment ({posArgs.length})
+                  </button>
+                  <button
+                    onClick={() => setSentimentTab('negative')}
+                    className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                      sentimentTab === 'negative'
+                        ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <ThumbsDown className="h-3.5 w-3.5" />
+                    Negative Sentiment ({negArgs.length})
+                  </button>
+                </div>
               </div>
 
-              {/* Scrollable body */}
-              <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-                {/* Positive arguments */}
-                {posArgs.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <ThumbsUp className="h-3 w-3" />
-                      Positive Arguments ({posArgs.length})
-                    </h4>
-                    {posArgs.map((arg, i) => renderArg(arg, i))}
+              {/* Body */}
+              <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
+                {/* Arguments for selected tab */}
+                {shownArgs.length > 0 && (
+                  <div className="space-y-3">
+                    {shownArgs.map((arg, i) => renderArg(arg, i))}
                   </div>
                 )}
-
-                {/* Negative arguments */}
-                {negArgs.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-semibold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <ThumbsDown className="h-3 w-3" />
-                      Negative Arguments ({negArgs.length})
-                    </h4>
-                    {negArgs.map((arg, i) => renderArg(arg, i))}
-                  </div>
+                {shownArgs.length === 0 && (
+                  <div className="text-center py-8 text-sm text-gray-500">No {sentimentTab} arguments found.</div>
                 )}
 
                 {/* Independent Analysis */}
