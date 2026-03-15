@@ -2428,7 +2428,7 @@ export function TokenSafetyPage() {
           {tokenIntel.social_timeline.length > 3 && (
             <button
               onClick={() => setTimelineModalOpen(true)}
-              className="w-full py-3 rounded-lg border border-white/10 bg-gray-800/50 hover:bg-gray-800 text-sm text-gray-300 hover:text-white transition-colors flex items-center justify-center gap-1"
+              className="w-full py-3 rounded-lg border border-white/10 hover:bg-gray-800/50 text-sm text-[#00D4FF] hover:text-white transition-colors flex items-center justify-center gap-1"
             >
               Show all {tokenIntel.social_timeline.length} events
             </button>
