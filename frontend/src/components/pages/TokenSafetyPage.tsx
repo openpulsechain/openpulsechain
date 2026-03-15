@@ -2794,71 +2794,71 @@ export function TokenSafetyPage() {
 
                 {/* Independent Analysis — between scores and argument tabs */}
                 {tokenSentiment.verdict && tokenSentiment.verdict.overall_assessment && (
-                  <div className="mb-4 space-y-3">
-                    <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Search className="h-3.5 w-3.5 text-[#00D4FF]" />
+                  <div className="mb-4 space-y-4">
+                    <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                      <Search className="h-4 w-4 text-[#00D4FF]" />
                       Independent Analysis
                     </h4>
 
                     <div className="flex gap-3">
                       {tokenSentiment.verdict.positive_validity != null && (
-                        <div className="flex-1 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-center">
-                          <div className="text-lg font-bold text-emerald-400">{tokenSentiment.verdict.positive_validity}%</div>
-                          <div className="text-[10px] text-gray-500">Positive claims valid</div>
+                        <div className="flex-1 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-center">
+                          <div className="text-xl font-bold text-emerald-400">{tokenSentiment.verdict.positive_validity}%</div>
+                          <div className="text-xs text-gray-500">Positive claims valid</div>
                         </div>
                       )}
                       {tokenSentiment.verdict.negative_validity != null && (
-                        <div className="flex-1 p-2 rounded-lg bg-red-500/5 border border-red-500/10 text-center">
-                          <div className="text-lg font-bold text-red-400">{tokenSentiment.verdict.negative_validity}%</div>
-                          <div className="text-[10px] text-gray-500">Negative claims valid</div>
+                        <div className="flex-1 p-3 rounded-lg bg-red-500/5 border border-red-500/10 text-center">
+                          <div className="text-xl font-bold text-red-400">{tokenSentiment.verdict.negative_validity}%</div>
+                          <div className="text-xs text-gray-500">Negative claims valid</div>
                         </div>
                       )}
                     </div>
 
-                    <div className="p-3 rounded-lg bg-gray-800/30 border border-white/5">
-                      <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-line">{tokenSentiment.verdict.overall_assessment}</p>
+                    <div className="p-4 rounded-lg bg-gray-800/30 border border-white/5">
+                      <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{tokenSentiment.verdict.overall_assessment}</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="grid grid-cols-2 gap-3 text-xs">
                       {tokenSentiment.verdict.key_facts_confirmed.length > 0 && (
-                        <div className="space-y-1">
-                          <span className="text-emerald-400 font-medium">Confirmed</span>
+                        <div className="space-y-1.5">
+                          <span className="text-emerald-400 font-semibold">Confirmed</span>
                           {tokenSentiment.verdict.key_facts_confirmed.map((f, i) => (
-                            <div key={i} className="flex items-start gap-1 text-gray-400">
-                              <CheckCircle className="h-3 w-3 text-emerald-400 shrink-0 mt-0.5" />
+                            <div key={i} className="flex items-start gap-1.5 text-gray-300">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />
                               <span>{f}</span>
                             </div>
                           ))}
                         </div>
                       )}
                       {tokenSentiment.verdict.key_facts_debunked.length > 0 && (
-                        <div className="space-y-1">
-                          <span className="text-red-400 font-medium">Debunked</span>
+                        <div className="space-y-1.5">
+                          <span className="text-red-400 font-semibold">Debunked</span>
                           {tokenSentiment.verdict.key_facts_debunked.map((f, i) => (
-                            <div key={i} className="flex items-start gap-1 text-gray-400">
-                              <XCircle className="h-3 w-3 text-red-400 shrink-0 mt-0.5" />
+                            <div key={i} className="flex items-start gap-1.5 text-gray-300">
+                              <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" />
                               <span>{f}</span>
                             </div>
                           ))}
                         </div>
                       )}
                       {tokenSentiment.verdict.unverifiable_claims.length > 0 && (
-                        <div className="space-y-1">
-                          <span className="text-gray-400 font-medium">Unverifiable</span>
+                        <div className="space-y-1.5">
+                          <span className="text-gray-400 font-semibold">Unverifiable</span>
                           {tokenSentiment.verdict.unverifiable_claims.map((f, i) => (
-                            <div key={i} className="flex items-start gap-1 text-gray-500">
-                              <AlertTriangle className="h-3 w-3 text-gray-500 shrink-0 mt-0.5" />
+                            <div key={i} className="flex items-start gap-1.5 text-gray-400">
+                              <AlertTriangle className="h-3.5 w-3.5 text-gray-500 shrink-0 mt-0.5" />
                               <span>{f}</span>
                             </div>
                           ))}
                         </div>
                       )}
                       {tokenSentiment.verdict.risk_factors.length > 0 && (
-                        <div className="space-y-1">
-                          <span className="text-amber-400 font-medium">Risk Factors</span>
+                        <div className="space-y-1.5">
+                          <span className="text-amber-400 font-semibold">Risk Factors</span>
                           {tokenSentiment.verdict.risk_factors.map((f, i) => (
-                            <div key={i} className="flex items-start gap-1 text-gray-400">
-                              <AlertTriangle className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
+                            <div key={i} className="flex items-start gap-1.5 text-gray-300">
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
                               <span>{f}</span>
                             </div>
                           ))}
@@ -2867,12 +2867,12 @@ export function TokenSafetyPage() {
                     </div>
 
                     {tokenSentiment.verdict.conclusion && (
-                      <div className="p-3 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/10">
-                        <p className="text-xs text-gray-300 font-medium">{tokenSentiment.verdict.conclusion}</p>
+                      <div className="p-4 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/10">
+                        <p className="text-sm text-gray-200 font-medium leading-relaxed">{tokenSentiment.verdict.conclusion}</p>
                       </div>
                     )}
 
-                    <p className="text-[10px] text-gray-600 italic text-center pt-1">
+                    <p className="text-xs text-gray-600 italic text-center pt-1">
                       AI-generated analysis based on community &amp; external social data. Not investment advice — DYOR.
                     </p>
                   </div>
