@@ -699,7 +699,6 @@ export function TokenSafetyPage() {
   // Section ⑧: Social Sentiment (dual-perspective)
   const [tokenSentiment, setTokenSentiment] = useState<TokenSentiment | null>(null)
   const [sentimentLoading, setSentimentLoading] = useState(true)
-  const [sentimentTab, setSentimentTab] = useState<'community' | 'external'>('community')
 
   // Section ⑨⑩: Token Intelligence (AI profile + social history)
   const [tokenIntel, setTokenIntel] = useState<TokenIntelligence | null>(null)
@@ -2593,20 +2592,19 @@ export function TokenSafetyPage() {
         )}
 
         {!sentimentLoading && tokenSentiment && (() => {
-          const tab = sentimentTab
-          const isComm = tab === 'community'
-          const score = isComm ? tokenSentiment.community_score : tokenSentiment.external_score
-          const tweetCount = isComm ? tokenSentiment.community_tweet_count : tokenSentiment.external_tweet_count
-          const posCount = isComm ? tokenSentiment.community_positive_count : tokenSentiment.external_positive_count
-          const negCount = isComm ? tokenSentiment.community_negative_count : tokenSentiment.external_negative_count
-          const args = isComm ? tokenSentiment.community_arguments : tokenSentiment.external_arguments
-          const posArgs = args.filter(a => a.stance === 'positive')
-          const negArgs = args.filter(a => a.stance === 'negative')
+          const totalTweets = tokenSentiment.community_tweet_count + tokenSentiment.external_tweet_count
+          const totalPos = tokenSentiment.community_positive_count + tokenSentiment.external_positive_count
+          const totalNeg = tokenSentiment.community_negative_count + tokenSentiment.external_negative_count
+          const posPct = totalTweets > 0 ? Math.round((totalPos / totalTweets) * 100) : 0
+          const negPct = totalTweets > 0 ? Math.round((totalNeg / totalTweets) * 100) : 0
+          const neutralPct = 100 - posPct - negPct
 
-          const scoreColor = score == null ? 'text-gray-400'
-            : score >= 65 ? 'text-emerald-400'
-            : score >= 40 ? 'text-yellow-400'
-            : 'text-red-400'
+          const allArgs = [
+            ...tokenSentiment.community_arguments.map(a => ({ ...a, source: 'community' as const })),
+            ...tokenSentiment.external_arguments.map(a => ({ ...a, source: 'external' as const })),
+          ]
+          const posArgs = allArgs.filter(a => a.stance === 'positive').sort((a, b) => b.frequency - a.frequency)
+          const negArgs = allArgs.filter(a => a.stance === 'negative').sort((a, b) => b.frequency - a.frequency)
 
           const FACTUAL_BADGE: Record<string, string> = {
             confirmed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -2615,7 +2613,7 @@ export function TokenSafetyPage() {
             debunked: 'bg-red-500/10 text-red-400 border-red-500/20',
           }
 
-          const renderArg = (arg: SentimentArgument, i: number) => (
+          const renderArg = (arg: SentimentArgument & { source: string }, i: number) => (
             <div key={i} className="p-3 rounded-lg bg-gray-800/30 border border-white/5 space-y-2">
               <div className="flex items-start gap-2">
                 {arg.stance === 'positive'
@@ -2623,7 +2621,12 @@ export function TokenSafetyPage() {
                   : <ThumbsDown className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" />}
                 <p className="text-sm text-gray-200">{arg.argument}</p>
               </div>
-              <div className="flex items-center gap-2 text-[10px] text-gray-500">
+              <div className="flex items-center gap-2 text-[10px] text-gray-500 flex-wrap">
+                <span className={`px-1.5 py-0.5 rounded border ${
+                  arg.source === 'community'
+                    ? 'bg-[#00D4FF]/5 text-[#00D4FF]/70 border-[#00D4FF]/15'
+                    : 'bg-[#8000E0]/5 text-[#8000E0]/70 border-[#8000E0]/15'
+                }`}>{arg.source === 'community' ? 'Community' : 'External'}</span>
                 <span>{arg.frequency} mentions</span>
                 {arg.ai_evaluation && (
                   <>
@@ -2653,82 +2656,78 @@ export function TokenSafetyPage() {
 
           return (
             <>
-              {/* Tab selector */}
-              <div className="flex rounded-lg bg-gray-800/50 border border-white/5 p-0.5">
-                <button
-                  onClick={() => setSentimentTab('community')}
-                  className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                    tab === 'community'
-                      ? 'bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/20'
-                      : 'text-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  <Users className="h-3.5 w-3.5" />
-                  Community View
-                  <span className="text-[10px] opacity-70">({tokenSentiment.community_tweet_count})</span>
-                </button>
-                <button
-                  onClick={() => setSentimentTab('external')}
-                  className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                    tab === 'external'
-                      ? 'bg-[#8000E0]/10 text-[#8000E0] border border-[#8000E0]/20'
-                      : 'text-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  External View
-                  <span className="text-[10px] opacity-70">({tokenSentiment.external_tweet_count})</span>
-                </button>
-              </div>
-
-              {/* Score bar */}
-              <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-800/50 border border-white/5">
-                <div className={`text-xl font-bold ${scoreColor}`}>
-                  {score != null ? `${score}/100` : '--'}
+              {/* Dual score cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/10">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Users className="h-3.5 w-3.5 text-[#00D4FF]" />
+                    <span className="text-[10px] text-gray-400 uppercase font-medium">Community</span>
+                  </div>
+                  <div className={`text-xl font-bold ${
+                    (tokenSentiment.community_score ?? 0) >= 65 ? 'text-emerald-400'
+                    : (tokenSentiment.community_score ?? 0) >= 40 ? 'text-yellow-400'
+                    : 'text-red-400'
+                  }`}>
+                    {tokenSentiment.community_score ?? '--'}/100
+                  </div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">{tokenSentiment.community_tweet_count} tweets</div>
                 </div>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>{tweetCount} tweets</span>
-                    <span>·</span>
-                    <span className="text-emerald-400">{posCount} positive</span>
-                    <span>·</span>
-                    <span className="text-red-400">{negCount} negative</span>
-                    <span>·</span>
-                    <span>{tweetCount - posCount - negCount} neutral</span>
+                <div className="p-3 rounded-lg bg-[#8000E0]/5 border border-[#8000E0]/10">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Eye className="h-3.5 w-3.5 text-[#8000E0]" />
+                    <span className="text-[10px] text-gray-400 uppercase font-medium">External</span>
                   </div>
-                  {/* Bar */}
-                  <div className="h-1.5 rounded-full bg-gray-700 overflow-hidden flex">
-                    {tweetCount > 0 && (
-                      <>
-                        <div className="h-full bg-emerald-500" style={{ width: `${(posCount / tweetCount) * 100}%` }} />
-                        <div className="h-full bg-red-500" style={{ width: `${(negCount / tweetCount) * 100}%` }} />
-                      </>
-                    )}
+                  <div className={`text-xl font-bold ${
+                    (tokenSentiment.external_score ?? 0) >= 65 ? 'text-emerald-400'
+                    : (tokenSentiment.external_score ?? 0) >= 40 ? 'text-yellow-400'
+                    : 'text-red-400'
+                  }`}>
+                    {tokenSentiment.external_score ?? '--'}/100
                   </div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">{tokenSentiment.external_tweet_count} tweets</div>
                 </div>
               </div>
 
-              {/* Arguments: positive & negative side by side */}
-              {args.length > 0 && (
-                <div className="grid grid-cols-1 gap-3">
-                  {posArgs.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <ThumbsUp className="h-3 w-3" />
-                        Positive Arguments ({posArgs.length})
-                      </h4>
-                      {posArgs.map((arg, i) => renderArg(arg, i))}
-                    </div>
+              {/* Combined sentiment bar */}
+              <div className="p-3 rounded-lg bg-gray-800/50 border border-white/5 space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-gray-400">
+                  <span>{totalTweets} tweets total</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-emerald-400">{posPct}% positive</span>
+                    <span className="text-red-400">{negPct}% negative</span>
+                    <span>{neutralPct}% neutral</span>
+                  </div>
+                </div>
+                <div className="h-2 rounded-full bg-gray-700 overflow-hidden flex">
+                  {totalTweets > 0 && (
+                    <>
+                      <div className="h-full bg-emerald-500 transition-all" style={{ width: `${posPct}%` }} />
+                      <div className="h-full bg-gray-500 transition-all" style={{ width: `${neutralPct}%` }} />
+                      <div className="h-full bg-red-500 transition-all" style={{ width: `${negPct}%` }} />
+                    </>
                   )}
-                  {negArgs.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-semibold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <ThumbsDown className="h-3 w-3" />
-                        Negative Arguments ({negArgs.length})
-                      </h4>
-                      {negArgs.map((arg, i) => renderArg(arg, i))}
-                    </div>
-                  )}
+                </div>
+              </div>
+
+              {/* All positive arguments */}
+              {posArgs.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <ThumbsUp className="h-3 w-3" />
+                    Positive Arguments ({posArgs.length})
+                  </h4>
+                  {posArgs.map((arg, i) => renderArg(arg, i))}
+                </div>
+              )}
+
+              {/* All negative arguments */}
+              {negArgs.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <ThumbsDown className="h-3 w-3" />
+                    Negative Arguments ({negArgs.length})
+                  </h4>
+                  {negArgs.map((arg, i) => renderArg(arg, i))}
                 </div>
               )}
 
