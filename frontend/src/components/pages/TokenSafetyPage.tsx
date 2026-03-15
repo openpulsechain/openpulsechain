@@ -2428,9 +2428,9 @@ export function TokenSafetyPage() {
           {tokenIntel.social_timeline.length > 3 && (
             <button
               onClick={() => setTimelineModalOpen(true)}
-              className="w-full text-center text-xs text-[#00D4FF] hover:text-white py-2 flex items-center justify-center gap-1 transition-colors"
+              className="w-full py-3 rounded-lg border border-white/10 bg-gray-800/50 hover:bg-gray-800 text-sm text-gray-300 hover:text-white transition-colors flex items-center justify-center gap-1"
             >
-              <ChevronDown className="h-3 w-3" /> Show all {tokenIntel.social_timeline.length} events
+              Show all {tokenIntel.social_timeline.length} events
             </button>
           )}
 
