@@ -2871,6 +2871,10 @@ export function TokenSafetyPage() {
                         <p className="text-xs text-gray-300 font-medium">{tokenSentiment.verdict.conclusion}</p>
                       </div>
                     )}
+
+                    <p className="text-[10px] text-gray-600 italic text-center pt-1">
+                      AI-generated analysis based on community &amp; external social data. Not investment advice — DYOR.
+                    </p>
                   </div>
                 )}
 
