@@ -245,6 +245,7 @@ RULES:
 - Language doesn't matter: English + French on same event = SAME topic.
 - Generic/motivational tweet without specific event → topic = "SKIP"
 - Pure promo (giveaway, ref link) → topic = "SKIP"
+- Tweets about OTHER tokens/presales that merely tag ${symbol} for visibility → topic = "SKIP"
 - When in doubt, prefer "SKIP".
 
 Tweets:
@@ -390,6 +391,16 @@ RESPOND IN STRICT JSON:
     market_impact = result.get("market_impact", "neutral")
     if market_impact not in ("bullish", "bearish", "neutral", "haussier", "baissier", "neutre"):
         market_impact = "neutral"
+
+    # ── Relevance check: story must actually be about the target token ──
+    title_lower = result.get("title", "").lower()
+    summary_lower = result.get("summary", "").lower()
+    sym_lower = token_symbol.lower()
+    sym_dollar = f"${sym_lower}"
+    check_text = f"{title_lower} {summary_lower}"
+    if sym_lower not in check_text and sym_dollar not in check_text:
+        logger.info(f"    Off-topic story skipped: \"{result.get('title', '')[:60]}\" (no mention of {token_symbol})")
+        return None
 
     return {
         "token_address": token_address.lower(),
