@@ -28,7 +28,6 @@ const PAGES = [
   { id: 'whales', label: 'Whales', path: '/whales' },
   { id: 'leagues', label: 'Leagues', path: '/leagues', icon: Crown },
   { id: 'intelligence', label: 'Intel', path: '/intelligence' },
-  { id: 'honeypot', label: 'Honeypot', path: '/honeypot', icon: Shield },
   { id: 'api', label: 'API', path: '/api' },
 ]
 

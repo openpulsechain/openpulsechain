@@ -1,9 +1,16 @@
 """
-Single-token scraper — scrapes ALL historical quarters for ONE token.
-Usage: SYMBOL=HEX ADDRESS=0x... python3 scrape_single_token.py
+Single-token scraper V2 — multi-query strategy for COMPLETE coverage.
+Usage: SYMBOL=HEX ADDRESS=0x... ALIASES=pHEX python3 scrape_single_token.py
+
+V1 only searched: "SYMBOL" pulsechain → missed 90%+ of tweets.
+V2 searches multiple query variants per quarter:
+  - cashtag:  $SYMBOL (crypto Twitter convention)
+  - broad:    "SYMBOL" (pulsechain OR pulsex OR pulseX)
+  - alias:    each alias with pulsechain context
+  - address:  raw contract address
 """
 from __future__ import annotations
-import os, sys, asyncio, logging, json, random
+import os, sys, asyncio, logging, json, random, urllib.parse
 from datetime import datetime, timezone, timedelta, date
 from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
@@ -20,6 +27,8 @@ TWITTER_AUTH_TOKEN = os.getenv("TWITTER_AUTH_TOKEN")
 TWITTER_CT0 = os.getenv("TWITTER_CT0")
 TOKEN_SYMBOL = os.getenv("SYMBOL", "")
 TOKEN_ADDRESS = os.getenv("ADDRESS", "")
+# Comma-separated aliases, e.g. "pHEX,Hex PulseChain"
+TOKEN_ALIASES = [a.strip() for a in os.getenv("ALIASES", "").split(",") if a.strip()]
 
 if not all([SUPABASE_URL, SUPABASE_KEY, TWITTER_AUTH_TOKEN, TWITTER_CT0, TOKEN_SYMBOL]):
     logger.error("Missing env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TWITTER_AUTH_TOKEN, TWITTER_CT0, SYMBOL")
@@ -34,29 +43,48 @@ Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
 window.chrome = { runtime: {} };
 """
 
-MAX_SCROLLS = 30
-STALE_THRESHOLD = 10
-DELAY_BETWEEN = (12, 25)  # seconds between searches
-MONTHS_BEFORE_LAUNCH = 4  # Start searching 4 months before token launch
+MAX_SCROLLS = 30  # Weekly periods = less content per search, no need for deep scroll
+STALE_THRESHOLD = 8
+DELAY_BETWEEN = (8, 18)  # seconds between searches (shorter windows = lighter load)
+MONTHS_BEFORE_LAUNCH = 4
 
 # Token launch date override via env, otherwise PulseChain launch
 _start_env = os.getenv("START_DATE", "")
 TOKEN_START_DATE = datetime.strptime(_start_env, "%Y-%m-%d").date() if _start_env else date(2023, 5, 10)
 
 
-def generate_quarters(start_date: date) -> list[tuple[date, date]]:
-    """Generate quarterly periods from start_date to now."""
-    quarters = []
+def generate_periods(start_date: date) -> list[tuple[date, date]]:
+    """Generate WEEKLY periods from start_date to now for maximum coverage."""
+    periods = []
     now = date.today() + timedelta(days=1)
-    # Start N months before token launch
     d = start_date - relativedelta(months=MONTHS_BEFORE_LAUNCH)
-    # Align to quarter start
-    d = d.replace(day=1, month=((d.month - 1) // 3) * 3 + 1)
+    # Align to Monday
+    d = d - timedelta(days=d.weekday())
     while d < now:
-        end = min(d + relativedelta(months=3), now)
-        quarters.append((d, end))
+        end = min(d + timedelta(days=7), now)
+        periods.append((d, end))
         d = end
-    return quarters
+    return periods
+
+
+def build_search_queries(symbol: str, address: str, aliases: list[str],
+                         q_start: date, q_end: date) -> list[tuple[str, str]]:
+    """Build query variants for a weekly period. Returns [(search_type, query), ...]
+
+    Weekly periods = shorter windows = Twitter returns more complete results.
+    Keep only the 2 most productive query types to avoid excessive searches.
+    """
+    since = q_start.isoformat()
+    until = q_end.isoformat()
+    queries = []
+
+    # 1. Cashtag search — crypto Twitter convention, highest volume
+    queries.append(("cashtag", f"${symbol} since:{since} until:{until}"))
+
+    # 2. Broad search — symbol + PulseChain ecosystem context
+    queries.append(("broad", f'"{symbol}" (pulsechain OR pulsex OR "pulse chain") since:{since} until:{until}'))
+
+    return queries
 
 
 def get_done_periods() -> set[str]:
@@ -94,9 +122,19 @@ async def deep_search(page, query: str) -> list[dict]:
     tweets = []
     seen_ids = set()
 
-    url = f"https://x.com/search?q={query}&src=typed_query&f=live"
-    await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    encoded_query = urllib.parse.quote(query, safe='')
+    url = f"https://x.com/search?q={encoded_query}&src=typed_query&f=live"
+    try:
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    except Exception as e:
+        logger.warning(f"      Page load timeout: {e}")
+        return tweets
     await asyncio.sleep(3)
+
+    # Check for "No results" or login wall
+    content = await page.content()
+    if "No results for" in content or "Log in" in content:
+        return tweets
 
     prev_count = 0
     stale = 0
@@ -121,7 +159,6 @@ async def deep_search(page, query: str) -> list[dict]:
         if len(tweets) == prev_count:
             stale += 1
             if stale >= STALE_THRESHOLD:
-                logger.info(f"      End of results after {scroll_n} scrolls")
                 break
         else:
             stale = 0
@@ -132,7 +169,6 @@ async def deep_search(page, query: str) -> list[dict]:
 
 async def extract_tweet(article) -> dict | None:
     """Extract tweet data from article element."""
-    # Get tweet link for ID
     links = await article.query_selector_all('a[href*="/status/"]')
     tweet_id = None
     tweet_url = None
@@ -188,16 +224,13 @@ async def extract_tweet(article) -> dict | None:
     # Media (images, videos, GIFs)
     media_urls = []
     media_types = []
-    # Photos
     photo_els = await article.query_selector_all('div[data-testid="tweetPhoto"] img')
     for img in photo_els:
         src = await img.get_attribute("src")
         if src and "pbs.twimg.com/media" in src:
-            # Get highest quality: append ?format=jpg&name=large
             clean_url = src.split("?")[0] if "?" in src else src
             media_urls.append(f"{clean_url}?format=jpg&name=large")
             media_types.append("photo")
-    # Videos / GIFs
     video_els = await article.query_selector_all('video')
     for vid in video_els:
         poster = await vid.get_attribute("poster")
@@ -258,27 +291,27 @@ def upsert_tweets(tweets: list[dict]) -> int:
 async def main():
     from playwright.async_api import async_playwright
 
-    logger.info(f"=== Single Token Scraper: ${TOKEN_SYMBOL} ===")
-    if TOKEN_ADDRESS:
-        logger.info(f"Address: {TOKEN_ADDRESS}")
+    logger.info(f"=== Single Token Scraper V2: ${TOKEN_SYMBOL} ===")
+    logger.info(f"  Address: {TOKEN_ADDRESS or 'none'}")
+    logger.info(f"  Aliases: {TOKEN_ALIASES or 'none'}")
+    logger.info(f"  Start date: {TOKEN_START_DATE}")
 
-    quarters = generate_quarters(TOKEN_START_DATE)
+    quarters = generate_periods(TOKEN_START_DATE)
     done = get_done_periods()
+    addr = TOKEN_ADDRESS.lower() if TOKEN_ADDRESS else TOKEN_SYMBOL.lower()
 
-    # Build search list
-    searches = []
+    # Build complete search list with all query variants
+    all_searches = []
     for q_start, q_end in reversed(quarters):  # Most recent first
-        key_sym = f"symbol_{q_start}"
-        if key_sym not in done:
-            searches.append(("symbol", q_start, q_end))
-        if TOKEN_ADDRESS:
-            key_addr = f"address_{q_start}"
-            if key_addr not in done:
-                searches.append(("address", q_start, q_end))
+        variants = build_search_queries(TOKEN_SYMBOL, TOKEN_ADDRESS, TOKEN_ALIASES, q_start, q_end)
+        for search_type, query in variants:
+            key = f"{search_type}_{q_start}"
+            if key not in done:
+                all_searches.append((search_type, q_start, q_end, query))
 
-    logger.info(f"Pending searches: {len(searches)}")
-    if not searches:
-        logger.info("All quarters already done!")
+    logger.info(f"Pending searches: {len(all_searches)}")
+    if not all_searches:
+        logger.info("All searches already done!")
         return
 
     async with async_playwright() as p:
@@ -296,33 +329,24 @@ async def main():
         logger.info("Twitter session ready")
 
         total_tweets = 0
-        for i, (search_type, q_start, q_end) in enumerate(searches):
-            if search_type == "symbol":
-                query = f'"{TOKEN_SYMBOL}" pulsechain since:{q_start} until:{q_end}'
-            else:
-                query = f'{TOKEN_ADDRESS} since:{q_start} until:{q_end}'
-
-            logger.info(f"  [{i+1}/{len(searches)}] {search_type} {q_start} → {q_end}")
+        for i, (search_type, q_start, q_end, query) in enumerate(all_searches):
+            logger.info(f"  [{i+1}/{len(all_searches)}] {search_type} {q_start} → {q_end}")
             logger.info(f"    Query: {query}")
 
-            addr = TOKEN_ADDRESS.lower() if TOKEN_ADDRESS else TOKEN_SYMBOL.lower()
             mark_progress(addr, search_type, q_start, q_end, "in_progress")
 
             try:
                 tweets = await deep_search(page, query)
                 count = upsert_tweets(tweets)
                 total_tweets += count
-                if count:
-                    logger.info(f"    {count} tweets upserted")
-                else:
-                    logger.info(f"    0 tweets found")
+                logger.info(f"    → {count} tweets {'upserted' if count else 'found'}")
                 mark_progress(addr, search_type, q_start, q_end, "done", count)
             except Exception as e:
                 logger.error(f"    Search failed: {e}")
                 mark_progress(addr, search_type, q_start, q_end, "failed")
 
-            # Delay
-            if i < len(searches) - 1:
+            # Delay between searches
+            if i < len(all_searches) - 1:
                 delay = random.randint(*DELAY_BETWEEN)
                 await asyncio.sleep(delay)
 

@@ -66,7 +66,7 @@ window.navigator.permissions.query = (params) =>
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
-MAX_SCROLLS_PER_SEARCH = 30       # Deep scroll per quarterly search
+MAX_SCROLLS_PER_SEARCH = 50       # Deep scroll per quarterly search
 SCROLL_PAUSE_MS = 2500            # ms between scrolls
 STALE_THRESHOLD = 10              # Stop after N scrolls without new tweets
 DELAY_BETWEEN_SEARCHES = (15, 30) # Random delay range (seconds) between searches
@@ -185,8 +185,10 @@ def get_pending_searches(token_address: str, token_symbol: str | None, creation_
     pending = []
     for q_start, q_end in quarters:
         start_str = q_start.isoformat()
+        since = q_start.isoformat()
+        until = q_end.isoformat()
 
-        # Symbol search
+        # Symbol search (V1 — kept for backwards compat)
         if token_symbol and ("symbol", start_str) not in done:
             pending.append({
                 "token_address": token_address,
@@ -194,7 +196,29 @@ def get_pending_searches(token_address: str, token_symbol: str | None, creation_
                 "search_type": "symbol",
                 "period_start": q_start,
                 "period_end": q_end,
-                "query": f'"{token_symbol}" pulsechain since:{q_start.isoformat()} until:{q_end.isoformat()}',
+                "query": f'"{token_symbol}" pulsechain since:{since} until:{until}',
+            })
+
+        # Cashtag search (V2 — crypto Twitter convention, much higher volume)
+        if token_symbol and ("cashtag", start_str) not in done:
+            pending.append({
+                "token_address": token_address,
+                "token_symbol": token_symbol,
+                "search_type": "cashtag",
+                "period_start": q_start,
+                "period_end": q_end,
+                "query": f'${token_symbol} since:{since} until:{until}',
+            })
+
+        # Broad search (V2 — symbol + PulseChain ecosystem context with OR)
+        if token_symbol and ("broad", start_str) not in done:
+            pending.append({
+                "token_address": token_address,
+                "token_symbol": token_symbol,
+                "search_type": "broad",
+                "period_start": q_start,
+                "period_end": q_end,
+                "query": f'"{token_symbol}" (pulsechain OR pulsex OR "pulse chain") since:{since} until:{until}',
             })
 
         # Address search
@@ -205,7 +229,7 @@ def get_pending_searches(token_address: str, token_symbol: str | None, creation_
                 "search_type": "address",
                 "period_start": q_start,
                 "period_end": q_end,
-                "query": f'{token_address} since:{q_start.isoformat()} until:{q_end.isoformat()}',
+                "query": f'{token_address} since:{since} until:{until}',
             })
 
     return pending
