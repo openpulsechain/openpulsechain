@@ -1194,7 +1194,7 @@ export function TokenSafetyPage() {
           <span className="text-[10px] text-gray-600 font-normal normal-case tracking-normal ml-auto">Informational</span>
         </h3>
         <p className="text-xs text-gray-500 leading-relaxed">
-          The deployer is the wallet that created this token's smart contract. A deployer with many dead or rugged tokens is a strong warning signal. We analyze all tokens deployed by this address to assess trust.
+          The deployer is the wallet address that created this token's smart contract on-chain. We scan <strong className="text-gray-400">all other tokens</strong> deployed by the same address and check how many are still active vs dead (zero liquidity or abandoned). A high mortality rate suggests a pattern of short-lived projects — a common rug pull indicator. Risk level is computed from mortality rate and total deployments: serial deployers with high mortality are flagged as <strong className="text-gray-400">Serial Rugger</strong>.
         </p>
         {deployerLoading ? (
           <div className="flex items-center gap-2 py-2">
