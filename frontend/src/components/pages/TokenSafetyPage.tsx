@@ -2050,169 +2050,9 @@ export function TokenSafetyPage() {
         )}
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          ⑥ TOKEN IDENTITY (informational)
-          Phase E: Canonical registry replaces auto-populated pulsechain_tokens (Finding #3)
-          Status: Canonical / Address differs / Unlisted
-          ══════════════════════════════════════════════════════════════════════ */}
-      <div id="identity" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
-        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-          <Fingerprint className="h-4 w-4 text-[#00D4FF]" />
-          Token Identity
-          <span className="text-[10px] text-gray-600 font-normal normal-case tracking-normal ml-auto">Informational</span>
-        </h3>
-
-        {/* Token registry status — canonical check */}
-        {(() => {
-          const symbol = tokenInfo?.symbol?.toUpperCase()
-          const canonical = symbol ? CANONICAL_TOKENS[symbol] : undefined
-          const isCanonical = canonical && address && canonical.address.toLowerCase() === address.toLowerCase()
-          const addressDiffers = canonical && address && canonical.address.toLowerCase() !== address.toLowerCase()
-          return (
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Symbol</span>
-                <span className="font-medium">{tokenInfo?.symbol || address?.slice(0, 10)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Name</span>
-                <span>{tokenInfo?.name || 'Unknown'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Canonical Status</span>
-                {isCanonical ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-emerald-400 font-bold">
-                    <CheckCircle className="h-3 w-3" /> Canonical
-                  </span>
-                ) : addressDiffers ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-red-400 font-bold">
-                    <XCircle className="h-3 w-3" /> Address differs
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                    Unlisted
-                  </span>
-                )}
-              </div>
-              {canonical && (
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Source</span>
-                  <span className="text-xs text-gray-500">{canonical.source}</span>
-                </div>
-              )}
-              {/* Warning banner for address mismatch */}
-              {addressDiffers && canonical && (
-                <div className="rounded-lg bg-red-500/5 border border-red-500/10 px-3 py-2 mt-1">
-                  <div className="text-xs text-red-300 font-bold mb-1">Impersonation Warning</div>
-                  <p className="text-[11px] text-red-300/80">
-                    This token uses the symbol "{tokenInfo?.symbol}" but its address does not match the canonical {canonical.name} ({canonical.address.slice(0, 10)}...{canonical.address.slice(-6)}).
-                    This could be a fork copy, a scam, or a different token. Verify the contract before interacting.
-                  </p>
-                  <Link to={`/token/${canonical.address}`} className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-[#00D4FF] hover:underline">
-                    <Shield className="h-3 w-3" /> View canonical {tokenInfo?.symbol}
-                  </Link>
-                </div>
-              )}
-            </div>
-          )
-        })()}
-
-        {/* Token Address Comparison — dual check: canonical + known (from pools) */}
-        {uniquePoolTokens.length > 0 && (
-          <div className="pt-2 border-t border-white/5">
-            <div className="text-xs text-gray-400 mb-3 font-medium">Token Address Comparison (from pools)</div>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-white/10 text-gray-500">
-                  <th className="py-1.5 text-left">Symbol</th>
-                  <th className="py-1.5 text-left">Address in Pools</th>
-                  <th className="py-1.5 text-center">Status</th>
-                  <th className="py-1.5 text-center">Safety</th>
-                </tr>
-              </thead>
-              <tbody>
-                {uniquePoolTokens.map((t, idx) => {
-                  // Canonical registry check (curated, reliable)
-                  const canonicalEntry = t.symbol ? CANONICAL_TOKENS[t.symbol.toUpperCase()] : undefined
-                  const isCanonicalMatch = canonicalEntry && t.address && canonicalEntry.address.toLowerCase() === t.address.toLowerCase()
-                  const isCanonicalMismatch = canonicalEntry && t.address && canonicalEntry.address.toLowerCase() !== t.address.toLowerCase()
-                  // Fallback: pulsechain_tokens check (auto-populated, less reliable)
-                  const knownTokens = t.symbol ? verifiedTokens[t.symbol] : undefined
-                  const matchesKnown = knownTokens?.some(v => v.address.toLowerCase() === t.address?.toLowerCase())
-                  return (
-                    <Fragment key={idx}>
-                      <tr className="border-b border-white/5">
-                        <td className="py-1.5 text-white font-medium">{t.symbol ?? '--'}</td>
-                        <td className="py-1.5 font-mono text-gray-300">
-                          {t.address ? (
-                            <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${t.address}`}
-                              target="_blank" rel="noopener noreferrer"
-                              className="hover:text-cyan-400 transition-colors"
-                            >
-                              {t.address.slice(0, 10)}...{t.address.slice(-8)}
-                            </a>
-                          ) : '--'}
-                        </td>
-                        <td className="py-1.5 text-center">
-                          {!t.address ? <span className="text-gray-600">--</span>
-                            : isCanonicalMatch ? <span className="text-emerald-400 font-bold">Canonical</span>
-                            : isCanonicalMismatch ? <span className="text-red-400 font-bold">Address differs</span>
-                            : matchesKnown ? <span className="text-cyan-400">Known</span>
-                            : <span className="text-gray-500">Unlisted</span>}
-                        </td>
-                        <td className="py-1.5 text-center">
-                          {t.address && (
-                            <Link to={`/token/${t.address}`}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#00D4FF]/10 border border-[#00D4FF]/20 text-[#00D4FF] hover:bg-[#00D4FF]/20 transition-colors"
-                              title={`Token Safety analysis for ${t.symbol}`}
-                            >
-                              <Shield className="h-3 w-3" />
-                              <span className="text-[10px] font-medium">Analyze</span>
-                            </Link>
-                          )}
-                        </td>
-                      </tr>
-                      {/* Show canonical address if mismatch */}
-                      {isCanonicalMismatch && canonicalEntry && (
-                        <tr className="border-b border-white/5 bg-red-500/5">
-                          <td className="py-1 text-emerald-400/60 pl-4 text-[10px]">Canonical {t.symbol}</td>
-                          <td className="py-1 font-mono text-emerald-400/80">
-                            <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${canonicalEntry.address}`}
-                              target="_blank" rel="noopener noreferrer"
-                              className="hover:text-emerald-300 transition-colors"
-                            >
-                              {canonicalEntry.address.slice(0, 10)}...{canonicalEntry.address.slice(-8)}
-                            </a>
-                          </td>
-                          <td className="py-1 text-center text-emerald-400 font-bold">Canonical</td>
-                          <td className="py-1 text-center">
-                            <Link to={`/token/${canonicalEntry.address}`}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                              title={`Token Safety for canonical ${t.symbol}`}
-                            >
-                              <Shield className="h-3 w-3" />
-                              <span className="text-[10px] font-medium">Analyze</span>
-                            </Link>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-            <p className="text-[10px] text-gray-600 mt-2">
-              "Canonical" = verified address from curated registry ({Object.keys(CANONICAL_TOKENS).length} tokens).
-              "Known" = found in auto-populated database (not manually verified).
-              "Address differs" = same symbol but different contract than canonical — potential impersonation.
-              "Unlisted" = symbol not in either registry.
-            </p>
-          </div>
-        )}
-      </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          ⑦ ACTIVITY TIMELINE (10 pts)
+          ⑥ ACTIVITY TIMELINE (10 pts)
           ══════════════════════════════════════════════════════════════════════ */}
       <div id="timeline" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
@@ -2338,7 +2178,7 @@ export function TokenSafetyPage() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          ⑨ ABOUT THIS PROJECT (AI-generated from tweet analysis)
+          ⑦ ABOUT THIS PROJECT (AI-generated from tweet analysis)
           ══════════════════════════════════════════════════════════════════════ */}
       {!intelLoading && tokenIntel?.project_summary && (
         <div className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
@@ -2389,7 +2229,120 @@ export function TokenSafetyPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          ⑩ SOCIAL HISTORY (AI timeline from tweet analysis)
+          ⑧ SOCIAL SENTIMENT (dual-perspective AI analysis)          ══════════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
+        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+          <MessageCircle className="h-4 w-4 text-[#00D4FF]" />
+          Social Sentiment
+          {tokenSentiment && (
+            <span className="text-xs font-normal text-gray-500 ml-1">({tokenSentiment.analyzed_tweet_count} tweets analyzed)</span>
+          )}
+        </h3>
+
+        {sentimentLoading && (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+          </div>
+        )}
+
+        {!sentimentLoading && !tokenSentiment && (
+          <div className="text-center py-6">
+            <MessageCircle className="h-8 w-8 text-gray-700 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No social sentiment data yet.</p>
+            <p className="text-xs text-gray-600 mt-1">Sentiment analysis runs daily.</p>
+          </div>
+        )}
+
+        {!sentimentLoading && tokenSentiment && (() => {
+          const totalTweets = tokenSentiment.community_tweet_count + tokenSentiment.external_tweet_count
+          const totalPos = tokenSentiment.community_positive_count + tokenSentiment.external_positive_count
+          const totalNeg = tokenSentiment.community_negative_count + tokenSentiment.external_negative_count
+          const posPct = totalTweets > 0 ? Math.round((totalPos / totalTweets) * 100) : 0
+          const negPct = totalTweets > 0 ? Math.round((totalNeg / totalTweets) * 100) : 0
+          const neutralPct = 100 - posPct - negPct
+
+          const allArgs = [
+            ...tokenSentiment.community_arguments,
+            ...tokenSentiment.external_arguments,
+          ]
+          const posArgs = allArgs.filter(a => a.stance === 'positive')
+          const negArgs = allArgs.filter(a => a.stance === 'negative')
+
+          return (
+            <>
+              {/* Dual score cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/10">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Users className="h-3.5 w-3.5 text-[#00D4FF]" />
+                    <span className="text-[10px] text-gray-400 uppercase font-medium">Community</span>
+                  </div>
+                  <div className={`text-xl font-bold ${
+                    (tokenSentiment.community_score ?? 0) >= 65 ? 'text-emerald-400'
+                    : (tokenSentiment.community_score ?? 0) >= 40 ? 'text-yellow-400'
+                    : 'text-red-400'
+                  }`}>
+                    {tokenSentiment.community_score ?? '--'}/100
+                  </div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">{tokenSentiment.community_tweet_count} tweets</div>
+                </div>
+                <div className="p-3 rounded-lg bg-[#8000E0]/5 border border-[#8000E0]/10">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Eye className="h-3.5 w-3.5 text-[#8000E0]" />
+                    <span className="text-[10px] text-gray-400 uppercase font-medium">External</span>
+                  </div>
+                  <div className={`text-xl font-bold ${
+                    (tokenSentiment.external_score ?? 0) >= 65 ? 'text-emerald-400'
+                    : (tokenSentiment.external_score ?? 0) >= 40 ? 'text-yellow-400'
+                    : 'text-red-400'
+                  }`}>
+                    {tokenSentiment.external_score ?? '--'}/100
+                  </div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">{tokenSentiment.external_tweet_count} tweets</div>
+                </div>
+              </div>
+
+              {/* Combined sentiment bar */}
+              <div className="p-3 rounded-lg bg-gray-800/50 border border-white/5 space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-gray-400">
+                  <span>{totalTweets} tweets total</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-emerald-400">{posPct}% positive</span>
+                    <span className="text-red-400">{negPct}% negative</span>
+                    <span>{neutralPct}% neutral</span>
+                  </div>
+                </div>
+                <div className="h-2 rounded-full bg-gray-700 overflow-hidden flex">
+                  {totalTweets > 0 && (
+                    <>
+                      <div className="h-full bg-emerald-500 transition-all" style={{ width: `${posPct}%` }} />
+                      <div className="h-full bg-gray-500 transition-all" style={{ width: `${neutralPct}%` }} />
+                      <div className="h-full bg-red-500 transition-all" style={{ width: `${negPct}%` }} />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* View full analysis button */}
+              {allArgs.length > 0 && (
+                <button
+                  onClick={() => setSentimentModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2.5 transition-colors"
+                >
+                  View full sentiment analysis ({posArgs.length} positive, {negArgs.length} negative arguments)
+                </button>
+              )}
+            </>
+          )
+        })()}
+
+        <p className="text-[10px] text-gray-600 text-center">
+          AI-analyzed Twitter mentions. Not investment advice.
+        </p>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ⑨ SOCIAL HISTORY (AI timeline from tweet analysis)
           ══════════════════════════════════════════════════════════════════════ */}
       {!intelLoading && tokenIntel && tokenIntel.social_timeline.length > 0 && (
         <div className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
@@ -2568,117 +2521,164 @@ export function TokenSafetyPage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          ⑧ SOCIAL SENTIMENT (dual-perspective AI analysis)
+          ⑩ TOKEN IDENTITY (informational)
+          Phase E: Canonical registry replaces auto-populated pulsechain_tokens (Finding #3)
+          Status: Canonical / Address differs / Unlisted
           ══════════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
+      <div id="identity" className="rounded-xl border border-white/5 bg-gray-900/50 p-5 space-y-4 break-inside-avoid">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-          <MessageCircle className="h-4 w-4 text-[#00D4FF]" />
-          Social Sentiment
-          {tokenSentiment && (
-            <span className="text-xs font-normal text-gray-500 ml-1">({tokenSentiment.analyzed_tweet_count} tweets analyzed)</span>
-          )}
+          <Fingerprint className="h-4 w-4 text-[#00D4FF]" />
+          Token Identity
+          <span className="text-[10px] text-gray-600 font-normal normal-case tracking-normal ml-auto">Informational</span>
         </h3>
 
-        {sentimentLoading && (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-          </div>
-        )}
-
-        {!sentimentLoading && !tokenSentiment && (
-          <div className="text-center py-6">
-            <MessageCircle className="h-8 w-8 text-gray-700 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">No social sentiment data yet.</p>
-            <p className="text-xs text-gray-600 mt-1">Sentiment analysis runs daily.</p>
-          </div>
-        )}
-
-        {!sentimentLoading && tokenSentiment && (() => {
-          const totalTweets = tokenSentiment.community_tweet_count + tokenSentiment.external_tweet_count
-          const totalPos = tokenSentiment.community_positive_count + tokenSentiment.external_positive_count
-          const totalNeg = tokenSentiment.community_negative_count + tokenSentiment.external_negative_count
-          const posPct = totalTweets > 0 ? Math.round((totalPos / totalTweets) * 100) : 0
-          const negPct = totalTweets > 0 ? Math.round((totalNeg / totalTweets) * 100) : 0
-          const neutralPct = 100 - posPct - negPct
-
-          const allArgs = [
-            ...tokenSentiment.community_arguments,
-            ...tokenSentiment.external_arguments,
-          ]
-          const posArgs = allArgs.filter(a => a.stance === 'positive')
-          const negArgs = allArgs.filter(a => a.stance === 'negative')
-
+        {/* Token registry status — canonical check */}
+        {(() => {
+          const symbol = tokenInfo?.symbol?.toUpperCase()
+          const canonical = symbol ? CANONICAL_TOKENS[symbol] : undefined
+          const isCanonical = canonical && address && canonical.address.toLowerCase() === address.toLowerCase()
+          const addressDiffers = canonical && address && canonical.address.toLowerCase() !== address.toLowerCase()
           return (
-            <>
-              {/* Dual score cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/10">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Users className="h-3.5 w-3.5 text-[#00D4FF]" />
-                    <span className="text-[10px] text-gray-400 uppercase font-medium">Community</span>
-                  </div>
-                  <div className={`text-xl font-bold ${
-                    (tokenSentiment.community_score ?? 0) >= 65 ? 'text-emerald-400'
-                    : (tokenSentiment.community_score ?? 0) >= 40 ? 'text-yellow-400'
-                    : 'text-red-400'
-                  }`}>
-                    {tokenSentiment.community_score ?? '--'}/100
-                  </div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">{tokenSentiment.community_tweet_count} tweets</div>
-                </div>
-                <div className="p-3 rounded-lg bg-[#8000E0]/5 border border-[#8000E0]/10">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Eye className="h-3.5 w-3.5 text-[#8000E0]" />
-                    <span className="text-[10px] text-gray-400 uppercase font-medium">External</span>
-                  </div>
-                  <div className={`text-xl font-bold ${
-                    (tokenSentiment.external_score ?? 0) >= 65 ? 'text-emerald-400'
-                    : (tokenSentiment.external_score ?? 0) >= 40 ? 'text-yellow-400'
-                    : 'text-red-400'
-                  }`}>
-                    {tokenSentiment.external_score ?? '--'}/100
-                  </div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">{tokenSentiment.external_tweet_count} tweets</div>
-                </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Symbol</span>
+                <span className="font-medium">{tokenInfo?.symbol || address?.slice(0, 10)}</span>
               </div>
-
-              {/* Combined sentiment bar */}
-              <div className="p-3 rounded-lg bg-gray-800/50 border border-white/5 space-y-1.5">
-                <div className="flex items-center justify-between text-xs text-gray-400">
-                  <span>{totalTweets} tweets total</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-emerald-400">{posPct}% positive</span>
-                    <span className="text-red-400">{negPct}% negative</span>
-                    <span>{neutralPct}% neutral</span>
-                  </div>
-                </div>
-                <div className="h-2 rounded-full bg-gray-700 overflow-hidden flex">
-                  {totalTweets > 0 && (
-                    <>
-                      <div className="h-full bg-emerald-500 transition-all" style={{ width: `${posPct}%` }} />
-                      <div className="h-full bg-gray-500 transition-all" style={{ width: `${neutralPct}%` }} />
-                      <div className="h-full bg-red-500 transition-all" style={{ width: `${negPct}%` }} />
-                    </>
-                  )}
-                </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Name</span>
+                <span>{tokenInfo?.name || 'Unknown'}</span>
               </div>
-
-              {/* View full analysis button */}
-              {allArgs.length > 0 && (
-                <button
-                  onClick={() => setSentimentModalOpen(true)}
-                  className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#00D4FF] hover:text-white rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/5 hover:bg-[#00D4FF]/10 py-2.5 transition-colors"
-                >
-                  View full sentiment analysis ({posArgs.length} positive, {negArgs.length} negative arguments)
-                </button>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Canonical Status</span>
+                {isCanonical ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-emerald-400 font-bold">
+                    <CheckCircle className="h-3 w-3" /> Canonical
+                  </span>
+                ) : addressDiffers ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-red-400 font-bold">
+                    <XCircle className="h-3 w-3" /> Address differs
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                    Unlisted
+                  </span>
+                )}
+              </div>
+              {canonical && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Source</span>
+                  <span className="text-xs text-gray-500">{canonical.source}</span>
+                </div>
               )}
-            </>
+              {/* Warning banner for address mismatch */}
+              {addressDiffers && canonical && (
+                <div className="rounded-lg bg-red-500/5 border border-red-500/10 px-3 py-2 mt-1">
+                  <div className="text-xs text-red-300 font-bold mb-1">Impersonation Warning</div>
+                  <p className="text-[11px] text-red-300/80">
+                    This token uses the symbol "{tokenInfo?.symbol}" but its address does not match the canonical {canonical.name} ({canonical.address.slice(0, 10)}...{canonical.address.slice(-6)}).
+                    This could be a fork copy, a scam, or a different token. Verify the contract before interacting.
+                  </p>
+                  <Link to={`/token/${canonical.address}`} className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-[#00D4FF] hover:underline">
+                    <Shield className="h-3 w-3" /> View canonical {tokenInfo?.symbol}
+                  </Link>
+                </div>
+              )}
+            </div>
           )
         })()}
 
-        <p className="text-[10px] text-gray-600 text-center">
-          AI-analyzed Twitter mentions. Not investment advice.
-        </p>
+        {/* Token Address Comparison — dual check: canonical + known (from pools) */}
+        {uniquePoolTokens.length > 0 && (
+          <div className="pt-2 border-t border-white/5">
+            <div className="text-xs text-gray-400 mb-3 font-medium">Token Address Comparison (from pools)</div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-white/10 text-gray-500">
+                  <th className="py-1.5 text-left">Symbol</th>
+                  <th className="py-1.5 text-left">Address in Pools</th>
+                  <th className="py-1.5 text-center">Status</th>
+                  <th className="py-1.5 text-center">Safety</th>
+                </tr>
+              </thead>
+              <tbody>
+                {uniquePoolTokens.map((t, idx) => {
+                  // Canonical registry check (curated, reliable)
+                  const canonicalEntry = t.symbol ? CANONICAL_TOKENS[t.symbol.toUpperCase()] : undefined
+                  const isCanonicalMatch = canonicalEntry && t.address && canonicalEntry.address.toLowerCase() === t.address.toLowerCase()
+                  const isCanonicalMismatch = canonicalEntry && t.address && canonicalEntry.address.toLowerCase() !== t.address.toLowerCase()
+                  // Fallback: pulsechain_tokens check (auto-populated, less reliable)
+                  const knownTokens = t.symbol ? verifiedTokens[t.symbol] : undefined
+                  const matchesKnown = knownTokens?.some(v => v.address.toLowerCase() === t.address?.toLowerCase())
+                  return (
+                    <Fragment key={idx}>
+                      <tr className="border-b border-white/5">
+                        <td className="py-1.5 text-white font-medium">{t.symbol ?? '--'}</td>
+                        <td className="py-1.5 font-mono text-gray-300">
+                          {t.address ? (
+                            <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${t.address}`}
+                              target="_blank" rel="noopener noreferrer"
+                              className="hover:text-cyan-400 transition-colors"
+                            >
+                              {t.address.slice(0, 10)}...{t.address.slice(-8)}
+                            </a>
+                          ) : '--'}
+                        </td>
+                        <td className="py-1.5 text-center">
+                          {!t.address ? <span className="text-gray-600">--</span>
+                            : isCanonicalMatch ? <span className="text-emerald-400 font-bold">Canonical</span>
+                            : isCanonicalMismatch ? <span className="text-red-400 font-bold">Address differs</span>
+                            : matchesKnown ? <span className="text-cyan-400">Known</span>
+                            : <span className="text-gray-500">Unlisted</span>}
+                        </td>
+                        <td className="py-1.5 text-center">
+                          {t.address && (
+                            <Link to={`/token/${t.address}`}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#00D4FF]/10 border border-[#00D4FF]/20 text-[#00D4FF] hover:bg-[#00D4FF]/20 transition-colors"
+                              title={`Token Safety analysis for ${t.symbol}`}
+                            >
+                              <Shield className="h-3 w-3" />
+                              <span className="text-[10px] font-medium">Analyze</span>
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                      {/* Show canonical address if mismatch */}
+                      {isCanonicalMismatch && canonicalEntry && (
+                        <tr className="border-b border-white/5 bg-red-500/5">
+                          <td className="py-1 text-emerald-400/60 pl-4 text-[10px]">Canonical {t.symbol}</td>
+                          <td className="py-1 font-mono text-emerald-400/80">
+                            <a href={`https://scan.mypinata.cloud/ipfs/bafybeienxyoyrhn5tswclvd3gdjy5mtkkwmu37aqtml6onbf7xnb3o22pe/#/address/${canonicalEntry.address}`}
+                              target="_blank" rel="noopener noreferrer"
+                              className="hover:text-emerald-300 transition-colors"
+                            >
+                              {canonicalEntry.address.slice(0, 10)}...{canonicalEntry.address.slice(-8)}
+                            </a>
+                          </td>
+                          <td className="py-1 text-center text-emerald-400 font-bold">Canonical</td>
+                          <td className="py-1 text-center">
+                            <Link to={`/token/${canonicalEntry.address}`}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                              title={`Token Safety for canonical ${t.symbol}`}
+                            >
+                              <Shield className="h-3 w-3" />
+                              <span className="text-[10px] font-medium">Analyze</span>
+                            </Link>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+            <p className="text-[10px] text-gray-600 mt-2">
+              "Canonical" = verified address from curated registry ({Object.keys(CANONICAL_TOKENS).length} tokens).
+              "Known" = found in auto-populated database (not manually verified).
+              "Address differs" = same symbol but different contract than canonical — potential impersonation.
+              "Unlisted" = symbol not in either registry.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── Sentiment Analysis Modal ── */}
