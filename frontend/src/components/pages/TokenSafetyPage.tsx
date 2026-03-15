@@ -2357,7 +2357,7 @@ export function TokenSafetyPage() {
 
           {/* Preview: first 3 events */}
           <div className="relative pl-6 space-y-4">
-            <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gradient-to-b from-[#00D4FF]/30 via-[#8000E0]/20 to-transparent" />
+            <div className="absolute left-[5px] top-2 bottom-2 w-px bg-gradient-to-b from-[#00D4FF]/30 via-[#8000E0]/20 to-transparent" />
 
             {tokenIntel.social_timeline.slice(0, 3).map((event, i) => {
               const cat = INTEL_CATEGORY_STYLES[event.category] || INTEL_CATEGORY_STYLES.other
@@ -2438,7 +2438,7 @@ export function TokenSafetyPage() {
                 {/* Modal body: scrollable timeline */}
                 <div className="overflow-y-auto flex-1 px-6 py-5">
                   <div className="relative pl-6 space-y-4">
-                    <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gradient-to-b from-[#00D4FF]/30 via-[#8000E0]/20 to-transparent" />
+                    <div className="absolute left-[5px] top-2 bottom-2 w-px bg-gradient-to-b from-[#00D4FF]/30 via-[#8000E0]/20 to-transparent" />
 
                     {tokenIntel.social_timeline.map((event, i) => {
                       const cat = INTEL_CATEGORY_STYLES[event.category] || INTEL_CATEGORY_STYLES.other
